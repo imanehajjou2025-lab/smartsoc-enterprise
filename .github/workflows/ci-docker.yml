@@ -42,7 +42,7 @@ jobs:
 
       # Visibilite : rapport complet dans les logs, sans bloquer
       - name: Trivy scan (report)
-        uses: aquasecurity/trivy-action@0.33.1
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: smartsoc/backend:ci
           format: table
@@ -51,7 +51,7 @@ jobs:
 
       # Gate : les vulnerabilites CRITICAL corrigeables bloquent la PR
       - name: Trivy scan (gate on CRITICAL)
-        uses: aquasecurity/trivy-action@0.33.1
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: smartsoc/backend:ci
           format: sarif
