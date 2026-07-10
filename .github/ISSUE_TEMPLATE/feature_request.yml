@@ -1,0 +1,50 @@
+name: 🚀 Feature Request
+description: Proposer une nouvelle fonctionnalité ou une amélioration
+title: "[Feature]: "
+labels: ["enhancement", "triage"]
+body:
+  - type: dropdown
+    id: component
+    attributes:
+      label: Composant concerné
+      options:
+        - Backend (Spring Boot)
+        - Frontend (React)
+        - AI Service (FastAPI)
+        - Moteur SOAR
+        - Connecteurs SOC
+        - Base de données
+        - DevSecOps / CI
+        - Documentation
+        - Autre
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problème à résoudre
+      description: Quel besoin utilisateur ou limitation motive cette demande ?
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Solution proposée
+      description: Description de la fonctionnalité souhaitée.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives envisagées
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priorité estimée
+      options:
+        - Critique (bloque un jalon)
+        - Haute
+        - Moyenne
+        - Basse
+    validations:
+      required: true

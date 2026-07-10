@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 🔒 Signaler une vulnérabilité de sécurité
+    url: https://github.com/imanehajjou2025-lab/smartsoc-enterprise/security/advisories/new
+    about: Ne jamais signaler une vulnérabilité via une issue publique — utiliser le signalement privé.
+  - name: 💬 Question / Discussion
+    url: https://github.com/imanehajjou2025-lab/smartsoc-enterprise/discussions
+    about: Pour les questions générales, utiliser les Discussions plutôt qu'une issue.

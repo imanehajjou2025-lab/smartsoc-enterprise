@@ -1,0 +1,54 @@
+name: 🐛 Bug Report
+description: Signaler un dysfonctionnement de la plateforme SmartSOC
+title: "[Bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Merci de vérifier qu'une issue similaire n'existe pas déjà avant de soumettre.
+        ⚠️ **Vulnérabilité de sécurité ?** N'utilisez PAS ce formulaire — voir [SECURITY.md](../../SECURITY.md).
+  - type: dropdown
+    id: component
+    attributes:
+      label: Composant concerné
+      options:
+        - Backend (Spring Boot)
+        - Frontend (React)
+        - AI Service (FastAPI)
+        - Base de données / Migrations
+        - Moteur SOAR
+        - Connecteurs SOC
+        - Docker / Déploiement
+        - CI/CD
+        - Autre
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Description du bug
+      description: Comportement observé vs comportement attendu.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Étapes de reproduction
+      placeholder: |
+        1. Aller sur…
+        2. Cliquer sur…
+        3. Observer l'erreur…
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / captures d'écran
+      description: Logs pertinents (⚠️ masquer toute donnée sensible).
+      render: shell
+  - type: input
+    id: environment
+    attributes:
+      label: Environnement
+      placeholder: "ex: Windows 11, Docker Compose dev, branche develop @ abc1234"

@@ -1,0 +1,17 @@
+# Dependabot — surveillance automatique des dépendances.
+# Les écosystèmes maven (backend/), npm (frontend/) et pip (ai-service/)
+# seront ajoutés dans la PR qui crée leur manifeste respectif :
+# les configurer sur des répertoires vides provoque des runs en erreur.
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    labels:
+      - "dependencies"
+      - "ci"
+    commit-message:
+      prefix: "build"
+    open-pull-requests-limit: 5
