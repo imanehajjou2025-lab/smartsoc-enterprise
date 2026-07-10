@@ -32,3 +32,11 @@ updates:
       spring:
         patterns:
           - "org.springframework*"
+    ignore:
+      # Le projet est volontairement sur Spring Boot 3 (cahier des charges,
+      # ADR-002) : ne jamais proposer les majeures Spring / springdoc
+      # (springdoc 3.x cible Spring Boot 4).
+      - dependency-name: "org.springframework*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "org.springdoc:*"
+        update-types: ["version-update:semver-major"]
