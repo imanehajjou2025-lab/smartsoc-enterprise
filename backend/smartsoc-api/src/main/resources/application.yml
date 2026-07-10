@@ -48,3 +48,18 @@ springdoc:
     path: /api-docs
   swagger-ui:
     path: /swagger-ui.html
+
+smartsoc:
+  security:
+    jwt:
+      # Secret HMAC >= 256 bits, exclusivement via l'environnement.
+      # Le demarrage echoue si absent ou trop court (voir JwtConfig) ;
+      # seul le profil dev fournit un defaut.
+      secret: ${JWT_SECRET:}
+      issuer: smartsoc
+      access-token-ttl: ${JWT_ACCESS_TOKEN_EXPIRATION_MINUTES:15}m
+      refresh-token-ttl: ${JWT_REFRESH_TOKEN_EXPIRATION_DAYS:7}d
+    bootstrap-admin:
+      username: ${SMARTSOC_ADMIN_USERNAME:admin}
+      email: ${SMARTSOC_ADMIN_EMAIL:admin@smartsoc.local}
+      password: ${SMARTSOC_ADMIN_PASSWORD:}
