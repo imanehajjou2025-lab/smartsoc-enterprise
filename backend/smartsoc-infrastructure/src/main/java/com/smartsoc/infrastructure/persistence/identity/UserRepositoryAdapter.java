@@ -4,7 +4,10 @@ import com.smartsoc.domain.identity.User;
 import com.smartsoc.domain.identity.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -33,6 +36,11 @@ public class UserRepositoryAdapter implements UserRepository {
     }
 
     @Override
+    public List<User> findAll() {
+        return springDataRepository.findAll().stream().map(mapper::toDomain).toList();
+    }
+
+    @Override
     public boolean existsByUsername(String username) {
         return springDataRepository.existsByUsernameIgnoreCase(username);
     }
@@ -40,5 +48,11 @@ public class UserRepositoryAdapter implements UserRepository {
     @Override
     public boolean existsByEmail(String email) {
         return springDataRepository.existsByEmailIgnoreCase(email);
+    }
+
+    @Override
+    @Transactional
+    public void deleteById(UUID id) {
+        springDataRepository.softDeleteById(id, Instant.now());
     }
 }
