@@ -3,7 +3,9 @@ package com.smartsoc.api.common.error;
 import com.smartsoc.domain.common.BusinessRuleViolationException;
 import com.smartsoc.domain.common.DomainException;
 import com.smartsoc.domain.common.ResourceNotFoundException;
+import com.smartsoc.domain.identity.InvalidRefreshTokenException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -38,6 +40,23 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(ResourceNotFoundException.class)
     public ProblemDetail handleResourceNotFound(ResourceNotFoundException ex) {
         return problemOf(HttpStatus.NOT_FOUND, "Resource not found", ex);
+    }
+
+    @ExceptionHandler(InvalidRefreshTokenException.class)
+    public ProblemDetail handleInvalidRefreshToken(InvalidRefreshTokenException ex) {
+        return problemOf(HttpStatus.UNAUTHORIZED, "Invalid refresh token", ex);
+    }
+
+    /** Bad credentials, disabled account… — always the same opaque 401. */
+    @ExceptionHandler(AuthenticationException.class)
+    public ProblemDetail handleAuthenticationFailure(AuthenticationException ex) {
+        log.debug("Authentication failure: {}", ex.getMessage());
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.UNAUTHORIZED, "Invalid username or password");
+        problem.setTitle("Authentication failed");
+        problem.setProperty(PROPERTY_CODE, "AUTHENTICATION_FAILED");
+        problem.setProperty(PROPERTY_TIMESTAMP, Instant.now());
+        return problem;
     }
 
     @ExceptionHandler(BusinessRuleViolationException.class)

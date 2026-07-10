@@ -8,6 +8,15 @@ logging:
     com.smartsoc: DEBUG
     org.springframework.web: INFO
 
+smartsoc:
+  security:
+    jwt:
+      # Defauts DEV UNIQUEMENT (jamais repris en docker/prod) pour que
+      # l'application demarre sans configuration prealable.
+      secret: ${JWT_SECRET:dev-only-jwt-secret-do-not-use-in-production-0123456789}
+    bootstrap-admin:
+      password: ${SMARTSOC_ADMIN_PASSWORD:DevOnly-Admin-ChangeMe}
+
 management:
   endpoints:
     web:
