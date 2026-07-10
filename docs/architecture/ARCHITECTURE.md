@@ -142,3 +142,4 @@ ai-service/
 | [ADR-002](adr/ADR-002-clean-architecture-ddd.md) | Clean Architecture + DDD pour le backend | ✅ Accepté |
 | [ADR-003](adr/ADR-003-ai-microservice.md) | Microservice IA indépendant (FastAPI) | ✅ Accepté |
 | [ADR-004](adr/ADR-004-postgresql-source-of-truth.md) | PostgreSQL, source de vérité unique de la plateforme | ✅ Accepté |
+| [ADR-005](adr/ADR-005-standalone-platform-integration-contracts.md) | Plateforme autonome, intégrations externes par contrats | ✅ Accepté |
