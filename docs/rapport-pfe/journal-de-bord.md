@@ -219,6 +219,37 @@ vulnérable), Gitleaks a validé l'ensemble.
 
 ---
 
-*Prochaines entrées : F2 layout MUI, F3 authentification frontend,
-F4 module Admin, F5 Docker/nginx, puis connecteurs SOC, moteur SOAR,
-contrats IA, déploiement Azure.*
+## 2026-07-10 — J1 : Frontend F2 — thème sombre et layout de la console (PR #21)
+
+**Réalisé.** Thème MUI sombre inspiré des consoles SOC modernes (fond
+bleu-nuit, accent bleu, palette de **sévérités centralisée**
+critical/high/medium/low/info exportée pour tous les futurs modules) ;
+layout applicatif : topbar fixe, sidebar permanente organisée en 4 sections
+(Supervision, Intelligence, Réponse, Plateforme) avec surlignage du module
+actif ; routing React Router — 13 routes correspondant aux modules du
+cahier des charges, chacune sur un stub titré indiquant son jalon ;
+polices Roboto auto-hébergées (`@fontsource`) — aucune dépendance CDN.
+
+**Choix.**
+- La carte de navigation (`navigation.ts`) est le miroir des bounded
+  contexts backend : même vocabulaire du domaine à l'API et à l'UI.
+- Les chemins d'URL sont définitifs dès maintenant ; seuls les contenus
+  des pages changeront — les liens et captures du rapport resteront valides.
+
+**Difficultés.**
+1. MUI 7 a supprimé la prop `paragraph` de `Typography` (breaking change
+   silencieux vs les exemples de la documentation courante) — corrigé.
+2. Testing Library : sans `globals: true` côté Vitest, le **cleanup
+   automatique entre tests ne s'exécute pas** — le second test voyait le DOM
+   du premier (« Found multiple elements »). Correctif : `cleanup()` explicite
+   dans le setup de test, commenté pour les futurs contributeurs.
+
+**Vérification.** Tests (2/2), lint, build OK ; rendu vérifié visuellement
+dans le navigateur (thème, sections, surlignage actif, redirection
+`/` → `/dashboard`).
+
+---
+
+*Prochaines entrées : F3 authentification frontend, F4 module Admin,
+F5 Docker/nginx, puis connecteurs SOC, moteur SOAR, contrats IA,
+déploiement Azure.*
