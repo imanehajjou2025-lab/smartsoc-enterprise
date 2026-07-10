@@ -250,6 +250,38 @@ dans le navigateur (thème, sections, surlignage actif, redirection
 
 ---
 
-*Prochaines entrées : F3 authentification frontend, F4 module Admin,
-F5 Docker/nginx, puis connecteurs SOC, moteur SOAR, contrats IA,
-déploiement Azure.*
+## 2026-07-11 — J2 : Frontend F3 — authentification complète (PR #22)
+
+**Réalisé.** Flux d'authentification client branché sur l'API réelle :
+page de login (erreurs RFC 9457 affichées) ; client axios unique avec
+intercepteurs — injection du Bearer, **refresh silencieux sur 401 en
+« single-flight »** (dix requêtes simultanées en 401 ⇒ un seul appel
+refresh, indispensable avec la rotation des tokens) ; restauration de
+session au chargement (`bootstrapSession`) ; guards `RequireAuth` (loader
+pendant la restauration, redirection login avec retour à la destination) et
+`RequireRole` (RBAC, page 403) ; menu utilisateur (rôle affiché,
+déconnexion) ; état de session en Redux Toolkit.
+
+**Choix de sécurité documenté.** Access token **en mémoire uniquement**
+(jamais dans le storage, expire en 15 min) ; refresh token en localStorage
+pour survivre au rechargement — risque XSS assumé et mitigé côté backend
+par la rotation + détection de réutilisation qui révoque la famille
+(PR #14). Compromis standard des SPA sans cookie httpOnly.
+
+**Vérification de bout en bout dans le navigateur, contre le backend
+Docker réel** : login admin → dashboard ; rechargement complet → session
+restaurée par le refresh silencieux ; route ADMIN accessible ; menu
+utilisateur ; déconnexion (purge du token vérifiée dans localStorage) ;
+accès anonyme redirigé vers login ; mauvais mot de passe → « Invalid
+username or password » (le 401 opaque du backend, sans oracle).
+
+**Difficulté.** Pendant la vérification, erreur « could not find
+react-redux context value » : artefact de HMR (le module router rechargé
+sans réexécuter `main.tsx` qui monte le Provider). Un rechargement complet
+la dissipe — aucun défaut de code ; noté pour ne pas confondre artefact de
+dev et vrai bug.
+
+---
+
+*Prochaines entrées : F4 module Admin, F5 Docker/nginx, puis connecteurs
+SOC, moteur SOAR, contrats IA, déploiement Azure.*
