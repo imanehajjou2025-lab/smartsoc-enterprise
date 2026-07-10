@@ -1,0 +1,63 @@
+name: SonarCloud
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - "backend/**"
+      - ".github/workflows/ci-sonarcloud.yml"
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - "backend/**"
+      - ".github/workflows/ci-sonarcloud.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  analyze:
+    name: Quality analysis (backend)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    steps:
+      # Le job saute proprement tant que l'onboarding SonarCloud n'est
+      # pas fait (secret SONAR_TOKEN absent) : la CI reste verte.
+      - name: Check SonarCloud onboarding
+        if: env.SONAR_TOKEN == ''
+        run: echo "::notice::SONAR_TOKEN absent - analyse SonarCloud sautee. Voir docs/devsecops/sonarcloud-setup.md"
+
+      - name: Checkout (full history for blame data)
+        if: env.SONAR_TOKEN != ''
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 21
+        if: env.SONAR_TOKEN != ''
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Cache SonarCloud packages
+        if: env.SONAR_TOKEN != ''
+        uses: actions/cache@v4
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+
+      - name: Build, test and analyze
+        if: env.SONAR_TOKEN != ''
+        working-directory: backend
+        run: >
+          ./mvnw -B -ntp verify
+          org.sonarsource.scanner.maven:sonar-maven-plugin:sonar
+          -Dsonar.host.url=https://sonarcloud.io
+          -Dsonar.organization=imanehajjou2025-lab
+          -Dsonar.projectKey=imanehajjou2025-lab_smartsoc-enterprise

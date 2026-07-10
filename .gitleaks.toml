@@ -1,0 +1,13 @@
+# Configuration Gitleaks : regles par defaut + allowlist ciblee.
+# Seuls les fichiers de defauts de developpement explicitement marques
+# "dev only" sont exclus ; tout le reste du depot est scanne.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Modeles et defauts de developpement documentes (jamais utilises en production)"
+paths = [
+    '''\.env\.example$''',
+    '''src/main/resources/application-dev\.yml$''',
+]

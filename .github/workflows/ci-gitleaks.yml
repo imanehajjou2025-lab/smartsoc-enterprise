@@ -1,0 +1,33 @@
+name: Gitleaks
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+  schedule:
+    # Scan hebdomadaire complet : attrape aussi les regles Gitleaks
+    # ajoutees apres coup sur l'historique existant.
+    - cron: "0 6 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    name: Secret detection (full history)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout (full history)
+        uses: actions/checkout@v7
+        with:
+          # Indispensable : Gitleaks scanne TOUT l'historique, pas
+          # seulement le dernier commit.
+          fetch-depth: 0
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
