@@ -27,6 +27,10 @@ public class SecurityConfig {
     private final ApiSecurityProblemSupport problemSupport;
 
     @Bean
+    // S4502 (CSRF disabled): false positive, same finding already dismissed
+    // in CodeQL — stateless bearer-token API, no session cookie, hence no
+    // CSRF surface (OWASP CSRF Prevention Cheat Sheet).
+    @SuppressWarnings("java:S4502")
     SecurityFilterChain securityFilterChain(HttpSecurity http,
                                             Converter<Jwt, AbstractAuthenticationToken> jwtConverter)
             throws Exception {
