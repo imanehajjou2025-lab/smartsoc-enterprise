@@ -5,6 +5,7 @@ import com.smartsoc.domain.common.DomainException;
 import com.smartsoc.domain.common.ResourceNotFoundException;
 import com.smartsoc.domain.identity.InvalidRefreshTokenException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -45,6 +46,21 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(InvalidRefreshTokenException.class)
     public ProblemDetail handleInvalidRefreshToken(InvalidRefreshTokenException ex) {
         return problemOf(HttpStatus.UNAUTHORIZED, "Invalid refresh token", ex);
+    }
+
+    /**
+     * Method-security denials (@PreAuthorize) surface inside the controller
+     * call, so they reach this advice instead of the filter-chain handler —
+     * without this mapping the generic handler would turn them into 500s.
+     */
+    @ExceptionHandler(AccessDeniedException.class)
+    public ProblemDetail handleAccessDenied(AccessDeniedException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.FORBIDDEN, "You do not have permission to access this resource");
+        problem.setTitle("Access denied");
+        problem.setProperty(PROPERTY_CODE, "ACCESS_DENIED");
+        problem.setProperty(PROPERTY_TIMESTAMP, Instant.now());
+        return problem;
     }
 
     /** Bad credentials, disabled account… — always the same opaque 401. */
