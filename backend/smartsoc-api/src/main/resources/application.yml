@@ -1,0 +1,34 @@
+# ============================================================
+# SmartSOC Backend - configuration commune (tous profils)
+# Les secrets viennent EXCLUSIVEMENT de variables d'environnement.
+# ============================================================
+spring:
+  application:
+    name: smartsoc-backend
+  profiles:
+    default: dev
+
+server:
+  port: ${BACKEND_PORT:8080}
+  shutdown: graceful
+  error:
+    # Ne jamais fuiter la stacktrace : la gestion d'erreurs RFC 9457
+    # fournira des reponses normalisees.
+    include-stacktrace: never
+    include-message: never
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html

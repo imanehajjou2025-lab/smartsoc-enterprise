@@ -1,0 +1,15 @@
+# ============================================================
+# Profil DEV - poste de developpement local (Windows)
+# PostgreSQL sur localhost ; la datasource sera ajoutee avec la
+# premiere migration Flyway (PR identity).
+# ============================================================
+logging:
+  level:
+    com.smartsoc: DEBUG
+    org.springframework.web: INFO
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics, env, loggers

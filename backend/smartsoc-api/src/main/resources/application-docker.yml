@@ -1,0 +1,13 @@
+# ============================================================
+# Profil DOCKER - execution dans Docker Compose
+# Les hotes pointent vers les noms de services du compose.
+# ============================================================
+logging:
+  level:
+    com.smartsoc: INFO
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics, prometheus
