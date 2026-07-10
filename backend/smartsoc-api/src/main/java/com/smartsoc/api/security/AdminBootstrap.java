@@ -10,13 +10,11 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
-import java.util.UUID;
-
 /**
  * Creates the initial administrator account on first start, so the platform
- * is usable out of the box without manual SQL. The password comes from
- * SMARTSOC_ADMIN_PASSWORD; if unset, a random one is generated and logged
- * ONCE — it must be changed at first login.
+ * is usable out of the box without manual SQL. The password MUST be provided
+ * via SMARTSOC_ADMIN_PASSWORD (a dev-only default exists in the dev profile):
+ * startup fails fast otherwise — a secret must never transit through logs.
  */
 @Slf4j
 @Component
@@ -34,9 +32,10 @@ public class AdminBootstrap implements ApplicationRunner {
         }
 
         String password = properties.password();
-        boolean generated = password == null || password.isBlank();
-        if (generated) {
-            password = UUID.randomUUID().toString();
+        if (password == null || password.isBlank()) {
+            throw new IllegalStateException(
+                    "No administrator account exists and SMARTSOC_ADMIN_PASSWORD is not set. "
+                            + "Set it (see .env.example) and restart.");
         }
 
         User admin = User.create(
@@ -47,13 +46,7 @@ public class AdminBootstrap implements ApplicationRunner {
                 Role.ADMIN);
         userRepository.save(admin);
 
-        if (generated) {
-            log.warn("""
-                    Bootstrap administrator '{}' created with a GENERATED password: {}
-                    Set SMARTSOC_ADMIN_PASSWORD to control it, and change it at first login.""",
-                    properties.username(), password);
-        } else {
-            log.info("Bootstrap administrator '{}' created.", properties.username());
-        }
+        log.info("Bootstrap administrator '{}' created. Change the password at first login.",
+                properties.username());
     }
 }

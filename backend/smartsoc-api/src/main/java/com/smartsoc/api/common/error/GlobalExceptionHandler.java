@@ -50,6 +50,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     /** Bad credentials, disabled account… — always the same opaque 401. */
     @ExceptionHandler(AuthenticationException.class)
     public ProblemDetail handleAuthenticationFailure(AuthenticationException ex) {
+        log.debug("Authentication failure: {}", ex.getMessage());
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                 HttpStatus.UNAUTHORIZED, "Invalid username or password");
         problem.setTitle("Authentication failed");
