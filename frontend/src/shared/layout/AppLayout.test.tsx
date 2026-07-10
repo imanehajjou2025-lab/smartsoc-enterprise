@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { ThemeProvider } from '@mui/material/styles';
+import { Provider } from 'react-redux';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import AppLayout from './AppLayout';
 import { navigation } from './navigation';
 import { theme } from '../../app/theme';
+import { store } from '../../app/store';
 
 function renderLayout() {
   const router = createMemoryRouter(
@@ -12,9 +14,11 @@ function renderLayout() {
     { initialEntries: ['/'] },
   );
   return render(
-    <ThemeProvider theme={theme}>
-      <RouterProvider router={router} />
-    </ThemeProvider>,
+    <Provider store={store}>
+      <ThemeProvider theme={theme}>
+        <RouterProvider router={router} />
+      </ThemeProvider>
+    </Provider>,
   );
 }
 

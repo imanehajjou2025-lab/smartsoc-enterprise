@@ -1,6 +1,5 @@
 import AppBar from '@mui/material/AppBar';
 import Box from '@mui/material/Box';
-import Chip from '@mui/material/Chip';
 import Drawer from '@mui/material/Drawer';
 import List from '@mui/material/List';
 import ListItemButton from '@mui/material/ListItemButton';
@@ -11,6 +10,7 @@ import ShieldIcon from '@mui/icons-material/Shield';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import UserMenu from '../../features/auth/UserMenu';
 import { navigation } from './navigation';
 
 const DRAWER_WIDTH = 248;
@@ -34,7 +34,7 @@ function AppLayout() {
               Enterprise
             </Box>
           </Typography>
-          <Chip label="Non connecté" size="small" variant="outlined" />
+          <UserMenu />
         </Toolbar>
       </AppBar>
 
