@@ -1,0 +1,10 @@
+# CODEOWNERS — les propriétaires sont automatiquement demandés en revue
+# sur toute PR touchant leurs fichiers.
+# Les coéquipiers seront ajoutés ici une fois collaborateurs du dépôt.
+
+# Par défaut : tout le dépôt
+* @imanehajjou2025-lab
+
+# Zones critiques (revue obligatoire du propriétaire)
+/.github/ @imanehajjou2025-lab
+/docs/architecture/ @imanehajjou2025-lab
