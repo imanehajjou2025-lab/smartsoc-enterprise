@@ -1,0 +1,224 @@
+# Journal de bord — SmartSOC Enterprise
+
+> Une entrée par jalon significatif, rédigée au moment des faits.
+> Chaque affirmation est traçable : PR, commit ou ADR référencé.
+
+---
+
+## 2026-07-10 — J1 : Initialisation du dépôt et gouvernance (PR #1, #2)
+
+**Réalisé.** Dépôt GitHub public `smartsoc-enterprise` créé et lié au dossier
+local ; arborescence monorepo (backend, frontend, ai-service, database,
+docker, docs, monitoring…) ; fichiers de gouvernance (README, LICENSE MIT,
+CONTRIBUTING avec Git Flow + Conventional Commits, SECURITY, CODE_OF_CONDUCT) ;
+hygiène Git (.gitignore multi-stack, .gitattributes forçant LF, .editorconfig).
+Git Flow opérationnel : `main` (stable), `develop` (défaut), branches
+`feature/*` mergées par PR. Templates de PR/issues, Dependabot, CODEOWNERS.
+
+**Choix techniques.**
+- *Dépôt public* : minutes GitHub Actions illimitées, CodeQL et SonarCloud
+  gratuits — indispensable pour la chaîne DevSecOps complète visée.
+- *Monorepo* (ADR-001) : une fonctionnalité traverse souvent les 3 services ;
+  PRs atomiques, un seul Compose, CI filtrée par chemins.
+- Adresse noreply GitHub configurée pour l'attribution des commits.
+
+**Difficulté rencontrée.** Dependabot a signalé des labels inexistants
+(`ci`, `dependencies`) référencés par sa configuration : GitHub ne les crée
+pas automatiquement. **Solution :** stratégie complète de 24 labels créée
+par script via l'API GitHub (priorités, types, zones `area:*`, statuts).
+
+---
+
+## 2026-07-10 — J1 : Architecture fondatrice (PR #1 docs)
+
+**Réalisé.** `ARCHITECTURE.md` en modèle C4 (contexte, conteneurs,
+composants) + 4 ADR : monorepo (001), Clean Architecture + DDD en 4 modules
+Maven (002), microservice IA indépendant derrière un contrat REST (003),
+PostgreSQL source de vérité unique avec Flyway (004).
+
+**Décisions structurantes** (justifications complètes dans les ADR) :
+- Le frontend ne parle qu'au backend ; le backend est le seul écrivain en
+  base ; temps réel par WebSocket, jamais de polling.
+- 8 bounded contexts DDD : alerts, incidents, assets, intelligence, soar,
+  connectors, identity, reporting.
+- Frontière stricte : la plateforme *consomme* les outils SOC via des
+  connecteurs, ne les déploie jamais.
+
+---
+
+## 2026-07-10 — J1 : Triage Dependabot — le piège Spring Boot 4 (PR #5–#11)
+
+**Difficulté.** Dès l'activation de Dependabot sur Maven, 5 PRs ouvertes dont
+deux **majeures dangereuses** : Spring Boot 3.5.16 → 4.1.0 et springdoc 2.x
+→ 3.x (qui cible Spring Boot 4). Les accepter aurait cassé la stack imposée
+par le cahier des charges.
+
+**Solution.** Fermeture motivée des deux majeures ; bumps sûrs (ArchUnit,
+JaCoCo) appliqués manuellement dans une PR unique car ils modifiaient le
+même `pom.xml` et se seraient mutuellement invalidés ; règles `ignore`
+ajoutées à la config Dependabot pour les majeures `org.springframework*` et
+`org.springdoc:*`. **Leçon :** l'automatisation des dépendances exige un
+garde-fou humain et une configuration explicite de la politique de versions.
+
+---
+
+## 2026-07-10 — J1 : Squelette backend multi-module (PR #4)
+
+**Réalisé.** POM parent + 4 modules Maven (`domain`, `application`,
+`infrastructure`, `api`) conformes ADR-002 ; Java 21, Spring Boot 3.5 ;
+Maven Wrapper ; profils `dev`/`docker`/`prod` ; Actuator ; CI backend
+(build + tests + JaCoCo) filtrée sur `backend/**` ; CodeQL activé à ce
+moment précis (l'activer avant aurait échoué : aucun code à analyser).
+
+**Choix.** Sens des dépendances `api → application → domain ← infrastructure`,
+domaine 100 % sans framework — décision qui sera *verrouillée par machine*
+au jalon suivant.
+
+---
+
+## 2026-07-10 — J1 : Socle transverse — erreurs RFC 9457 et ArchUnit (PR #10)
+
+**Réalisé.** Hiérarchie d'exceptions métier pure Java (codes stables
+machine-readable) ; `GlobalExceptionHandler` traduisant toute erreur en
+RFC 9457 Problem Details (validation → champs structurés ; erreur interne →
+500 opaque loggé côté serveur, jamais fuité) ; **test ArchUnit** qui fait
+échouer la CI si une dépendance framework entre dans le domaine ou si le
+sens des couches est violé.
+
+**Choix.** L'ADR-002 cesse d'être une promesse documentaire : c'est une
+contrainte exécutée à chaque build.
+
+---
+
+## 2026-07-10 — J1 : Contexte identity — domaine et persistance (PR #13)
+
+**Réalisé.** Entité riche `User` (invariants imposés, normalisation
+username/email, jamais de mot de passe en clair dans le domaine), enum RBAC
+4 rôles, port `UserRepository` ; introduction JPA/Flyway ; migration
+`V1__identity.sql` établissant les conventions ADR-004 (UUID, colonnes
+d'audit, soft delete, index uniques partiels insensibles à la casse) ;
+entité JPA séparée du domaine + MapStruct ; **Testcontainers** : le test de
+contexte démarre un vrai PostgreSQL 18 éphémère, applique Flyway et fait
+valider le mapping par Hibernate (`ddl-auto: validate`).
+
+**Choix débattu.** Testcontainers plutôt que H2 : H2 « ment » (pas de JSONB,
+comportements différents) ; des tests verts sur H2 peuvent casser en
+production. Coût accepté : ~40 s de test en plus, Docker requis.
+
+**Difficultés.**
+1. Premier run : échec réseau du pull de l'image Testcontainers (TLS
+   handshake timeout, Docker Desktop venait de démarrer). Solution : pré-pull
+   manuel des images.
+2. La validation Hibernate a immédiatement payé : `CHAR(64)` en SQL vs
+   `VARCHAR(64)` attendu par l'entité — divergence attrapée avant tout merge.
+
+---
+
+## 2026-07-10 — J1 : Authentification JWT avec rotation (PR #14)
+
+**Réalisé.** Spring Security stateless ; access token JWT HS256 15 min
+(secret ≥ 256 bits exigé au démarrage, échec sinon) ; refresh token opaque
+384 bits CSPRNG dont **seul le hash SHA-256 est stocké** ; **rotation avec
+détection de vol** (familles de tokens : rejouer un token consommé révoque
+toute la famille — OWASP) ; endpoints login/refresh/logout/me ; 401/403 de
+la filter chain au format RFC 9457 ; auditeur JPA = principal authentifié ;
+compte admin bootstrap au premier démarrage.
+
+**Bug réel n°1 attrapé par les tests d'intégration.** La détection de
+réutilisation révoquait la famille *puis* levait l'exception 401… dont le
+rollback transactionnel **annulait la révocation** — la session volée
+restait vivante. Correctif : `@Transactional(noRollbackFor =
+InvalidRefreshTokenException.class)`, commenté dans le code.
+
+**Épisode DevSecOps (CodeQL).** 3 alertes sur la PR : (1) mot de passe
+généré loggé → design changé, `SMARTSOC_ADMIN_PASSWORD` obligatoire avec
+échec au démarrage, défaut marqué dev uniquement ; (2) paramètre inutilisé →
+corrigé ; (3) CSRF désactivé → **faux positif documenté et rejeté avec
+justification auditée** (API stateless à bearer token, aucune surface CSRF).
+
+---
+
+## 2026-07-10 — J1 : Gestion des utilisateurs et OpenAPI (PR #15)
+
+**Réalisé.** Premier use case du module `application`
+(`UserManagementService`) : CRUD complet avec unicité, PATCH sémantique,
+soft delete ; règle de sécurité : désactiver/supprimer un utilisateur
+révoque immédiatement toutes ses sessions ; port `PasswordHasher` ;
+endpoints `/api/v1/users` réservés ADMIN (`@PreAuthorize`) ; politique de
+mot de passe 12–128 caractères ; springdoc/Swagger avec flux bearer câblé.
+
+**Bug réel n°2.** Le refus RBAC (`AccessDeniedException` levée *dans* le
+contrôleur par method security) était avalé par le handler générique →
+**500 au lieu de 403**. Correctif : mapping explicite vers un problème
+RFC 9457 403, cohérent avec la filter chain. Attrapé par le test
+d'intégration « un analyste reçoit 403 ».
+
+---
+
+## 2026-07-10 — J1 : Conteneurisation Docker Compose (PR #16)
+
+**Réalisé.** Dockerfile backend multi-stage (cache des dépendances Maven,
+runtime JRE 21 Alpine, utilisateur non-root, healthcheck actuator) ;
+`docker-compose.yml` PostgreSQL 18 + backend, secrets obligatoires
+(`:?err`), démarrage ordonné par healthchecks ; workflow CI Docker : build
+buildx avec cache GHA + **Trivy** (rapport MEDIUM+, gate bloquante sur les
+CRITICAL corrigeables, SARIF dans l'onglet Security). **ADR-005** : la
+séparation plateforme / SOC / IA est confirmée par l'équipe — les deux
+modules IA sont développés hors dépôt, la plateforme livre les contrats.
+
+**Vérification réelle.** Stack démarrée localement : 2 conteneurs healthy,
+login admin → tokens, `/auth/me` → ADMIN, Swagger 200. Scan : 0 CRITICAL.
+
+**Difficultés.**
+1. Tag d'action inexistant (`trivy-action@0.33.1` au lieu de `v0.33.1`).
+2. Piège documenté du format SARIF : le filtre `severity` y est ignoré par
+   défaut → la gate bloquait malgré 0 CRITICAL. Correctif :
+   `limit-severities-for-sarif: true`.
+
+---
+
+## 2026-07-10 — J1 : Chaîne DevSecOps complète (PR #17, #18)
+
+**Réalisé.** **Gitleaks** (historique complet + scan hebdomadaire,
+allowlist minimale limitée aux défauts dev documentés) — historique vérifié
+100 % propre ; **SonarCloud** (workflow Maven+JaCoCo qui saute proprement
+tant que `SONAR_TOKEN` absent, guide d'onboarding rédigé) ;
+**dependency-review** (bloque l'introduction de dépendances vulnérables
+high+) ; **push protection GitHub** activée par API.
+
+**Choix.** SonarCloud plutôt que SonarQube auto-hébergé (même moteur,
+gratuit en public, ~2 Go de RAM économisés sur la future VM Azure). OWASP
+Dependency Check **différé** : triple doublon avec Trivy + Dependabot +
+dependency-review, et il ralentirait chaque build (sync NVD).
+
+**Difficulté.** dependency-review échouait : le *dependency graph* GitHub
+n'était pas activé sur le dépôt. Activé par API avec les alertes Dependabot.
+
+**Premières métriques SonarCloud (après onboarding)** : couverture
+**70,5 %**, 0 bug, 0 duplication, 2 code smells mineurs, 1 « vulnérabilité »
+= le même faux positif CSRF que CodeQL (S4502), traité par suppression
+**dans le code** avec justification versionnée (PR #18).
+
+---
+
+## 2026-07-10 — J1 : Frontend F1 — squelette Vite/React (PR #19)
+
+**Réalisé.** Scaffold Vite 8 + React 19 + TypeScript 6 ; Prettier ; Vitest +
+Testing Library (premier smoke test) ; proxy dev `/api` → backend (le
+frontend ne connaît jamais l'URL du backend, même topologie qu'en
+production) ; CI frontend (format, lint, tests + couverture, build,
+artefact) filtrée sur `frontend/**`.
+
+**Choix.** **Oxlint conservé** au lieu d'ESLint : c'est désormais le linter
+par défaut du template Vite (Rust, ~50× plus rapide, règles react-hooks
+incluses) ; ESLint reste possible si un plugin spécifique manque un jour.
+
+**Observation.** La chaîne DevSecOps a immédiatement servi :
+dependency-review a scanné les ~400 nouveaux paquets npm de la PR (aucun
+vulnérable), Gitleaks a validé l'ensemble.
+
+---
+
+*Prochaines entrées : F2 layout MUI, F3 authentification frontend,
+F4 module Admin, F5 Docker/nginx, puis connecteurs SOC, moteur SOAR,
+contrats IA, déploiement Azure.*
