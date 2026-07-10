@@ -1,0 +1,71 @@
+name: Docker Build & Scan
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - "backend/**"
+      - "docker-compose.yml"
+      - ".github/workflows/ci-docker.yml"
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - "backend/**"
+      - "docker-compose.yml"
+      - ".github/workflows/ci-docker.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  build-and-scan:
+    name: Build image & Trivy scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          load: true
+          tags: smartsoc/backend:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Visibilite : rapport complet dans les logs, sans bloquer
+      - name: Trivy scan (report)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: smartsoc/backend:ci
+          format: table
+          severity: CRITICAL,HIGH,MEDIUM
+          exit-code: "0"
+
+      # Gate : les vulnerabilites CRITICAL corrigeables bloquent la PR
+      - name: Trivy scan (gate on CRITICAL)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: smartsoc/backend:ci
+          format: sarif
+          output: trivy-results.sarif
+          severity: CRITICAL
+          # Sans ceci, le format SARIF ignore le filtre severity et la
+          # gate se declencherait sur n'importe quelle vulnerabilite.
+          limit-severities-for-sarif: true
+          ignore-unfixed: true
+          exit-code: "1"
+
+      - name: Upload Trivy results to GitHub Security
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: trivy-results.sarif
+          category: trivy-backend-image

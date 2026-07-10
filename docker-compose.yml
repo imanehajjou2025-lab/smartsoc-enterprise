@@ -1,0 +1,65 @@
+# ============================================================
+# SmartSOC Enterprise - environnement Docker Compose
+# Contient UNIQUEMENT les services de la plateforme (ADR-005) :
+# jamais les outils SOC ni les services IA, qui sont externes
+# et integres par configuration.
+#
+# Usage : cp .env.example .env  (puis renseigner les valeurs)
+#         docker compose up -d --build
+# ============================================================
+name: smartsoc
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    container_name: smartsoc-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-smartsoc}
+      POSTGRES_USER: ${POSTGRES_USER:-smartsoc}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-smartsoc} -d ${POSTGRES_DB:-smartsoc}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - smartsoc-net
+
+  backend:
+    build:
+      context: ./backend
+    image: smartsoc/backend:local
+    container_name: smartsoc-backend
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: ${POSTGRES_DB:-smartsoc}
+      POSTGRES_USER: ${POSTGRES_USER:-smartsoc}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in .env (at least 32 characters)}
+      SMARTSOC_ADMIN_USERNAME: ${SMARTSOC_ADMIN_USERNAME:-admin}
+      SMARTSOC_ADMIN_EMAIL: ${SMARTSOC_ADMIN_EMAIL:-admin@smartsoc.local}
+      SMARTSOC_ADMIN_PASSWORD: ${SMARTSOC_ADMIN_PASSWORD:?SMARTSOC_ADMIN_PASSWORD must be set in .env}
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - smartsoc-net
+
+volumes:
+  postgres-data:
+    name: smartsoc-postgres-data
+
+networks:
+  smartsoc-net:
+    name: smartsoc-net
+    driver: bridge

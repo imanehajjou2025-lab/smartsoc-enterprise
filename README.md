@@ -55,13 +55,27 @@ SmartSOC Enterprise centralise les composants essentiels d'un écosystème de cy
 
 ## 🚀 Démarrage rapide
 
-> ⚠️ Le projet est en cours de construction. Les instructions de démarrage seront complétées au fur et à mesure des jalons.
-
 ```bash
 git clone https://github.com/imanehajjou2025-lab/smartsoc-enterprise.git
 cd smartsoc-enterprise
-# docker compose up -d   (disponible prochainement)
+
+# 1. Configurer l'environnement (obligatoire)
+cp .env.example .env
+#    Editer .env : POSTGRES_PASSWORD, JWT_SECRET (>= 32 caracteres,
+#    ex. `openssl rand -base64 48`) et SMARTSOC_ADMIN_PASSWORD
+
+# 2. Demarrer la plateforme
+docker compose up -d --build
+
+# 3. Verifier
+#    Sante    : http://localhost:8080/actuator/health
+#    Swagger  : http://localhost:8080/swagger-ui.html
+#    Login    : POST /api/v1/auth/login  { "username": "admin", "password": "<SMARTSOC_ADMIN_PASSWORD>" }
 ```
+
+> ℹ️ Conformément à l'[ADR-005](docs/architecture/adr/ADR-005-standalone-platform-integration-contracts.md),
+> ce Compose ne contient **que** la plateforme (PostgreSQL + backend, bientôt frontend).
+> Les outils SOC et les services IA sont externes et branchés par configuration.
 
 ### Prérequis
 
