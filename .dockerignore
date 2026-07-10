@@ -1,0 +1,27 @@
+# SmartSOC Enterprise - .dockerignore global
+# (chaque service aura aussi le sien, plus spécifique)
+
+.git
+.github
+.idea
+.vscode
+docs
+tests
+*.md
+!README.md
+
+# Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Artefacts de build locaux
+**/target
+**/node_modules
+**/dist
+**/__pycache__
+**/.venv
+**/venv
+**/*.log

@@ -1,0 +1,36 @@
+# ======================================
+# SmartSOC Enterprise - .gitattributes
+# Normalisation des fins de ligne (LF)
+# Critique : équipe sous Windows, exécution sous Docker/Linux
+# ======================================
+
+# Par défaut : normaliser en LF dans le dépôt et à l'extraction
+* text=auto eol=lf
+
+# Scripts Windows : CRLF obligatoire
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Scripts shell : LF obligatoire (exécutés dans les conteneurs)
+*.sh text eol=lf
+mvnw text eol=lf
+gradlew text eol=lf
+
+# Fichiers binaires : jamais de conversion
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.jar binary
+*.zip binary
+*.tar.gz binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+*.pkl binary
+*.joblib binary
+*.onnx binary

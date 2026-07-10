@@ -1,0 +1,36 @@
+# ============================================================
+# Workflow temporaire : vérifie que GitHub Actions est
+# opérationnel sur le dépôt. Sera remplacé par les pipelines
+# complets (build, tests, SonarQube, Trivy, Gitleaks…) dès
+# qu'il y aura du code à construire.
+# ============================================================
+name: CI Sanity
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sanity:
+    name: Repository sanity check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify repository structure
+        run: |
+          echo "✅ GitHub Actions is operational."
+          echo "--- Repository structure ---"
+          find . -maxdepth 2 -type d -not -path './.git*' | sort
+          echo "--- Governance files ---"
+          for f in README.md LICENSE CHANGELOG.md CONTRIBUTING.md SECURITY.md CODE_OF_CONDUCT.md; do
+            if [ -f "$f" ]; then echo "OK  $f"; else echo "MISSING $f" && exit 1; fi
+          done
