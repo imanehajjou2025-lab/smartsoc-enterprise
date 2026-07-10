@@ -1,0 +1,24 @@
+# ============================================================
+# Profil PROD - durcissement (VM Azure)
+# ============================================================
+logging:
+  level:
+    root: WARN
+    com.smartsoc: INFO
+
+server:
+  # Derriere un reverse proxy TLS
+  forward-headers-strategy: framework
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info
+
+springdoc:
+  # Documentation API fermee en production
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false

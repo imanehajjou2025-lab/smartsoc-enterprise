@@ -1,7 +1,7 @@
 # Dependabot — surveillance automatique des dépendances.
-# Les écosystèmes maven (backend/), npm (frontend/) et pip (ai-service/)
-# seront ajoutés dans la PR qui crée leur manifeste respectif :
-# les configurer sur des répertoires vides provoque des runs en erreur.
+# Les écosystèmes npm (frontend/) et pip (ai-service/) seront ajoutés
+# dans la PR qui crée leur manifeste respectif : les configurer sur
+# des répertoires vides provoque des runs en erreur.
 version: 2
 updates:
   - package-ecosystem: "github-actions"
@@ -15,3 +15,20 @@ updates:
     commit-message:
       prefix: "build"
     open-pull-requests-limit: 5
+
+  - package-ecosystem: "maven"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    labels:
+      - "dependencies"
+      - "area:backend"
+    commit-message:
+      prefix: "build"
+    open-pull-requests-limit: 5
+    groups:
+      # Les dependances Spring évoluent ensemble : une seule PR groupée
+      spring:
+        patterns:
+          - "org.springframework*"
