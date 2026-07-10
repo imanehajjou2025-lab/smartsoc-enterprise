@@ -57,6 +57,9 @@ jobs:
           format: sarif
           output: trivy-results.sarif
           severity: CRITICAL
+          # Sans ceci, le format SARIF ignore le filtre severity et la
+          # gate se declencherait sur n'importe quelle vulnerabilite.
+          limit-severities-for-sarif: true
           ignore-unfixed: true
           exit-code: "1"
 
