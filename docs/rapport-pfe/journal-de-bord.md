@@ -459,5 +459,31 @@ n'est pas republié ; le CONNECT sans token est rejeté.
 
 ---
 
-*Prochaines entrées : A5-A6 module frontend Alertes, puis connecteurs
-SOC, moteur SOAR, contrats IA, déploiement Azure.*
+## 2026-07-11 — J2 : Jalon Alertes A5 — module frontend Alertes (PR #30)
+
+**Réalisé.** La file de triage — le cœur opérationnel de la console :
+table paginée avec sévérités colorées (palette centralisée du thème),
+filtres statut/sévérité (React Query, `keepPreviousData` pour une
+pagination sans clignotement) ; **panneau de détail** : contexte SOC
+complet, chips MITRE ATT&CK **cliquables vers attack.mitre.org**,
+payload brut JSON formaté (l'évidence), emplacement du score IA
+(« Non évalué — service IA non connecté » tant que le classifieur
+externe n'est pas branché, ADR-005) ; **actions de triage** limitées aux
+transitions autorisées — la carte des transitions du frontend est le
+miroir du domaine backend, qui reste l'autorité (422 sinon) ; boutons
+masqués pour le rôle VIEWER. Champ `rawPayload` ajouté au contrat
+`AlertResponse` backend (additif).
+
+**Difficultés (série MUI 7).** Trois breaking changes de props attrapés
+par TypeScript à la compilation (`paragraph`, `fontWeight`, `flexWrap`
+retirés au profit de `sx`) — le typage strict transforme des breaking
+changes silencieux en erreurs de build immédiates.
+
+**Vérification.** 11 tests frontend + 40 backend verts ; vérification
+E2E navigateur contre la stack Docker reconstruite avec alertes
+simulées (voir A6).
+
+---
+
+*Prochaines entrées : A6 temps réel frontend, puis connecteurs SOC,
+moteur SOAR, contrats IA, déploiement Azure.*

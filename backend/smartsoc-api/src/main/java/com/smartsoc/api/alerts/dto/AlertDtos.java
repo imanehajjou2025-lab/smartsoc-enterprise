@@ -54,6 +54,7 @@ public final class AlertDtos {
             String hostname,
             String ruleId,
             List<String> mitreTechniques,
+            String rawPayload,
             Double aiScore,
             AiVerdict aiVerdict) {
     }
