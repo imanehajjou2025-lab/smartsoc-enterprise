@@ -1,0 +1,192 @@
+import Alert from '@mui/material/Alert';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Chip from '@mui/material/Chip';
+import Divider from '@mui/material/Divider';
+import Drawer from '@mui/material/Drawer';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useAppSelector } from '../../app/hooks';
+import { problemDetail } from '../../shared/api/client';
+import {
+  ALLOWED_TRANSITIONS,
+  updateAlertStatus,
+  type Alert as SocAlert,
+  type AlertStatus,
+} from './alertsApi';
+import { SeverityChip, StatusChip, STATUS_LABELS } from './chips';
+
+interface Props {
+  alert: SocAlert | null;
+  onClose: () => void;
+  onUpdated: (alert: SocAlert) => void;
+}
+
+const TRANSITION_BUTTON_COLORS: Record<string, 'primary' | 'success' | 'warning'> = {
+  ACKNOWLEDGED: 'primary',
+  IN_PROGRESS: 'primary',
+  RESOLVED: 'success',
+  FALSE_POSITIVE: 'warning',
+};
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <Box sx={{ mb: 1.5 }}>
+      <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+        {label}
+      </Typography>
+      {children}
+    </Box>
+  );
+}
+
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'medium' });
+}
+
+/** Détail d'une alerte : contexte SOC, payload brut (évidence) et triage. */
+function AlertDetailDrawer({ alert, onClose, onUpdated }: Props) {
+  const queryClient = useQueryClient();
+  const role = useAppSelector((state) => state.auth.user?.role);
+  const canTriage = role === 'ADMIN' || role === 'SOC_MANAGER' || role === 'SOC_ANALYST';
+
+  const mutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: AlertStatus }) =>
+      updateAlertStatus(id, status),
+    onSuccess: (updated) => {
+      void queryClient.invalidateQueries({ queryKey: ['alerts'] });
+      onUpdated(updated);
+    },
+  });
+
+  const transitions = alert ? ALLOWED_TRANSITIONS[alert.status] : [];
+
+  const rawPayloadPretty = (() => {
+    if (!alert?.rawPayload) return null;
+    try {
+      return JSON.stringify(JSON.parse(alert.rawPayload), null, 2);
+    } catch {
+      return alert.rawPayload;
+    }
+  })();
+
+  return (
+    <Drawer anchor="right" open={Boolean(alert)} onClose={onClose}>
+      {alert && (
+        <Box sx={{ width: 480, maxWidth: '90vw', p: 3 }}>
+          <Stack direction="row" spacing={1} sx={{ mb: 1 }}>
+            <SeverityChip severity={alert.severity} />
+            <StatusChip status={alert.status} />
+          </Stack>
+          <Typography variant="h6" sx={{ mb: 2 }}>
+            {alert.title}
+          </Typography>
+
+          {mutation.isError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {problemDetail(mutation.error, 'Transition impossible.')}
+            </Alert>
+          )}
+
+          {canTriage && transitions.length > 0 && (
+            <>
+              <Stack direction="row" spacing={1} useFlexGap sx={{ mb: 2, flexWrap: 'wrap' }}>
+                {transitions.map((target) => (
+                  <Button
+                    key={target}
+                    size="small"
+                    variant="outlined"
+                    color={TRANSITION_BUTTON_COLORS[target]}
+                    disabled={mutation.isPending}
+                    onClick={() => mutation.mutate({ id: alert.id, status: target })}
+                  >
+                    {STATUS_LABELS[target]}
+                  </Button>
+                ))}
+              </Stack>
+              <Divider sx={{ mb: 2 }} />
+            </>
+          )}
+
+          {alert.description && (
+            <Field label="Description">
+              <Typography variant="body2">{alert.description}</Typography>
+            </Field>
+          )}
+          <Field label="Source / Identifiant externe">
+            <Typography variant="body2">
+              {alert.source} · {alert.externalId}
+            </Typography>
+          </Field>
+          <Field label="Détection / Réception">
+            <Typography variant="body2">
+              {formatDate(alert.detectedAt)} · reçue {formatDate(alert.receivedAt)}
+            </Typography>
+          </Field>
+          {alert.hostname && (
+            <Field label="Actif concerné">
+              <Typography variant="body2">{alert.hostname}</Typography>
+            </Field>
+          )}
+          {alert.ruleId && (
+            <Field label="Règle de détection">
+              <Typography variant="body2">{alert.ruleId}</Typography>
+            </Field>
+          )}
+          {alert.mitreTechniques.length > 0 && (
+            <Field label="Techniques MITRE ATT&CK">
+              <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
+                {alert.mitreTechniques.map((technique) => (
+                  <Chip
+                    key={technique}
+                    label={technique}
+                    size="small"
+                    component="a"
+                    clickable
+                    href={`https://attack.mitre.org/techniques/${technique.replace('.', '/')}/`}
+                    target="_blank"
+                    rel="noreferrer"
+                  />
+                ))}
+              </Stack>
+            </Field>
+          )}
+          <Field label="Score IA (classifieur TP/FP externe)">
+            <Typography
+              variant="body2"
+              color={alert.aiScore == null ? 'text.secondary' : undefined}
+            >
+              {alert.aiScore == null
+                ? 'Non évalué — service IA non connecté'
+                : `${(alert.aiScore * 100).toFixed(1)} % · ${alert.aiVerdict}`}
+            </Typography>
+          </Field>
+
+          {rawPayloadPretty && (
+            <Field label="Événement brut (évidence)">
+              <Box
+                component="pre"
+                sx={{
+                  m: 0,
+                  p: 1.5,
+                  bgcolor: 'background.default',
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  borderRadius: 1,
+                  fontSize: 12,
+                  overflow: 'auto',
+                  maxHeight: 320,
+                }}
+              >
+                {rawPayloadPretty}
+              </Box>
+            </Field>
+          )}
+        </Box>
+      )}
+    </Drawer>
+  );
+}
+
+export default AlertDetailDrawer;

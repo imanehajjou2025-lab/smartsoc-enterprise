@@ -1,5 +1,6 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import UsersPage from '../features/admin/UsersPage';
+import AlertsPage from '../features/alerts/AlertsPage';
 import LoginPage from '../features/auth/LoginPage';
 import { RequireAuth, RequireRole } from '../features/auth/guards';
 import AppLayout from '../shared/layout/AppLayout';
@@ -32,16 +33,7 @@ export const router = createBrowserRouter([
               />
             ),
           },
-          {
-            path: 'alerts',
-            element: (
-              <PageStub
-                title="Alertes"
-                description="File d'alertes normalisées provenant des connecteurs SOC, triage assisté par le score IA TP/FP."
-                milestone="jalon Alertes"
-              />
-            ),
-          },
+          { path: 'alerts', element: <AlertsPage /> },
           {
             path: 'incidents',
             element: (
