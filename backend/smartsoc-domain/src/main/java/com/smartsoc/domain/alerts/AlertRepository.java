@@ -16,4 +16,7 @@ public interface AlertRepository {
     Optional<Alert> findBySourceAndExternalId(String source, String externalId);
 
     PageResult<Alert> search(AlertQuery query);
+
+    /** Statistiques agrégées ; timeline sur les {@code timelineDays} derniers jours. */
+    AlertStatistics statistics(int timelineDays);
 }

@@ -1,6 +1,7 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import UsersPage from '../features/admin/UsersPage';
 import AlertsPage from '../features/alerts/AlertsPage';
+import DashboardPage from '../features/dashboard/DashboardPage';
 import LoginPage from '../features/auth/LoginPage';
 import { RequireAuth, RequireRole } from '../features/auth/guards';
 import AppLayout from '../shared/layout/AppLayout';
@@ -23,16 +24,7 @@ export const router = createBrowserRouter([
         element: <AppLayout />,
         children: [
           { index: true, element: <Navigate to="/dashboard" replace /> },
-          {
-            path: 'dashboard',
-            element: (
-              <PageStub
-                title="Dashboard"
-                description="Vue globale : KPIs SOC et DevSecOps, risk score, security score, activité temps réel."
-                milestone="jalon Dashboard"
-              />
-            ),
-          },
+          { path: 'dashboard', element: <DashboardPage /> },
           { path: 'alerts', element: <AlertsPage /> },
           {
             path: 'incidents',

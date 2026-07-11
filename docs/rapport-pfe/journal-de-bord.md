@@ -508,5 +508,28 @@ STOMP `/topic/alerts` → invalidation → re-fetch.
 
 ---
 
-*Jalon Alertes terminé (A1→A6). Prochaines entrées : jalon Incidents ou
-Dashboard, connecteurs SOC, moteur SOAR, contrats IA, déploiement Azure.*
+## 2026-07-11 — J2 : Jalon Dashboard — la console prend vie (PR #32)
+
+**Réalisé.** Backend : `GET /api/v1/alerts/stats` — agrégations JPQL
+(sévérité, statut, source) + timeline 7 jours en SQL natif
+(`date_trunc`), **jours vides inclus** (une courbe d'activité doit
+montrer les silences autant que les pics) ; type domaine
+`AlertStatistics`, port étendu. Frontend : 4 cartes KPI (totales, à
+trier, critiques, faux positifs), 3 graphes **ECharts** (aire d'activité
+7 jours, donut de sévérités aux couleurs de la palette centralisée,
+barres top sources) via un wrapper React minimal (init/dispose/resize
+liés au cycle de vie) ; **badge temps réel** : le dashboard réutilise le
+hook STOMP du jalon Alertes — la clé de cache `['alerts','stats']`
+partage le préfixe invalidé à chaque alerte reçue, donc les KPIs et
+graphes se rafraîchissent seuls.
+
+**Vérification E2E.** Dashboard ouvert : 10 alertes, 8 à trier,
+3 graphes rendus, badge « Temps réel » ; injection de 5 alertes par le
+script de simulation → **cartes passées à 15/13 en direct, sans
+rechargement**. Bonus vérifié : la session a survécu au redémarrage du
+backend (refresh silencieux). 41 tests backend + 14 frontend.
+
+---
+
+*Prochaines entrées : jalon Incidents, connecteurs SOC, moteur SOAR,
+contrats IA, déploiement Azure.*
