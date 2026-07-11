@@ -342,5 +342,37 @@ curl). La plateforme complète démarre d'une seule commande.
 
 ---
 
-*Prochaines entrées : connecteurs SOC, moteur SOAR, contrats IA,
-déploiement Azure.*
+## 2026-07-11 — J2 : Jalon Alertes A1 — domaine et persistance (PR #25)
+
+**Réalisé.** Le concept central de la plateforme : l'entité `Alert`
+normalisée (source, externalId, sévérité 5 niveaux, hostname, ruleId,
+techniques MITRE, payload brut intégral) avec **cycle de vie gardé par le
+domaine** (NEW → ACKNOWLEDGED → IN_PROGRESS → RESOLVED, sortie
+FALSE_POSITIVE, statuts terminaux verrouillés) ; champs IA nullables
+(`aiScore`, `aiVerdict`) prêts pour le classifieur externe (ADR-005) avec
+la méthode `applyAiAssessment` bornée [0,1]. **Pagination indépendante du
+framework** introduite dans le domaine (`PageQuery`/`PageResult`).
+Migration `V3__alerts.sql` : JSONB pour le payload brut et les
+techniques MITRE, index unique de déduplication `(source, external_id)`,
+index des chemins d'accès de la console, **pas de soft delete** (une
+alerte est une pièce d'évidence SOC). Adaptateur avec recherche par
+`Specification` (filtres statut/sévérité/source, tri détection récente).
+
+**Choix.**
+- Une alerte ne se « rouvre » pas : statuts terminaux définitifs, on
+  ingère un nouvel événement — cohérent avec les pratiques SIEM.
+- `raw_payload` JSONB plutôt que colonne texte : requêtable plus tard
+  (corrélation, threat hunting) sans re-parsing.
+- Le domaine impose l'unicité de création par `Alert.ingest()` : pas de
+  constructeur public, pas d'état incohérent possible.
+
+**Vérification.** 29 tests verts, dont 3 nouveaux tests d'intégration sur
+PostgreSQL réel : aller-retour JSONB, **déduplication par index unique**
+(violation attendue vérifiée), recherche filtrée par sévérité avec
+pagination (2 éléments/page, total ≥ 3, 2 pages).
+
+---
+
+*Prochaines entrées : A2 ingestion webhook, A3 API de triage,
+A4 WebSocket temps réel, A5-A6 module frontend Alertes, puis connecteurs
+SOC, moteur SOAR, contrats IA, déploiement Azure.*
