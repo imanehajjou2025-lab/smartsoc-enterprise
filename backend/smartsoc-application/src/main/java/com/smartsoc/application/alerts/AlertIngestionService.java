@@ -53,17 +53,18 @@ public class AlertIngestionService {
     }
 
     private IngestionResult insertNew(IngestAlertCommand command, String source, String externalId) {
-        Alert alert = Alert.ingest(
-                command.source(),
-                command.externalId(),
-                command.title(),
-                command.description(),
-                command.severity(),
-                command.detectedAt(),
-                command.hostname(),
-                command.ruleId(),
-                command.mitreTechniques(),
-                command.rawPayload());
+        Alert alert = Alert.ingest(Alert.IngestionData.builder()
+                .source(command.source())
+                .externalId(command.externalId())
+                .title(command.title())
+                .description(command.description())
+                .severity(command.severity())
+                .detectedAt(command.detectedAt())
+                .hostname(command.hostname())
+                .ruleId(command.ruleId())
+                .mitreTechniques(command.mitreTechniques())
+                .rawPayload(command.rawPayload())
+                .build());
         try {
             Alert saved = alertRepository.save(alert);
             log.info("Alert ingested: source={}, externalId={}, severity={}",

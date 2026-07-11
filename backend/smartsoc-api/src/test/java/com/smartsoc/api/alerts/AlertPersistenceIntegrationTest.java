@@ -33,9 +33,18 @@ class AlertPersistenceIntegrationTest {
     private AlertRepository alertRepository;
 
     private static Alert alert(String externalId, Severity severity) {
-        return Alert.ingest("wazuh", externalId, "Brute force on ssh", "10 failures",
-                severity, Instant.now(), "srv-01", "5710",
-                List.of("T1110", "T1078"), "{\"agent\":{\"name\":\"srv-01\"},\"rule\":{\"id\":\"5710\"}}");
+        return Alert.ingest(Alert.IngestionData.builder()
+                .source("wazuh")
+                .externalId(externalId)
+                .title("Brute force on ssh")
+                .description("10 failures")
+                .severity(severity)
+                .detectedAt(Instant.now())
+                .hostname("srv-01")
+                .ruleId("5710")
+                .mitreTechniques(List.of("T1110", "T1078"))
+                .rawPayload("{\"agent\":{\"name\":\"srv-01\"},\"rule\":{\"id\":\"5710\"}}")
+                .build());
     }
 
     @Test
@@ -54,7 +63,9 @@ class AlertPersistenceIntegrationTest {
         String externalId = "evt-dup-" + UUID.randomUUID();
         alertRepository.save(alert(externalId, Severity.MEDIUM));
 
-        assertThatThrownBy(() -> alertRepository.save(alert(externalId, Severity.MEDIUM)))
+        // Doublon construit hors lambda : seule save() peut lever (S5778).
+        Alert duplicate = alert(externalId, Severity.MEDIUM);
+        assertThatThrownBy(() -> alertRepository.save(duplicate))
                 .isInstanceOf(DataIntegrityViolationException.class);
 
         assertThat(alertRepository.findBySourceAndExternalId("wazuh", externalId)).isPresent();
