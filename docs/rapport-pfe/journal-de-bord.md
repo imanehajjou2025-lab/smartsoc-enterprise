@@ -421,6 +421,21 @@ d'API → consultation JWT filtrée/paginée → triage à travers tout le cycle
 de vie → transition illégale rejetée 422 → **un VIEWER peut lire mais
 reçoit 403 au triage** (RBAC prouvé de bout en bout).
 
+**Deux incidents DevSecOps sur cette PR (chaîne à l'œuvre).**
+1. *Quality gate SonarCloud en échec* : couverture du nouveau code 54,5 %
+   < 80 % — alors que tout était testé. Cause : le problème JaCoCo
+   classique du multi-module — les classes du module `application`
+   exercées par les tests d'intégration du module `api` étaient créditées
+   0 % (rapports par module). Correctif : rapport **`report-aggregate`**
+   produit par le module api + propriété `sonar.coverage.jacoco.
+   xmlReportPaths`. Après correctif : **100 % de couverture sur le
+   nouveau code**, gate OK.
+2. *Gitleaks en échec* : détection de la fausse clé d'API des tests
+   d'intégration (entropie 4,39 — le scanner fait son travail).
+   Traitement : allowlist **par valeur littérale exacte** dans
+   `.gitleaks.toml`, datée et commentée — le reste du dépôt et de
+   l'historique reste intégralement scanné.
+
 ---
 
 *Prochaines entrées : A4 WebSocket temps réel, A5-A6 module frontend
