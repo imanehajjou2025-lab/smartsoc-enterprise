@@ -37,6 +37,10 @@ public final class AlertDtos {
             JsonNode rawPayload) {
     }
 
+    /** Demande de transition de triage (PATCH /alerts/{id}/status). */
+    public record UpdateAlertStatusRequest(@NotNull AlertStatus status) {
+    }
+
     public record AlertResponse(
             UUID id,
             String source,

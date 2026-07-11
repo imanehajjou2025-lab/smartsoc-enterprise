@@ -405,6 +405,39 @@ absente/fausse → 401 RFC 9457, payload invalide → 400 avec champs.
 
 ---
 
-*Prochaines entrées : A3 API de triage, A4 WebSocket temps réel,
-A5-A6 module frontend Alertes, puis connecteurs SOC, moteur SOAR,
-contrats IA, déploiement Azure.*
+## 2026-07-11 — J2 : Jalon Alertes A3 — API de consultation et triage (PR #27)
+
+**Réalisé.** `GET /api/v1/alerts` (filtres statut/sévérité/source,
+pagination uniforme via `PageResponse`), `GET /{id}` (détail avec payload
+brut et techniques MITRE), `PATCH /{id}/status` (transitions du cycle de
+vie). **RBAC gradué** : lecture pour tout utilisateur authentifié
+(VIEWER inclus), triage réservé à ANALYST et plus. Transition illégale →
+422 RFC 9457 avec le code `INVALID_ALERT_TRANSITION` (la règle vient du
+domaine, l'API ne fait que la traduire).
+
+**Vérification.** 38 tests verts, dont 5 nouveaux tests d'intégration
+couvrant le **flux SOC complet sur PostgreSQL réel** : ingestion par clé
+d'API → consultation JWT filtrée/paginée → triage à travers tout le cycle
+de vie → transition illégale rejetée 422 → **un VIEWER peut lire mais
+reçoit 403 au triage** (RBAC prouvé de bout en bout).
+
+**Deux incidents DevSecOps sur cette PR (chaîne à l'œuvre).**
+1. *Quality gate SonarCloud en échec* : couverture du nouveau code 54,5 %
+   < 80 % — alors que tout était testé. Cause : le problème JaCoCo
+   classique du multi-module — les classes du module `application`
+   exercées par les tests d'intégration du module `api` étaient créditées
+   0 % (rapports par module). Correctif : rapport **`report-aggregate`**
+   produit par le module api + propriété `sonar.coverage.jacoco.
+   xmlReportPaths`. Après correctif : **100 % de couverture sur le
+   nouveau code**, gate OK.
+2. *Gitleaks en échec* : détection de la fausse clé d'API des tests
+   d'intégration (entropie 4,39 — le scanner fait son travail).
+   Traitement : allowlist **par valeur littérale exacte** dans
+   `.gitleaks.toml`, datée et commentée — le reste du dépôt et de
+   l'historique reste intégralement scanné.
+
+---
+
+*Prochaines entrées : A4 WebSocket temps réel, A5-A6 module frontend
+Alertes, puis connecteurs SOC, moteur SOAR, contrats IA, déploiement
+Azure.*
