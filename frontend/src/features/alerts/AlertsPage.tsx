@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
+import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
 import MenuItem from '@mui/material/MenuItem';
 import Paper from '@mui/material/Paper';
@@ -24,6 +25,7 @@ import {
   type AlertStatus,
 } from './alertsApi';
 import { SeverityChip, StatusChip, STATUS_LABELS } from './chips';
+import { useAlertsRealtime } from './useAlertsRealtime';
 
 const SEVERITIES: AlertSeverity[] = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'];
 const STATUSES: AlertStatus[] = [
@@ -51,12 +53,21 @@ function AlertsPage() {
     queryFn: () => listAlerts({ status, severity, page, size }),
     placeholderData: keepPreviousData,
   });
+  const { connected } = useAlertsRealtime();
 
   return (
     <Box>
-      <Typography variant="h5" component="h2" sx={{ mb: 2 }}>
-        Alertes
-      </Typography>
+      <Stack direction="row" spacing={1.5} sx={{ mb: 2, alignItems: 'center' }}>
+        <Typography variant="h5" component="h2">
+          Alertes
+        </Typography>
+        <Chip
+          size="small"
+          label={connected ? 'Temps réel' : 'Hors ligne'}
+          color={connected ? 'success' : 'default'}
+          variant="outlined"
+        />
+      </Stack>
 
       <Stack direction="row" spacing={2} sx={{ mb: 2 }}>
         <TextField
