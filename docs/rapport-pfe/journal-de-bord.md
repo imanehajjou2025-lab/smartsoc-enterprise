@@ -373,6 +373,38 @@ pagination (2 éléments/page, total ≥ 3, 2 pages).
 
 ---
 
-*Prochaines entrées : A2 ingestion webhook, A3 API de triage,
-A4 WebSocket temps réel, A5-A6 module frontend Alertes, puis connecteurs
-SOC, moteur SOAR, contrats IA, déploiement Azure.*
+## 2026-07-11 — J2 : Jalon Alertes A2 — ingestion webhook (PR #26)
+
+**Réalisé.** `POST /api/v1/ingest/alerts`, le point d'entrée des outils
+SOC : authentification par **clé d'API** (`X-API-Key`, filtre dédié avec
+**comparaison en temps constant** — pas d'oracle de timing), rôle
+`INGEST` distinct des utilisateurs ; **ingestion idempotente** (201 à la
+création, 200 avec l'alerte existante au replay — les retries des outils
+SOC sont sûrs), y compris en cas de **course entre deux webhooks
+identiques** (violation d'unicité rattrapée puis relecture — service
+volontairement sans transaction englobante, expliqué en commentaire) ;
+clé vide = ingestion désactivée avec warning (plateforme autonome,
+ADR-005). **Contrat d'intégration publié** (`docs/integration/
+alert-ingestion.md`) : schéma, sémantique d'idempotence, guide de mapping
+des sévérités Wazuh/Suricata, exemples curl. **Scripts de simulation**
+(`scripts/simulate-alerts.sh` + `.ps1`) : jeu d'alertes réalistes
+multi-sources avec replay volontaire pour démontrer l'idempotence.
+
+**Choix.** Clé d'API statique plutôt que JWT pour l'ingestion : les
+outils SOC ne savent pas jouer un flux login/refresh ; c'est le standard
+du domaine (TheHive, Shuffle). Révocable par changement d'environnement.
+
+**Difficulté.** Le module `application` ne compilait plus : `@Slf4j`
+requiert `slf4j-api`, absent de ce module volontairement minimal.
+Ajouté en tant qu'API pure (l'implémentation reste fournie par le
+module `api`) — le module reste sans framework lourd.
+
+**Vérification.** 33 tests verts, dont 4 nouveaux tests d'intégration du
+webhook complet : 201 + normalisation, **replay → 200 même id**, clé
+absente/fausse → 401 RFC 9457, payload invalide → 400 avec champs.
+
+---
+
+*Prochaines entrées : A3 API de triage, A4 WebSocket temps réel,
+A5-A6 module frontend Alertes, puis connecteurs SOC, moteur SOAR,
+contrats IA, déploiement Azure.*

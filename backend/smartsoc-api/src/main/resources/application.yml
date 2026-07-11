@@ -63,3 +63,7 @@ smartsoc:
       username: ${SMARTSOC_ADMIN_USERNAME:admin}
       email: ${SMARTSOC_ADMIN_EMAIL:admin@smartsoc.local}
       password: ${SMARTSOC_ADMIN_PASSWORD:}
+    ingest:
+      # Cle d'API des webhooks d'ingestion (outils SOC).
+      # Vide = ingestion desactivee (la plateforme fonctionne sans SOC).
+      api-key: ${SMARTSOC_INGEST_API_KEY:}
