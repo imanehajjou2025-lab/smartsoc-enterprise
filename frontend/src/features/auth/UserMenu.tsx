@@ -11,13 +11,7 @@ import Typography from '@mui/material/Typography';
 import { useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../app/hooks';
 import { logout } from './authSlice';
-
-const ROLE_LABELS: Record<string, string> = {
-  ADMIN: 'Administrateur',
-  SOC_MANAGER: 'SOC Manager',
-  SOC_ANALYST: 'SOC Analyst',
-  VIEWER: 'Lecture seule',
-};
+import { ROLE_LABELS } from './roles';
 
 function UserMenu() {
   const user = useAppSelector((state) => state.auth.user);

@@ -1,4 +1,5 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
+import UsersPage from '../features/admin/UsersPage';
 import LoginPage from '../features/auth/LoginPage';
 import { RequireAuth, RequireRole } from '../features/auth/guards';
 import AppLayout from '../shared/layout/AppLayout';
@@ -133,18 +134,7 @@ export const router = createBrowserRouter([
           },
           {
             element: <RequireRole roles={['ADMIN']} />,
-            children: [
-              {
-                path: 'admin/users',
-                element: (
-                  <PageStub
-                    title="Utilisateurs"
-                    description="Administration des comptes et des rôles (RBAC) — branchée sur l'API /api/v1/users."
-                    milestone="jalon F4"
-                  />
-                ),
-              },
-            ],
+            children: [{ path: 'admin/users', element: <UsersPage /> }],
           },
           {
             path: 'settings',

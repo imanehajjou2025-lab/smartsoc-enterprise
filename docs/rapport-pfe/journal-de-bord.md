@@ -283,5 +283,32 @@ dev et vrai bug.
 
 ---
 
-*Prochaines entrées : F4 module Admin, F5 Docker/nginx, puis connecteurs
-SOC, moteur SOAR, contrats IA, déploiement Azure.*
+## 2026-07-11 — J2 : Frontend F4 — module Administration/Utilisateurs (PR #23)
+
+**Réalisé.** Première feature complète de bout en bout de la console,
+branchée sur l'API \`/api/v1/users\` (PR #15) : tableau des comptes
+(rôle en chip coloré, statut actif/désactivé, badge « vous ») ; création
+avec validation (mot de passe 12+, rôle sélectionnable) ; édition PATCH
+(nom, rôle, activation) ; suppression logique avec confirmation explicitant
+la révocation des sessions. **React Query** gère l'état serveur (cache
+30 s, invalidation après chaque mutation) — première utilisation, complète
+la paire avec Redux Toolkit (état client/session) comme prévu en conception.
+
+**Choix UX/sécurité.** L'interface empêche l'auto-sabotage : impossible de
+supprimer son propre compte, de se désactiver ou de changer son propre
+rôle (contrôles désactivés avec explication). Les erreurs RFC 9457 du
+backend (unicité username/email → 422) s'affichent telles quelles dans les
+dialogues.
+
+**Difficultés.** Série de breaking changes MUI 7 vs les exemples courants :
+props \`paragraph\`, \`fontWeight\`, \`display\` retirées de Typography (→ \`sx\`),
+icône \`DeleteOutline\` renommée \`DeleteOutlined\`. Attrapées par la
+compilation TypeScript avant tout commit — illustre l'intérêt du typage
+strict sur les dépendances récentes. Côté tests : un mock de module doit
+couvrir **tous** les exports importés par l'arbre rendu, et l'attente
+asynchrone doit cibler un élément qui n'apparaît qu'après chargement.
+
+---
+
+*Prochaines entrées : F5 Docker/nginx, puis connecteurs SOC, moteur SOAR,
+contrats IA, déploiement Azure.*
