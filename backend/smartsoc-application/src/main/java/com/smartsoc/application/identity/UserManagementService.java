@@ -76,7 +76,7 @@ public class UserManagementService {
             user.changeRole(command.role());
         }
         if (command.enabled() != null) {
-            if (command.enabled()) {
+            if (Boolean.TRUE.equals(command.enabled())) {
                 user.enable();
             } else {
                 user.disable();

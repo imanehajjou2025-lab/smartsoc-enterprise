@@ -38,34 +38,47 @@ public class Alert {
     private Double aiScore;
     private AiVerdict aiVerdict;
 
+    /** Données d'ingestion — parameter object du point d'entrée unique. */
+    @Builder
+    public record IngestionData(
+            String source,
+            String externalId,
+            String title,
+            String description,
+            Severity severity,
+            Instant detectedAt,
+            String hostname,
+            String ruleId,
+            List<String> mitreTechniques,
+            String rawPayload) {
+    }
+
     /** Point d'entrée unique de création : une alerte naît de l'ingestion. */
-    public static Alert ingest(String source, String externalId, String title,
-                               String description, Severity severity, Instant detectedAt,
-                               String hostname, String ruleId, List<String> mitreTechniques,
-                               String rawPayload) {
-        requireNonBlank(source, "source");
-        requireNonBlank(externalId, "externalId");
-        requireNonBlank(title, "title");
-        if (severity == null) {
+    public static Alert ingest(IngestionData data) {
+        requireNonBlank(data.source(), "source");
+        requireNonBlank(data.externalId(), "externalId");
+        requireNonBlank(data.title(), "title");
+        if (data.severity() == null) {
             throw new BusinessRuleViolationException("INVALID_ALERT", "An alert must have a severity");
         }
-        if (detectedAt == null) {
+        if (data.detectedAt() == null) {
             throw new BusinessRuleViolationException("INVALID_ALERT", "An alert must have a detection time");
         }
         return Alert.builder()
                 .id(UUID.randomUUID())
-                .source(source.trim().toLowerCase())
-                .externalId(externalId.trim())
-                .title(title.trim())
-                .description(description)
-                .severity(severity)
+                .source(data.source().trim().toLowerCase())
+                .externalId(data.externalId().trim())
+                .title(data.title().trim())
+                .description(data.description())
+                .severity(data.severity())
                 .status(AlertStatus.NEW)
-                .detectedAt(detectedAt)
+                .detectedAt(data.detectedAt())
                 .receivedAt(Instant.now())
-                .hostname(hostname)
-                .ruleId(ruleId)
-                .mitreTechniques(mitreTechniques == null ? List.of() : List.copyOf(mitreTechniques))
-                .rawPayload(rawPayload)
+                .hostname(data.hostname())
+                .ruleId(data.ruleId())
+                .mitreTechniques(data.mitreTechniques() == null
+                        ? List.of() : List.copyOf(data.mitreTechniques()))
+                .rawPayload(data.rawPayload())
                 .build();
     }
 

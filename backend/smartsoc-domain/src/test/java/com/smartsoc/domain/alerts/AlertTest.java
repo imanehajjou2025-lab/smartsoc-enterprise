@@ -11,10 +11,22 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class AlertTest {
 
+    private static Alert.IngestionData.IngestionDataBuilder sampleData() {
+        return Alert.IngestionData.builder()
+                .source("Wazuh")
+                .externalId("evt-42")
+                .title("Brute force detected")
+                .description("10 failed SSH logins")
+                .severity(Severity.HIGH)
+                .detectedAt(Instant.parse("2026-07-11T08:00:00Z"))
+                .hostname("srv-web-01")
+                .ruleId("5710")
+                .mitreTechniques(List.of("T1110"))
+                .rawPayload("{\"full\":\"payload\"}");
+    }
+
     private static Alert sampleAlert() {
-        return Alert.ingest("Wazuh", "evt-42", "Brute force detected",
-                "10 failed SSH logins", Severity.HIGH, Instant.parse("2026-07-11T08:00:00Z"),
-                "srv-web-01", "5710", List.of("T1110"), "{\"full\":\"payload\"}");
+        return Alert.ingest(sampleData().build());
     }
 
     @Test
@@ -32,13 +44,16 @@ class AlertTest {
 
     @Test
     void ingestRejectsMissingMandatoryFields() {
-        assertThatThrownBy(() -> Alert.ingest("wazuh", " ", "title", null,
-                Severity.LOW, Instant.now(), null, null, null, null))
+        // Donnees construites HORS des lambdas : une seule invocation
+        // susceptible de lever par assertion (Sonar S5778).
+        Alert.IngestionData blankExternalId = sampleData().externalId(" ").build();
+        Alert.IngestionData missingSeverity = sampleData().severity(null).build();
+
+        assertThatThrownBy(() -> Alert.ingest(blankExternalId))
                 .isInstanceOf(BusinessRuleViolationException.class)
                 .hasMessageContaining("externalId");
 
-        assertThatThrownBy(() -> Alert.ingest("wazuh", "evt-1", "title", null,
-                null, Instant.now(), null, null, null, null))
+        assertThatThrownBy(() -> Alert.ingest(missingSeverity))
                 .isInstanceOf(BusinessRuleViolationException.class)
                 .hasMessageContaining("severity");
     }
