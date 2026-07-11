@@ -46,6 +46,9 @@ public class SecurityConfig {
                                 "/api/v1/auth/logout").permitAll()
                         .requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
                         .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/api-docs/**").permitAll()
+                        // Handshake WebSocket : l'authentification JWT a lieu
+                        // sur la trame STOMP CONNECT (StompAuthChannelInterceptor)
+                        .requestMatchers("/ws/**").permitAll()
                         // Webhooks des outils SOC : cle d'API dediee (IngestApiKeyFilter)
                         .requestMatchers("/api/v1/ingest/**").hasRole("INGEST")
                         .anyRequest().authenticated())

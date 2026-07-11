@@ -438,6 +438,26 @@ reçoit 403 au triage** (RBAC prouvé de bout en bout).
 
 ---
 
-*Prochaines entrées : A4 WebSocket temps réel, A5-A6 module frontend
-Alertes, puis connecteurs SOC, moteur SOAR, contrats IA, déploiement
-Azure.*
+## 2026-07-11 — J2 : Jalon Alertes A4 — temps réel WebSocket (PR #29)
+
+**Réalisé.** Endpoint STOMP `/ws` ; chaque **nouvelle** alerte ingérée
+(pas les replays) est publiée sur `/topic/alerts` — la règle
+d'architecture « WebSocket, jamais de polling » devient réalité.
+**Découplage par événement applicatif** : l'ingestion publie
+`AlertIngestedEvent` ; le relais WebSocket n'est qu'un listener du module
+api — demain, le scoring IA et les déclencheurs SOAR s'abonneront au même
+événement sans toucher à l'ingestion. **Authentification du CONNECT
+STOMP par le même JWT que l'API REST** (header natif Authorization —
+jamais de token en query string, il finirait dans les logs des proxys) ;
+connexion refusée sans token valide. Le payload STOMP est le même
+`AlertResponse` que l'API REST : un seul contrat côté frontend.
+
+**Vérification.** 40 tests verts, dont un test temps réel de bout en
+bout : un vrai client STOMP authentifié s'abonne, le webhook ingère →
+**l'alerte arrive en < 10 s sur le topic** ; le replay du même événement
+n'est pas republié ; le CONNECT sans token est rejeté.
+
+---
+
+*Prochaines entrées : A5-A6 module frontend Alertes, puis connecteurs
+SOC, moteur SOAR, contrats IA, déploiement Azure.*

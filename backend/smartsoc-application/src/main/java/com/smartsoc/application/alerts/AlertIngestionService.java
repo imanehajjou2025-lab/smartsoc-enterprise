@@ -5,6 +5,7 @@ import com.smartsoc.domain.alerts.AlertRepository;
 import com.smartsoc.domain.alerts.Severity;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
@@ -26,6 +27,7 @@ import java.util.List;
 public class AlertIngestionService {
 
     private final AlertRepository alertRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     public record IngestAlertCommand(
             String source,
@@ -69,6 +71,7 @@ public class AlertIngestionService {
             Alert saved = alertRepository.save(alert);
             log.info("Alert ingested: source={}, externalId={}, severity={}",
                     saved.getSource(), saved.getExternalId(), saved.getSeverity());
+            eventPublisher.publishEvent(new AlertIngestedEvent(saved));
             return new IngestionResult(saved, true);
         } catch (DataIntegrityViolationException e) {
             // Course perdue contre un webhook identique : l'autre a inséré.
