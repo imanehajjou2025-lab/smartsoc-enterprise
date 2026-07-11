@@ -3,6 +3,9 @@ package com.smartsoc.infrastructure.persistence.alerts;
 import com.smartsoc.domain.alerts.Alert;
 import com.smartsoc.domain.alerts.AlertQuery;
 import com.smartsoc.domain.alerts.AlertRepository;
+import com.smartsoc.domain.alerts.AlertStatistics;
+import com.smartsoc.domain.alerts.AlertStatus;
+import com.smartsoc.domain.alerts.Severity;
 import com.smartsoc.domain.common.PageResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -11,8 +14,16 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Component;
 
+import java.sql.Date;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Function;
 
 @Component
 @RequiredArgsConstructor
@@ -60,5 +71,39 @@ public class AlertRepositoryAdapter implements AlertRepository {
                 page.getTotalElements(),
                 query.page().page(),
                 query.page().size());
+    }
+
+    @Override
+    public AlertStatistics statistics(int timelineDays) {
+        LocalDate today = LocalDate.now(ZoneOffset.UTC);
+        LocalDate from = today.minusDays(timelineDays - 1L);
+
+        Map<LocalDate, Long> countsPerDay = new LinkedHashMap<>();
+        for (Object[] row : springDataRepository.countPerDaySince(
+                from.atStartOfDay().toInstant(ZoneOffset.UTC))) {
+            countsPerDay.put(((Date) row[0]).toLocalDate(), (Long) row[1]);
+        }
+        // Jours vides inclus : une courbe d'activité montre aussi les silences.
+        List<AlertStatistics.DailyCount> timeline = from.datesUntil(today.plusDays(1))
+                .map(day -> new AlertStatistics.DailyCount(day, countsPerDay.getOrDefault(day, 0L)))
+                .toList();
+
+        Map<Severity, Long> bySeverity = groupCounts(
+                springDataRepository.countGroupedBySeverity(), Severity.class::cast);
+        Map<AlertStatus, Long> byStatus = groupCounts(
+                springDataRepository.countGroupedByStatus(), AlertStatus.class::cast);
+        Map<String, Long> bySource = groupCounts(
+                springDataRepository.countGroupedBySource(), String.class::cast);
+
+        long total = bySeverity.values().stream().mapToLong(Long::longValue).sum();
+        return new AlertStatistics(total, bySeverity, byStatus, bySource, timeline);
+    }
+
+    private static <K> Map<K, Long> groupCounts(List<Object[]> rows, Function<Object, K> keyMapper) {
+        Map<K, Long> counts = new LinkedHashMap<>();
+        for (Object[] row : rows) {
+            counts.put(keyMapper.apply(row[0]), (Long) row[1]);
+        }
+        return counts;
     }
 }

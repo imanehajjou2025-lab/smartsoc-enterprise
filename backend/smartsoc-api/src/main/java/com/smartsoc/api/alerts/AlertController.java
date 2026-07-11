@@ -3,7 +3,9 @@ package com.smartsoc.api.alerts;
 import com.smartsoc.api.alerts.dto.AlertDtos.AlertResponse;
 import com.smartsoc.api.alerts.dto.AlertDtos.UpdateAlertStatusRequest;
 import com.smartsoc.api.common.dto.PageResponse;
+import com.smartsoc.application.alerts.AlertStatsService;
 import com.smartsoc.application.alerts.AlertTriageService;
+import com.smartsoc.domain.alerts.AlertStatistics;
 import com.smartsoc.domain.alerts.AlertQuery;
 import com.smartsoc.domain.alerts.AlertStatus;
 import com.smartsoc.domain.alerts.Severity;
@@ -31,7 +33,14 @@ import java.util.UUID;
 public class AlertController {
 
     private final AlertTriageService triageService;
+    private final AlertStatsService statsService;
     private final AlertApiMapper mapper;
+
+    /** Statistiques agrégées du dashboard (timeline 7 jours). */
+    @GetMapping("/stats")
+    public AlertStatistics stats() {
+        return statsService.statistics();
+    }
 
     @GetMapping
     public PageResponse<AlertResponse> list(
