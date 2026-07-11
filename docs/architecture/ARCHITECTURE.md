@@ -143,3 +143,7 @@ ai-service/
 | [ADR-003](adr/ADR-003-ai-microservice.md) | Microservice IA indépendant (FastAPI) | ✅ Accepté |
 | [ADR-004](adr/ADR-004-postgresql-source-of-truth.md) | PostgreSQL, source de vérité unique de la plateforme | ✅ Accepté |
 | [ADR-005](adr/ADR-005-standalone-platform-integration-contracts.md) | Plateforme autonome, intégrations externes par contrats | ✅ Accepté |
+| [ADR-006](adr/ADR-006-soc-on-azure-multi-account.md) | SOC sur Azure multi-comptes relié par overlay WireGuard | ✅ Accepté |
+
+Le SOC déployé sur Azure fait l'objet d'une conception détaillée dédiée :
+[`docs/architecture/soc/SOC-ARCHITECTURE.md`](soc/SOC-ARCHITECTURE.md).
