@@ -485,5 +485,28 @@ simulées (voir A6).
 
 ---
 
-*Prochaines entrées : A6 temps réel frontend, puis connecteurs SOC,
-moteur SOAR, contrats IA, déploiement Azure.*
+## 2026-07-11 — J2 : Jalon Alertes A6 — temps réel de bout en bout (PR #31)
+
+**Réalisé.** Le jalon Alertes est complet. Client STOMP frontend
+(`@stomp/stompjs`) : URL relative `/ws` (même topologie que `/api` —
+proxy Vite en dev, nginx en conteneur, **aucun hôte codé en dur**) ;
+JWT de session posé sur la trame CONNECT, relu à chaque reconnexion
+(`beforeConnect`, compatible rotation) ; reconnexion automatique (5 s) ;
+badge « Temps réel / Hors ligne » dans la file ; à chaque alerte reçue,
+**invalidation du cache React Query** — la file se rafraîchit en
+respectant filtres et pagination courants, plutôt qu'une insertion
+manuelle dans le DOM qui les contournerait. Proxy `/ws` ajouté à Vite
+(`ws: true`) et à nginx (`Upgrade`/`Connection`, `proxy_read_timeout`
+long pour les connexions persistantes).
+
+**Vérification E2E en conditions réelles** — la démonstration clé du
+projet : page Alertes ouverte, badge « Temps réel » actif, puis
+`simulate-alerts.sh` exécuté dans un terminal → **la table passe de 5 à
+10 lignes sans aucun rechargement**, pagination mise à jour (1–10 of 10).
+Chaîne complète prouvée : webhook (clé d'API) → événement applicatif →
+STOMP `/topic/alerts` → invalidation → re-fetch.
+
+---
+
+*Jalon Alertes terminé (A1→A6). Prochaines entrées : jalon Incidents ou
+Dashboard, connecteurs SOC, moteur SOAR, contrats IA, déploiement Azure.*

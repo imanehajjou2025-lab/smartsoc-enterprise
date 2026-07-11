@@ -60,6 +60,11 @@ vi.mock('./alertsApi', async (importOriginal) => ({
   updateAlertStatus: vi.fn(),
 }));
 
+// jsdom n'a pas de WebSocket : le hook temps réel est simulé connecté.
+vi.mock('./useAlertsRealtime', () => ({
+  useAlertsRealtime: () => ({ connected: true }),
+}));
+
 function renderPage() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
@@ -93,5 +98,12 @@ describe('AlertsPage', () => {
 
     expect(screen.getByLabelText('Statut')).toBeInTheDocument();
     expect(screen.getByLabelText('Sévérité')).toBeInTheDocument();
+  });
+
+  it('shows the realtime connection badge', async () => {
+    renderPage();
+    await screen.findByText(/brute force/i);
+
+    expect(screen.getByText('Temps réel')).toBeInTheDocument();
   });
 });
