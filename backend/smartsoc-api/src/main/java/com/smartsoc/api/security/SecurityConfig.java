@@ -17,6 +17,7 @@ import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
 @EnableWebSecurity
@@ -25,6 +26,7 @@ import org.springframework.security.web.SecurityFilterChain;
 public class SecurityConfig {
 
     private final ApiSecurityProblemSupport problemSupport;
+    private final IngestApiKeyFilter ingestApiKeyFilter;
 
     @Bean
     // S4502 (CSRF disabled): false positive, same finding already dismissed
@@ -44,7 +46,10 @@ public class SecurityConfig {
                                 "/api/v1/auth/logout").permitAll()
                         .requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
                         .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/api-docs/**").permitAll()
+                        // Webhooks des outils SOC : cle d'API dediee (IngestApiKeyFilter)
+                        .requestMatchers("/api/v1/ingest/**").hasRole("INGEST")
                         .anyRequest().authenticated())
+                .addFilterBefore(ingestApiKeyFilter, UsernamePasswordAuthenticationFilter.class)
                 .oauth2ResourceServer(oauth2 -> oauth2
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtConverter))
                         .authenticationEntryPoint(problemSupport)

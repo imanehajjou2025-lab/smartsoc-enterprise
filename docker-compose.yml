@@ -47,6 +47,8 @@ services:
       SMARTSOC_ADMIN_USERNAME: ${SMARTSOC_ADMIN_USERNAME:-admin}
       SMARTSOC_ADMIN_EMAIL: ${SMARTSOC_ADMIN_EMAIL:-admin@smartsoc.local}
       SMARTSOC_ADMIN_PASSWORD: ${SMARTSOC_ADMIN_PASSWORD:?SMARTSOC_ADMIN_PASSWORD must be set in .env}
+      # Optionnelle : vide = ingestion desactivee (plateforme autonome, ADR-005)
+      SMARTSOC_INGEST_API_KEY: ${SMARTSOC_INGEST_API_KEY:-}
     ports:
       - "${BACKEND_PORT:-8080}:8080"
     depends_on:
