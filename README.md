@@ -68,9 +68,9 @@ cp .env.example .env
 docker compose up -d --build
 
 # 3. Verifier
+#    Console  : http://localhost:3000  (login: admin / <SMARTSOC_ADMIN_PASSWORD>)
 #    Sante    : http://localhost:8080/actuator/health
 #    Swagger  : http://localhost:8080/swagger-ui.html
-#    Login    : POST /api/v1/auth/login  { "username": "admin", "password": "<SMARTSOC_ADMIN_PASSWORD>" }
 ```
 
 > ℹ️ Conformément à l'[ADR-005](docs/architecture/adr/ADR-005-standalone-platform-integration-contracts.md),

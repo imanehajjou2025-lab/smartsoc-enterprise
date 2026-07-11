@@ -310,5 +310,37 @@ asynchrone doit cibler un élément qui n'apparaît qu'après chargement.
 
 ---
 
-*Prochaines entrées : F5 Docker/nginx, puis connecteurs SOC, moteur SOAR,
-contrats IA, déploiement Azure.*
+## 2026-07-11 — J2 : Frontend F5 — conteneurisation nginx, plateforme complète en une commande (PR #24)
+
+**Réalisé.** Dockerfile frontend multi-stage (build Vite sous Node 24 →
+**nginx unprivileged**, non-root comme le backend) ; configuration nginx
+reproduisant exactement le contrat du dev : SPA fallback pour React Router,
+relais `/api` vers le service backend, en-têtes de sécurité
+(nosniff, X-Frame-Options DENY, Referrer-Policy), cache immutable des
+assets fingerprintés, gzip. Service `frontend` ajouté au Compose
+(healthcheck, démarrage après backend healthy). Workflow Docker CI passé en
+**matrice** : les deux images sont construites et scannées par Trivy
+(gate CRITICAL) avec caches séparés.
+
+**Choix.** Le navigateur ne connaît toujours qu'une seule origine : en dev
+Vite proxifie `/api`, en conteneur nginx fait de même — aucune URL backend
+dans le code frontend, aucun CORS à configurer, même topologie qu'en
+production Azure derrière un reverse proxy.
+
+**Difficulté.** Conteneur frontend « unhealthy » alors qu'il répondait
+parfaitement depuis l'hôte : dans le conteneur, `localhost` se résout
+d'abord en IPv6 (`::1`) alors que nginx n'écoutait qu'en IPv4 — le
+healthcheck échouait donc seul. Correctif : `127.0.0.1` explicite dans le
+healthcheck, commenté dans le Dockerfile. Piège réseau classique des
+conteneurs, bon cas d'école pour le rapport.
+
+**Vérification.** `docker compose up -d --build` : 3 conteneurs healthy ;
+connexion via nginx (port 3000) ; accès direct à `/admin/users` en
+rechargement complet — valide d'un coup le fallback SPA, la restauration
+de session et le proxy API ; en-têtes de sécurité présents (vérifiés par
+curl). La plateforme complète démarre d'une seule commande.
+
+---
+
+*Prochaines entrées : connecteurs SOC, moteur SOAR, contrats IA,
+déploiement Azure.*
