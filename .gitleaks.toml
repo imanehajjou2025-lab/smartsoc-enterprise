@@ -11,3 +11,8 @@ paths = [
     '''\.env\.example$''',
     '''src/main/resources/application-dev\.yml$''',
 ]
+regexes = [
+    # Fausse cle d'API des tests d'integration (valeur exacte, fixture
+    # assumee — detectee par gitleaks le 2026-07-11, faux positif).
+    '''test-ingest-key-0123456789abcdef''',
+]
