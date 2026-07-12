@@ -36,76 +36,83 @@ Azure VPN Gateway (trop coûteux pour le crédit étudiant).
 | **MISP** | Threat Intelligence | Gestion et corrélation d'IOC (feeds ouverts) ; enrichit les alertes Wazuh. |
 | **Shuffle** | SOAR | Orchestration et automatisation des réponses ; enrichit puis pousse vers SmartSOC ; actions (email, blocage IP). |
 | **Atomic Red Team / Kali** | Simulation d'adversaire | Génère des attaques MITRE réalistes pour **valider** la détection de bout en bout. |
-| **Reverse proxy (nginx)** | Exposition contrôlée | TLS + point d'entrée unique pour les consoles ; réduit la surface d'attaque. |
+| **Cloudflare Tunnel** | Exposition de SmartSOC | **Unique point d'entrée HTTPS** vers SmartSOC. Connexion **sortante** depuis le PC d'Imane : **aucun port entrant ouvert**, aucun reverse proxy à administrer. Remplace Nginx. |
 | **SmartSOC (plateforme)** | Console unifiée + IA | Reçoit les alertes normalisées ; dashboard, incidents, score IA TP/FP, agent IA. |
 
 ## 3. Diagramme d'architecture
 
 ```mermaid
 flowchart TB
-    subgraph INET["🌐 Internet"]
-        ANALYST["👩‍💻 Analystes SOC"]
+    subgraph AZ3["☁️ COMPTE AZURE — Ilyas · CTI / SOAR / Offensif · VNet 10.30.0.0/16"]
+        KALI["🗡️ Kali Linux<br/>attaques · pentest"]
+        ATOMIC["⚛️ Atomic Red Team<br/>simulation ATT&CK"]
+        MISP["🧬 MISP<br/>IOC · threat feeds"]
+        SHUFFLE["⚙️ Shuffle SOAR<br/>playbooks · enrichissement"]
+        WGS3["🔐 WireGuard spoke · 10.100.0.3"]
     end
 
-    subgraph AZ1["☁️ COMPTE AZURE 1 — Imane · Cœur SIEM · VNet 10.10.0.0/16"]
-        WGHUB["🔐 WireGuard Hub<br/>B1s · UDP 51820<br/>overlay 10.100.0.1"]
-        RP["🔀 Reverse proxy nginx<br/>TLS 443"]
-        WAZUH["🐺 Wazuh all-in-one<br/>Manager + Indexer + Dashboard<br/>B2ms 8 Go<br/>1514/1515 agents · 443 UI · 55000 API"]
-        RP --> WAZUH
+    subgraph AZ2["☁️ COMPTE AZURE — Siham · Détection & Endpoints · VNet 10.20.0.0/16"]
+        WINSRV["🖥️ Windows Server<br/>Sysmon + Wazuh Agent"]
+        WIN11["💻 Windows 11<br/>Sysmon + Wazuh Agent"]
+        UBU["🐧 Ubuntu<br/>auditd + Wazuh Agent"]
+        SURICATA["🛰️ Suricata IDS/IPS<br/>eve.json → Filebeat"]
+        ZEEK["📡 Zeek<br/>logs → Filebeat"]
+        WGS2["🔐 WireGuard spoke · 10.100.0.2"]
     end
 
-    subgraph AZ2["☁️ COMPTE AZURE 2 — Étudiant 2 · Détection · VNet 10.20.0.0/16"]
-        WGS2["🔐 WireGuard spoke<br/>overlay 10.100.0.2"]
-        SURICATA["🛰️ Suricata IDS/IPS<br/>+ Zeek (option)<br/>eve.json"]
-        WINSRV["🖥️ Windows Server 2022<br/>Sysmon + agent Wazuh"]
-        WIN11["💻 Windows 11<br/>Sysmon + agent Wazuh"]
-        UBU["🐧 Ubuntu Server<br/>auditd + agent Wazuh"]
+    subgraph AZ1["☁️ COMPTE AZURE — Imane · SIEM central / Hub · VNet 10.10.0.0/16"]
+        WGHUB["🔐 WireGuard Hub · 10.100.0.1<br/>UDP 51820"]
+        WAZUH["🐺 Wazuh Manager + OpenSearch<br/>+ Dashboard + API<br/>corrélation → alertes"]
     end
 
-    subgraph AZ3["☁️ COMPTE AZURE 3 — Étudiant 3 · CTI / SOAR / Offensif · VNet 10.30.0.0/16"]
-        WGS3["🔐 WireGuard spoke<br/>overlay 10.100.0.3"]
-        MISP["🧬 MISP<br/>Threat Intel · 443"]
-        SHUFFLE["⚙️ Shuffle SOAR<br/>Docker"]
-        REDTEAM["🗡️ Kali / Atomic Red Team"]
-    end
-
-    subgraph PLATFORM["🛡️ SmartSOC (Docker : Azure 1 ou local)"]
-        FRONT["Frontend React (nginx)"]
-        BACK["Backend Spring Boot<br/>/api/v1/ingest/alerts"]
-        DB["PostgreSQL"]
-        AI["🤖 Services IA (externes)<br/>Score TP/FP · Agent"]
+    subgraph PC["🖥️ SmartSOC — PC d'Imane · Docker Compose (sans Nginx)"]
+        BACK["🍃 Spring Boot API<br/>:8080 · /api/v1/ingest/alerts"]
+        DB["🐘 PostgreSQL :5432"]
+        FRONT["⚛️ React frontend"]
         FRONT --> BACK --> DB
-        BACK -.REST.-> AI
     end
 
-    %% Overlay VPN (tunnels chiffrés inter-comptes)
+    CF{{"☁️ Cloudflare Tunnel — HTTPS 443<br/>unique entrée · aucun port entrant sur le PC"}}
+    ANALYST["👩‍💻 Analystes SOC"]
+
+    %% Attaques Ilyas -> endpoints Siham
+    KALI -. "attaque" .-> WIN11
+    KALI -. "attaque" .-> UBU
+    ATOMIC -. "ATT&CK" .-> WINSRV
+
+    %% Détection -> logs -> WireGuard -> Wazuh (Imane)
+    WINSRV -- "Wazuh Agent 1514" --> WGS2
+    WIN11 -- "Wazuh Agent 1514" --> WGS2
+    UBU -- "Wazuh Agent 1514" --> WGS2
+    SURICATA -- "Filebeat 1514" --> WGS2
+    ZEEK -- "Filebeat 1514" --> WGS2
     WGS2 == "tunnel WireGuard" ==> WGHUB
+    WGHUB --> WAZUH
+
+    %% CTI : MISP -> Wazuh (via overlay) ET MISP -> Shuffle
+    MISP -- "IOC" --> WGS3
     WGS3 == "tunnel WireGuard" ==> WGHUB
+    MISP -- "IOC" --> SHUFFLE
 
-    %% Flux de logs endpoints -> SIEM (via overlay, 1514/tcp)
-    WINSRV -- "1514/tcp" --> WGS2
-    WIN11 -- "1514/tcp" --> WGS2
-    UBU -- "1514/tcp" --> WGS2
-    SURICATA -- "eve.json → agent → 1514/tcp" --> WGS2
-    WGS2 -- "overlay" --> WAZUH
+    %% SOAR : Wazuh alertes -> Shuffle (via overlay)
+    WAZUH -- "alertes (overlay)" --> SHUFFLE
 
-    %% CTI / SOAR
-    MISP -- "IOC lookup" --> WAZUH
-    WGS3 -- "overlay" --> WAZUH
+    %% Vers SmartSOC : 2 chemins, uniquement via Cloudflare Tunnel
+    WAZUH -- "Wazuh API · alertes<br/>HTTPS + X-API-Key" --> CF
+    SHUFFLE -- "enrichissements<br/>HTTPS + X-API-Key" --> CF
+    CF --> BACK
 
-    %% Attaques red team -> endpoints
-    REDTEAM -. "attaques MITRE" .-> WIN11
-    REDTEAM -. "brute force" .-> UBU
-
-    %% Corrélation -> SOAR -> SmartSOC
-    WAZUH -- "alertes" --> SHUFFLE
-    SHUFFLE -- "HTTPS + X-API-Key<br/>POST /api/v1/ingest/alerts" --> BACK
-    WAZUH -- "integratord (alternative)<br/>HTTPS + X-API-Key" --> BACK
-
-    %% Consoles
-    ANALYST -- "443" --> FRONT
-    ANALYST -- "443" --> RP
+    %% Analystes : même tunnel
+    ANALYST -- "HTTPS 443" --> CF
+    CF -.-> FRONT
 ```
+
+> **Corrections clés vs versions précédentes** : (1) **aucun Nginx** — Cloudflare
+> Tunnel expose directement Spring Boot ; (2) **Siham ne parle jamais à SmartSOC** —
+> elle n'envoie que ses logs au Wazuh Manager d'Imane via WireGuard ; (3) **deux**
+> chemins vers SmartSOC (Wazuh API **et** Shuffle), tous deux via Cloudflare Tunnel ;
+> (4) **MISP alimente à la fois Wazuh et Shuffle** en IOC ; (5) le flux d'attaque
+> **Ilyas → endpoints Siham → détection → Wazuh** est explicite.
 
 ### Plan d'adressage
 
@@ -123,10 +130,10 @@ flowchart TB
 | Agents Wazuh → Manager | `1514/tcp` | Overlay uniquement |
 | Enrôlement agent | `1515/tcp` | Overlay uniquement |
 | API Wazuh | `55000/tcp` | Overlay uniquement |
-| Wazuh Dashboard | `443/tcp` | Reverse proxy |
+| Wazuh Dashboard | `443/tcp` | Overlay / bastion (interne aux analystes) |
 | WireGuard | `51820/udp` | Public (chiffré) |
-| MISP / Shuffle | `443/tcp` | Overlay + reverse proxy |
-| Ingestion SmartSOC | `443/tcp` | HTTPS + `X-API-Key` |
+| MISP / Shuffle | `443/tcp` | Overlay uniquement |
+| Ingestion SmartSOC | `443/tcp` | **Cloudflare Tunnel** (HTTPS + `X-API-Key`) — connexion sortante, aucun port entrant sur le PC |
 
 ## 4. Répartition entre les 3 comptes Azure
 
@@ -137,20 +144,21 @@ overlay (Phase 1) est en place.
 
 ### Compte 1 — Imane · **Cœur SIEM & Intégration**
 - Hub WireGuard (point d'intégration des 3 comptes)
-- Wazuh (Manager + Indexer + Dashboard), reverse proxy
+- Wazuh (Manager + OpenSearch + Dashboard + API)
 - Règles de corrélation, mapping MITRE
-- **Intégration Wazuh → SmartSOC** (cohérent avec sa responsabilité plateforme)
+- **Intégration Wazuh API → SmartSOC via Cloudflare Tunnel** (cohérent avec sa responsabilité plateforme)
 
 > *Pourquoi Imane :* elle porte SmartSOC ; concentrer le SIEM et le point
 > d'intégration chez elle minimise les allers-retours inter-équipes sur le
 > contrat d'ingestion.
 
-### Compte 2 — Étudiant 2 · **Détection (réseau + endpoints)**
-- Suricata (+ Zeek optionnel)
+### Compte 2 — Siham · **Détection (réseau + endpoints)**
+- Suricata + Zeek (capteurs réseau, sortie via Filebeat)
 - Windows Server + Windows 11 + Ubuntu (Sysmon, agents Wazuh, auditd)
-- Vérification de la remontée des logs vers le SIEM
+- Vérification de la remontée des logs vers le SIEM d'Imane
+- **Ne communique jamais directement avec SmartSOC** — uniquement Wazuh Manager via WireGuard
 
-### Compte 3 — Étudiant 3 · **CTI / SOAR / Offensif**
+### Compte 3 — Ilyas · **CTI / SOAR / Offensif**
 - MISP (threat intel) + intégration IOC ↔ Wazuh
 - Shuffle (SOAR) + workflows d'enrichissement et de réponse
 - Kali / Atomic Red Team + scénarios d'attaque de validation
@@ -173,11 +181,11 @@ overlay (Phase 1) est en place.
 | --- | --- | --- | --- |
 | **0 · Préparation** | 3 comptes Azure, RG, alertes budget, même région, quotas vCPU | — | Tous |
 | **1 · Réseau** | VNets/subnets/NSG + **overlay WireGuard** (hub + 2 spokes) | Phase 0 | Tous (hub: Imane) |
-| **2 · SIEM** | Wazuh all-in-one, durcissement, reverse proxy | Phase 1 | Imane |
-| **3 · Endpoints** | Windows/Linux + Sysmon + agents → enrôlés dans Wazuh | Phase 2 | Étudiant 2 |
-| **4 · Détection** | Suricata + règles ; attaquant + scénarios de test | Phase 3 | Ét. 2 (capteur) + Ét. 3 (attaque) |
-| **5 · CTI / SOAR** | MISP + Shuffle opérationnels | Phase 2 | Étudiant 3 |
-| **6 · Intégration** | Wazuh/Shuffle → SmartSOC ; MISP ↔ Wazuh ; validation bout-en-bout | Phases 4 + 5 | Imane + Étudiant 3 |
+| **2 · SIEM** | Wazuh all-in-one, durcissement, **Cloudflare Tunnel** | Phase 1 | Imane |
+| **3 · Endpoints** | Windows/Linux + Sysmon + agents → enrôlés dans Wazuh | Phase 2 | Siham |
+| **4 · Détection** | Suricata/Zeek + règles ; attaquant + scénarios de test | Phase 3 | Siham (capteur) + Ilyas (attaque) |
+| **5 · CTI / SOAR** | MISP + Shuffle opérationnels | Phase 2 | Ilyas |
+| **6 · Intégration** | Wazuh API + Shuffle → SmartSOC (Cloudflare Tunnel) ; MISP ↔ Wazuh ; validation bout-en-bout | Phases 4 + 5 | Imane + Ilyas |
 | **7 · IA** | Score TP/FP + agent IA branchés sur SmartSOC | Phase 6 | Équipe IA |
 
 Le chemin critique est **0 → 1 → 2 → 3 → 4 → 6**. Les phases 5 (CTI/SOAR) et
@@ -187,15 +195,26 @@ debout.
 ## 6. Flux d'intégration complet SOC → SmartSOC
 
 ```
-Sources de logs (Windows Sysmon, Linux auditd, trafic réseau)
+Kali / Atomic Red Team (compte Ilyas)
+        ↓   attaques · simulation MITRE ATT&CK
+Endpoints & réseau du compte Siham
         ↓
-Suricata (IDS/IPS réseau)  +  Agents Wazuh (endpoints)
-        ↓   (overlay WireGuard, 1514/tcp)
-Wazuh Manager  → décodage, règles de corrélation, mapping MITRE ATT&CK
+Sysmon · auditd · Suricata (eve.json) · Zeek
         ↓
-Enrichissement  →  MISP (IOC)  ·  Shuffle (SOAR : VirusTotal, contexte)
-        ↓   (HTTPS + X-API-Key)
-SmartSOC — POST /api/v1/ingest/alerts  (idempotent, déduplication)
+Wazuh Agent (endpoints)  ·  Filebeat (Suricata/Zeek)
+        ↓   overlay WireGuard, 1514/tcp
+Wazuh Manager (compte Imane) → décodage, corrélation, mapping MITRE ATT&CK
+        ↑   enrichissement IOC : MISP (compte Ilyas) → Wazuh via WireGuard
+        ↓
+Alertes générées
+        ├──►  Wazuh API  ───────────────┐
+        └──►  Shuffle (SOAR) : reçoit    │   (Shuffle interroge MISP,
+             les alertes, enrichit,      │    exécute les playbooks)
+             pousse ────────────────────┤
+                                         ↓   HTTPS 443 + X-API-Key
+                              Cloudflare Tunnel  (unique entrée, aucun port entrant sur le PC)
+                                         ↓
+SmartSOC (PC d'Imane) — POST /api/v1/ingest/alerts  (idempotent, déduplication)
         ↓
 Dashboard temps réel (WebSocket)  →  Triage des alertes
         ↓
@@ -203,6 +222,10 @@ Incidents (corrélation, timeline, escalade)
         ↓
 IA — Score TP/FP (réduction des faux positifs)  ·  Agent (analyse, résumé, remédiation)
 ```
+
+> Siham ne parle jamais directement à SmartSOC : elle n'envoie que ses logs au
+> Wazuh Manager d'Imane. Seuls **Wazuh API** et **Shuffle** communiquent avec
+> SmartSOC, exclusivement via **Cloudflare Tunnel**.
 
 ## 7. Contraintes Azure for Students — recommandations d'architecte
 

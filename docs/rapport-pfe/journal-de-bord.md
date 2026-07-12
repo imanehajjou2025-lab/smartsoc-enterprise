@@ -531,5 +531,25 @@ backend (refresh silencieux). 41 tests backend + 14 frontend.
 
 ---
 
+## 2026-07-12 — Correction de l'architecture SOC (PR #34)
+
+**Réalisé.** Régénération du diagramme d'architecture SOC après validation
+d'équipe des flux réels. Cinq corrections structurantes vs les versions
+précédentes : (1) **suppression de Nginx** — Cloudflare Tunnel expose
+directement le backend Spring Boot ; (2) **Siham ne communique jamais avec
+SmartSOC** — elle n'envoie que ses logs au Wazuh Manager d'Imane via
+WireGuard ; (3) **deux chemins vers SmartSOC** (Wazuh API *et* Shuffle),
+tous deux via Cloudflare Tunnel uniquement ; (4) **MISP alimente Wazuh
+*et* Shuffle** en IOC ; (5) flux d'attaque explicite Ilyas (Kali / Atomic
+Red Team) → endpoints Siham → détection → Wazuh. Noms réels des étudiants
+(Siham, Ilyas) substitués aux « Étudiant 2/3 ». Diagramme Mermaid corrigé
++ version visuelle SVG produite pour la soutenance.
+
+**Choix.** Cloudflare Tunnel comme unique point d'entrée HTTPS : connexion
+sortante depuis le PC d'Imane, **aucun port entrant ouvert**, aucun reverse
+proxy à administrer — plus sûr et plus simple qu'un Nginx exposé.
+
+---
+
 *Prochaines entrées : jalon Incidents, connecteurs SOC, moteur SOAR,
 contrats IA, déploiement Azure.*
