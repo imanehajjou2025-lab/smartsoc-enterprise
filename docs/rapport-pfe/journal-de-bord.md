@@ -531,5 +531,54 @@ backend (refresh silencieux). 41 tests backend + 14 frontend.
 
 ---
 
+## 2026-07-12 — Correction de l'architecture SOC (PR #34)
+
+**Réalisé.** Régénération du diagramme d'architecture SOC après validation
+d'équipe des flux réels. Cinq corrections structurantes vs les versions
+précédentes : (1) **suppression de Nginx** — Cloudflare Tunnel expose
+directement le backend Spring Boot ; (2) **Siham ne communique jamais avec
+SmartSOC** — elle n'envoie que ses logs au Wazuh Manager d'Imane via
+WireGuard ; (3) **deux chemins vers SmartSOC** (Wazuh API *et* Shuffle),
+tous deux via Cloudflare Tunnel uniquement ; (4) **MISP alimente Wazuh
+*et* Shuffle** en IOC ; (5) flux d'attaque explicite Ilyas (Kali / Atomic
+Red Team) → endpoints Siham → détection → Wazuh. Noms réels des étudiants
+(Siham, Ilyas) substitués aux « Étudiant 2/3 ». Diagramme Mermaid corrigé
++ version visuelle SVG produite pour la soutenance.
+
+**Choix.** Cloudflare Tunnel comme unique point d'entrée HTTPS : connexion
+sortante depuis le PC d'Imane, **aucun port entrant ouvert**, aucun reverse
+proxy à administrer — plus sûr et plus simple qu'un Nginx exposé.
+
+---
+
+## 2026-07-12 — Alignement plateforme / architecture SOC : suppression de Nginx (PR #35, ADR-007)
+
+**Contexte.** L'architecture SOC exige que Cloudflare Tunnel soit l'unique
+entrée HTTPS vers SmartSOC, **sans Nginx**. Or l'implémentation (PR #24)
+exposait la plateforme via un conteneur `frontend` sous Nginx —
+contradiction directe avec le schéma. Contradiction identifiée en revue
+d'architecture, corrigée ici.
+
+**Réalisé.** **Spring Boot sert désormais lui-même le build React**
+(embarqué dans `classpath:/static/`) : la plateforme n'expose qu'**un seul
+service `:8080`** rendant l'UI *et* l'API. Nginx supprimé
+(`frontend/Dockerfile` + `frontend/nginx.conf` retirés, service `frontend`
+retiré du Compose). Dockerfile multi-stage (Node build React → Maven copie
+le `dist` dans les ressources statiques → package). Service SPA
+(`WebMvcConfigurer`) : fichiers statiques réels + fallback `index.html`
+pour les routes client, en excluant `/api`, `/actuator`, `/swagger`,
+`/api-docs`, `/webjars`, `/ws`. Sécurité : UI publique (coquille HTML),
+**API et actuator sensibles restent protégés**. CI Docker : une seule
+image au lieu de deux. **ADR-007** rédigé.
+
+**Vérification réelle.** 32 tests backend verts (dont Swagger et les 401
+d'auth, inchangés). Stack Docker reconstruite (2 conteneurs : backend +
+postgres). Sur `:8080` : UI racine 200, deep-link `/alerts` 200 (fallback
+SPA), asset JS hashé 200, `/api/v1/auth/me` sans token 401, Swagger 200,
+health 200, login admin → token → identité ADMIN. React se monte et
+redirige `/alerts` → `/login` — le tout servi par Spring Boot, sans Nginx.
+
+---
+
 *Prochaines entrées : jalon Incidents, connecteurs SOC, moteur SOAR,
 contrats IA, déploiement Azure.*

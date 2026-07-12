@@ -45,13 +45,20 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/auth/login", "/api/v1/auth/refresh",
                                 "/api/v1/auth/logout").permitAll()
                         .requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
-                        .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/api-docs/**").permitAll()
+                        .requestMatchers("/swagger-ui.html", "/swagger-ui/**",
+                                "/api-docs/**", "/v3/api-docs/**", "/webjars/**").permitAll()
                         // Handshake WebSocket : l'authentification JWT a lieu
                         // sur la trame STOMP CONNECT (StompAuthChannelInterceptor)
                         .requestMatchers("/ws/**").permitAll()
                         // Webhooks des outils SOC : cle d'API dediee (IngestApiKeyFilter)
                         .requestMatchers("/api/v1/ingest/**").hasRole("INGEST")
-                        .anyRequest().authenticated())
+                        // Toute l'API est protegee ; l'actuator sensible aussi.
+                        .requestMatchers("/api/**").authenticated()
+                        .requestMatchers("/actuator/**").authenticated()
+                        // Le reste = SPA React servie par Spring Boot (coquille
+                        // HTML publique ; les donnees restent derriere l'API).
+                        // Cloudflare Tunnel expose ce seul service (sans Nginx).
+                        .anyRequest().permitAll())
                 .addFilterBefore(ingestApiKeyFilter, UsernamePasswordAuthenticationFilter.class)
                 .oauth2ResourceServer(oauth2 -> oauth2
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtConverter))

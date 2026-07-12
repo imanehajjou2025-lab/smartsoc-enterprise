@@ -64,18 +64,23 @@ cp .env.example .env
 #    Editer .env : POSTGRES_PASSWORD, JWT_SECRET (>= 32 caracteres,
 #    ex. `openssl rand -base64 48`) et SMARTSOC_ADMIN_PASSWORD
 
-# 2. Demarrer la plateforme
+# 2. Demarrer la plateforme (un seul service : Spring Boot sert l'UI + l'API)
 docker compose up -d --build
 
-# 3. Verifier
-#    Console  : http://localhost:3000  (login: admin / <SMARTSOC_ADMIN_PASSWORD>)
+# 3. Verifier — tout est sur le port 8080 (sans Nginx)
+#    Console  : http://localhost:8080/        (login: admin / <SMARTSOC_ADMIN_PASSWORD>)
 #    Sante    : http://localhost:8080/actuator/health
 #    Swagger  : http://localhost:8080/swagger-ui.html
 ```
 
-> ℹ️ Conformément à l'[ADR-005](docs/architecture/adr/ADR-005-standalone-platform-integration-contracts.md),
-> ce Compose ne contient **que** la plateforme (PostgreSQL + backend, bientôt frontend).
-> Les outils SOC et les services IA sont externes et branchés par configuration.
+> ℹ️ **Un seul conteneur applicatif** (+ PostgreSQL) : Spring Boot sert à la fois
+> l'API et le build React ([ADR-007](docs/architecture/adr/ADR-007-backend-serves-spa.md)),
+> **sans Nginx**. Cloudflare Tunnel exposera ce seul service. Conformément à
+> l'[ADR-005](docs/architecture/adr/ADR-005-standalone-platform-integration-contracts.md),
+> le Compose ne contient **que** la plateforme ; les outils SOC et l'IA sont externes.
+>
+> Pour le **développement frontend** (hot-reload), lancer en plus le serveur Vite :
+> `cd frontend && npm run dev` → <http://localhost:5173> (proxifie `/api` et `/ws` vers le backend).
 
 ### Prérequis
 
