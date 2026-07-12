@@ -580,5 +580,37 @@ redirige `/alerts` → `/login` — le tout servi par Spring Boot, sans Nginx.
 
 ---
 
-*Prochaines entrées : jalon Incidents, connecteurs SOC, moteur SOAR,
+## 2026-07-12 — Jalon Incidents I1 — domaine et persistance (PR #35)
+
+**Réalisé.** Le contexte `incidents` : un incident **regroupe des alertes**
+et porte le travail de l'analyste. Entité `Incident` (domaine pur) avec
+**cycle de vie gardé** (OPEN → INVESTIGATING → CONTAINED → RESOLVED →
+CLOSED, réouverture depuis RESOLVED, CLOSED terminal), affectation
+normalisée, référence lisible. `IncidentTimelineEntry` (trace
+d'investigation horodatée) et `IncidentEventType`. Ports `IncidentRepository`
+et `IncidentReferenceGenerator`. Migration `V4` : tables `incidents`,
+`incident_alerts` (liaison N↔1, FK vers `alerts`, `ON DELETE CASCADE`),
+`incident_timeline`, + **séquence PostgreSQL** pour les références. Pas de
+soft delete (pièce de dossier SOC). Adaptateurs : recherche par
+`Specification` (statut/sévérité/assigné, tri ouverture récente), liaison
+d'alertes **idempotente** (`ON CONFLICT DO NOTHING`), générateur de
+référence via `nextval`.
+
+**Choix.**
+- **Référence `INC-YYYY-NNNN`** générée par séquence Postgres : unicité et
+  monotonie garanties par la base, sans course possible (vs un max()+1
+  applicatif).
+- La `Severity` est **réutilisée** du contexte `alerts` (même échelle) —
+  vocabulaire partagé du domaine.
+- Liaison d'alertes idempotente : rejouer un lien ne crée pas de doublon.
+
+**Vérification.** 41 tests verts, dont 5 nouveaux tests d'intégration sur
+PostgreSQL réel : référence au format attendu et monotone, aller-retour,
+liaison/déliaison idempotente d'une alerte (avec FK réelle), timeline
+ordonnée, recherche filtrée par sévérité et paginée. Migration V4 appliquée.
+
+---
+
+*Prochaines entrées : I2 API incidents (CRUD, transitions, liens, timeline,
+escalade depuis une alerte), I3 frontend, puis connecteurs SOC, SOAR,
 contrats IA, déploiement Azure.*
