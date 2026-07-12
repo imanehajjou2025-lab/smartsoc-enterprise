@@ -23,13 +23,9 @@ permissions:
 
 jobs:
   build-and-scan:
-    name: Build & scan ${{ matrix.image }}
+    name: Build & scan platform image
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    strategy:
-      fail-fast: false
-      matrix:
-        image: [backend, frontend]
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -37,20 +33,23 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build ${{ matrix.image }} image
+      # Image unique : Spring Boot sert l'API + le build React (sans Nginx).
+      # Contexte = racine du dépôt (build frontend + backend).
+      - name: Build platform image
         uses: docker/build-push-action@v6
         with:
-          context: ./${{ matrix.image }}
+          context: .
+          file: backend/Dockerfile
           load: true
-          tags: smartsoc/${{ matrix.image }}:ci
-          cache-from: type=gha,scope=${{ matrix.image }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+          tags: smartsoc/backend:ci
+          cache-from: type=gha,scope=platform
+          cache-to: type=gha,mode=max,scope=platform
 
       # Visibilite : rapport complet dans les logs, sans bloquer
       - name: Trivy scan (report)
         uses: aquasecurity/trivy-action@v0.36.0
         with:
-          image-ref: smartsoc/${{ matrix.image }}:ci
+          image-ref: smartsoc/backend:ci
           format: table
           severity: CRITICAL,HIGH,MEDIUM
           exit-code: "0"
@@ -59,7 +58,7 @@ jobs:
       - name: Trivy scan (gate on CRITICAL)
         uses: aquasecurity/trivy-action@v0.36.0
         with:
-          image-ref: smartsoc/${{ matrix.image }}:ci
+          image-ref: smartsoc/backend:ci
           format: sarif
           output: trivy-results.sarif
           severity: CRITICAL
@@ -74,4 +73,4 @@ jobs:
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: trivy-results.sarif
-          category: trivy-${{ matrix.image }}-image
+          category: trivy-platform-image

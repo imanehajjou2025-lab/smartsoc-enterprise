@@ -1,26 +1,41 @@
 # ============================================================
-# SmartSOC Backend - build multi-stage
-# Etape 1 : build Maven (JDK 21) avec cache des dependances
-# Etape 2 : runtime minimal (JRE 21 Alpine), utilisateur non-root
+# SmartSOC — image unique : Spring Boot sert l'API ET l'UI React
+# (aucun Nginx ; Cloudflare Tunnel expose ce seul service :8080).
+# Contexte de build = racine du dépôt (accès à backend/ et frontend/).
+#
+# Étape 1 : build du frontend React (Node 24) -> dist/
+# Étape 2 : build Maven (JDK 21), le dist React est copié dans les
+#           ressources statiques de smartsoc-api avant le package
+# Étape 3 : runtime minimal (JRE 21 Alpine), utilisateur non-root
 # ============================================================
+
+FROM node:24-alpine AS frontend
+WORKDIR /fe
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
+COPY frontend/ ./
+RUN npm run build
 
 FROM eclipse-temurin:21-jdk-alpine AS build
 WORKDIR /build
 
 # Couche dependances : ne s'invalide que si un pom.xml change
-COPY .mvn/ .mvn/
-COPY mvnw pom.xml ./
-COPY smartsoc-domain/pom.xml smartsoc-domain/
-COPY smartsoc-application/pom.xml smartsoc-application/
-COPY smartsoc-infrastructure/pom.xml smartsoc-infrastructure/
-COPY smartsoc-api/pom.xml smartsoc-api/
+COPY backend/.mvn/ .mvn/
+COPY backend/mvnw backend/pom.xml ./
+COPY backend/smartsoc-domain/pom.xml smartsoc-domain/
+COPY backend/smartsoc-application/pom.xml smartsoc-application/
+COPY backend/smartsoc-infrastructure/pom.xml smartsoc-infrastructure/
+COPY backend/smartsoc-api/pom.xml smartsoc-api/
 RUN ./mvnw -B -ntp dependency:go-offline -DexcludeGroupIds=com.smartsoc || true
 
 # Couche sources : les tests tournent dans la CI, pas dans le build d'image
-COPY smartsoc-domain/src smartsoc-domain/src
-COPY smartsoc-application/src smartsoc-application/src
-COPY smartsoc-infrastructure/src smartsoc-infrastructure/src
-COPY smartsoc-api/src smartsoc-api/src
+COPY backend/smartsoc-domain/src smartsoc-domain/src
+COPY backend/smartsoc-application/src smartsoc-application/src
+COPY backend/smartsoc-infrastructure/src smartsoc-infrastructure/src
+COPY backend/smartsoc-api/src smartsoc-api/src
+
+# Le build React devient une ressource statique servie par Spring Boot
+COPY --from=frontend /fe/dist/ smartsoc-api/src/main/resources/static/
 RUN ./mvnw -B -ntp package -DskipTests
 
 FROM eclipse-temurin:21-jre-alpine

@@ -30,9 +30,12 @@ services:
     networks:
       - smartsoc-net
 
+  # Service unique de la plateforme : Spring Boot sert l'API ET l'UI React
+  # (sans Nginx). Cloudflare Tunnel exposera ce seul service (ADR-007).
   backend:
     build:
-      context: ./backend
+      context: .
+      dockerfile: backend/Dockerfile
     image: smartsoc/backend:local
     container_name: smartsoc-backend
     restart: unless-stopped
@@ -53,20 +56,6 @@ services:
       - "${BACKEND_PORT:-8080}:8080"
     depends_on:
       postgres:
-        condition: service_healthy
-    networks:
-      - smartsoc-net
-
-  frontend:
-    build:
-      context: ./frontend
-    image: smartsoc/frontend:local
-    container_name: smartsoc-frontend
-    restart: unless-stopped
-    ports:
-      - "${FRONTEND_PORT:-3000}:8080"
-    depends_on:
-      backend:
         condition: service_healthy
     networks:
       - smartsoc-net
