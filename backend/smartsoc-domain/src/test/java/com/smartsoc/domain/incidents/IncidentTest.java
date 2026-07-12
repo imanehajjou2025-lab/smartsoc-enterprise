@@ -74,4 +74,21 @@ class IncidentTest {
         incident.unassign();
         assertThat(incident.getAssigneeUsername()).isNull();
     }
+
+    @Test
+    void renameTrimsTheTitle() {
+        Incident incident = sample();
+
+        incident.rename("  Nouveau titre  ");
+        assertThat(incident.getTitle()).isEqualTo("Nouveau titre");
+    }
+
+    @Test
+    void queryDefaultsToFirstPageWhenPageIsNull() {
+        IncidentQuery query = new IncidentQuery(null, null, null, null);
+
+        assertThat(query.page()).isNotNull();
+        assertThat(query.page().page()).isZero();
+        assertThat(query.page().size()).isEqualTo(25);
+    }
 }

@@ -109,6 +109,22 @@ class IncidentPersistenceIntegrationTest {
                 assertThat(i.getSeverity()).isEqualTo(Severity.CRITICAL));
     }
 
+    @Test
+    void searchFiltersByStatusAndAssignee() {
+        Incident incident = newIncident(Severity.HIGH);
+        incident.transitionTo(IncidentStatus.INVESTIGATING);
+        incident.assignTo("analyst-" + UUID.randomUUID().toString().substring(0, 8));
+        String assignee = incident.getAssigneeUsername();
+        incidentRepository.save(incident);
+
+        PageResult<Incident> byAssignee = incidentRepository.search(
+                new IncidentQuery(IncidentStatus.INVESTIGATING, null, assignee, PageQuery.of(0, 10)));
+
+        assertThat(byAssignee.items()).hasSize(1);
+        assertThat(byAssignee.items().get(0).getAssigneeUsername()).isEqualTo(assignee);
+        assertThat(byAssignee.items().get(0).getStatus()).isEqualTo(IncidentStatus.INVESTIGATING);
+    }
+
     private UUID ingestAlert() {
         Alert alert = alertRepository.save(Alert.ingest(Alert.IngestionData.builder()
                 .source("wazuh")
