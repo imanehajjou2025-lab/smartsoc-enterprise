@@ -611,6 +611,26 @@ ordonnée, recherche filtrée par sévérité et paginée. Migration V4 appliqu�
 
 ---
 
-*Prochaines entrées : I2 API incidents (CRUD, transitions, liens, timeline,
-escalade depuis une alerte), I3 frontend, puis connecteurs SOC, SOAR,
-contrats IA, déploiement Azure.*
+## 2026-07-14 — Jalon Incidents I2 — API REST (PR #36)
+
+**Réalisé.** `IncidentService` (module application) + `IncidentController` :
+création manuelle, **escalade depuis une alerte** (crée l'incident à partir
+du titre/sévérité de l'alerte et la lie), liste filtrée/paginée, détail
+(incident + alertes liées + timeline), transitions de statut, assignation /
+désassignation, notes, liaison/déliaison d'alertes. **Chaque action inscrit
+une entrée de timeline** avec l'analyste authentifié (JWT `sub`) comme
+auteur. RBAC gradué : lecture pour tout authentifié, écriture réservée à
+ANALYST et plus (`@PreAuthorize`). Transition illégale → 422
+`INVALID_INCIDENT_TRANSITION` (règle du domaine). Réutilisation de
+`AlertResponse` pour les alertes liées (contrat unique).
+
+**Vérification.** 47 tests verts, dont 5 nouveaux tests d'intégration API
+sur PostgreSQL réel : création + timeline `CREATED`, escalade depuis une
+alerte réellement liée, cycle de vie + rejet 422, assignation/note, **RBAC
+(VIEWER lit mais reçoit 403 à l'écriture)**.
+
+---
+
+*Prochaines entrées : I3 frontend incidents (liste, détail, escalade depuis
+le tiroir d'alerte), puis connecteurs SOC, SOAR, contrats IA, déploiement
+Azure.*
