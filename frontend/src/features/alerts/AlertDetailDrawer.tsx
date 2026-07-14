@@ -6,9 +6,12 @@ import Divider from '@mui/material/Divider';
 import Drawer from '@mui/material/Drawer';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
+import ArrowOutwardIcon from '@mui/icons-material/ArrowOutward';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { useAppSelector } from '../../app/hooks';
 import { problemDetail } from '../../shared/api/client';
+import { escalateFromAlert } from '../incidents/incidentsApi';
 import {
   ALLOWED_TRANSITIONS,
   updateAlertStatus,
@@ -48,6 +51,7 @@ function formatDate(iso: string) {
 /** Détail d'une alerte : contexte SOC, payload brut (évidence) et triage. */
 function AlertDetailDrawer({ alert, onClose, onUpdated }: Props) {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const role = useAppSelector((state) => state.auth.user?.role);
   const canTriage = role === 'ADMIN' || role === 'SOC_MANAGER' || role === 'SOC_ANALYST';
 
@@ -57,6 +61,15 @@ function AlertDetailDrawer({ alert, onClose, onUpdated }: Props) {
     onSuccess: (updated) => {
       void queryClient.invalidateQueries({ queryKey: ['alerts'] });
       onUpdated(updated);
+    },
+  });
+
+  const escalateMutation = useMutation({
+    mutationFn: (alertId: string) => escalateFromAlert(alertId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['incidents'] });
+      onClose();
+      navigate('/incidents');
     },
   });
 
@@ -87,6 +100,24 @@ function AlertDetailDrawer({ alert, onClose, onUpdated }: Props) {
             <Alert severity="error" sx={{ mb: 2 }}>
               {problemDetail(mutation.error, 'Transition impossible.')}
             </Alert>
+          )}
+          {escalateMutation.isError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {problemDetail(escalateMutation.error, 'Escalade impossible.')}
+            </Alert>
+          )}
+
+          {canTriage && (
+            <Button
+              size="small"
+              variant="contained"
+              startIcon={<ArrowOutwardIcon />}
+              disabled={escalateMutation.isPending}
+              onClick={() => escalateMutation.mutate(alert.id)}
+              sx={{ mb: 2 }}
+            >
+              {escalateMutation.isPending ? 'Escalade…' : 'Escalader en incident'}
+            </Button>
           )}
 
           {canTriage && transitions.length > 0 && (
