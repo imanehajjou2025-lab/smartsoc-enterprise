@@ -631,6 +631,25 @@ alerte réellement liée, cycle de vie + rejet 422, assignation/note, **RBAC
 
 ---
 
-*Prochaines entrées : I3 frontend incidents (liste, détail, escalade depuis
-le tiroir d'alerte), puis connecteurs SOC, SOAR, contrats IA, déploiement
-Azure.*
+## 2026-07-14 — Jalon Incidents I3 — module frontend (PR #37)
+
+**Réalisé.** Le module Incidents de la console : liste filtrée/paginée
+(référence, sévérité, statut, assigné, date), dialogue de création, et
+**tiroir de détail** complet — transitions de statut (miroir du cycle de
+vie du domaine), assignation/désassignation, alertes liées (avec déliaison),
+timeline avec ajout de notes. **Bouton « Escalader en incident »** ajouté au
+tiroir d'alerte : crée un incident depuis l'alerte, la lie, et redirige vers
+`/incidents`. Écriture réservée aux analystes ; réutilisation de
+`SeverityChip` et du contrat `AlertResponse`.
+
+**Vérification E2E réelle** (navigateur Vite → backend Docker reconstruit
+avec l'API I2) : login, page Incidents, création via API, **escalade d'une
+alerte → INC-2026-0002 avec l'alerte liée**, ouverture du détail (alerte
+liée + timeline `CREATED` visibles), **transition OPEN → INVESTIGATING** qui
+inscrit « OPEN → INVESTIGATING » dans la timeline et met à jour les boutons.
+16 tests frontend (2 nouveaux). Jalon Incidents (I1→I3) terminé.
+
+---
+
+*Prochaines entrées : connecteurs SOC (interface commune, ADR-005), moteur
+SOAR, contrats IA, déploiement Azure.*
