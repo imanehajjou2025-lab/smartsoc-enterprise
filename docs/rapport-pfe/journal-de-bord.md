@@ -691,6 +691,44 @@ invariant score ∈ [0,1] de `Alert.applyAiAssessment`).
 
 ---
 
-*Prochaines entrées : intégration backend du classifieur (port + stub +
-Feign), assistant conversationnel, frontend IA, connecteurs SOC, moteur
-SOAR, déploiement Azure.*
+## 2026-07-17 — Jalon IA C2 — classifieur TP/FP derrière un port interchangeable (PR #44)
+
+**Réalisé.** Première concrétisation de l'ADR-008 : le port `AlertClassifier`
+(couche application) et ses **deux adaptateurs sélectionnés par
+configuration** (`SMARTSOC_AI_MODE`) — le futur service IA remplacera la
+simulation par pure configuration, **zéro refactoring** côté plateforme :
+- `simulation` (défaut) : stub embarqué **déterministe** (score de base par
+  sévérité ± bruit dérivé de l'id) — la plateforme se démontre seule ;
+- `live` : client **OpenFeign** implémentant exactement le contrat
+  `ai-classifier-api.yaml` (X-API-Key, timeouts 2 s/5 s, **circuit breaker
+  Resilience4j**) ; les beans Feign n'existent qu'en mode live.
+
+L'IA n'est **jamais sur le chemin critique** : classification asynchrone
+(`@Async` sur `AlertIngestedEvent`) après la réponse au webhook ; l'échec
+laisse l'alerte traitable sans score. `POST /api/v1/alerts/{id}/classify`
+(ANALYST+) pour la (re)classification manuelle — 503 `AI_UNAVAILABLE` si le
+service ne répond pas. Alerte classée poussée sur `/topic/alerts/updates`
+(topic distinct : `/topic/alerts` garde la sémantique « nouvelle alerte »,
+les tests temps réel existants restent intacts).
+
+**Difficulté rencontrée.** Démarrage du contexte cassé par un
+`ClassNotFoundException` Resilience4j : le pin direct de
+`resilience4j-spring-boot3` 2.3.0 cohabitait avec des transitives 2.2.x
+gérées par le BOM Spring Cloud. **Solution :** import du
+`resilience4j-bom` AVANT `spring-cloud-dependencies` dans le
+dependencyManagement — toutes les briques Resilience4j alignées sur la
+même version. **Leçon :** ne jamais pinner un artefact isolé d'une famille
+qui publie un BOM.
+
+**Vérification.** **83 tests verts** (build complet sur PostgreSQL
+Testcontainers) dont 15 nouveaux : orchestration (verdict appliqué,
+indisponibilité silencieuse à l'ingestion mais signalée à la demande),
+déterminisme du stub, E2E simulation (le webhook répond AVANT le verdict,
+verdict asynchrone appliqué, RBAC VIEWER → 403), et **WireMock rejouant le
+contrat OpenAPI** : verdict du service appliqué (0.87/TRUE_POSITIVE),
+X-API-Key transmis, payload conforme, service down → 503 + alerte intacte.
+
+---
+
+*Prochaines entrées : agent conversationnel (même patron port/simulation/
+live), frontend IA, connecteurs SOC, moteur SOAR, déploiement Azure.*
