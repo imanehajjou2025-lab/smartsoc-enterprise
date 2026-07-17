@@ -52,6 +52,11 @@ services:
       SMARTSOC_ADMIN_PASSWORD: ${SMARTSOC_ADMIN_PASSWORD:?SMARTSOC_ADMIN_PASSWORD must be set in .env}
       # Optionnelle : vide = ingestion desactivee (plateforme autonome, ADR-005)
       SMARTSOC_INGEST_API_KEY: ${SMARTSOC_INGEST_API_KEY:-}
+      # Integration IA (ADR-008) : simulation par defaut. Brancher les vrais
+      # services IA = passer en live + renseigner URL et cle, rien d'autre.
+      SMARTSOC_AI_MODE: ${SMARTSOC_AI_MODE:-simulation}
+      SMARTSOC_AI_CLASSIFIER_URL: ${SMARTSOC_AI_CLASSIFIER_URL:-http://localhost:8000}
+      SMARTSOC_AI_CLASSIFIER_API_KEY: ${SMARTSOC_AI_CLASSIFIER_API_KEY:-}
     ports:
       - "${BACKEND_PORT:-8080}:8080"
     depends_on:

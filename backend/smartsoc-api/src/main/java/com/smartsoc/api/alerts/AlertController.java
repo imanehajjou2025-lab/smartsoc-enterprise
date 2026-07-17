@@ -3,6 +3,7 @@ package com.smartsoc.api.alerts;
 import com.smartsoc.api.alerts.dto.AlertDtos.AlertResponse;
 import com.smartsoc.api.alerts.dto.AlertDtos.UpdateAlertStatusRequest;
 import com.smartsoc.api.common.dto.PageResponse;
+import com.smartsoc.application.ai.AlertClassificationService;
 import com.smartsoc.application.alerts.AlertStatsService;
 import com.smartsoc.application.alerts.AlertTriageService;
 import com.smartsoc.domain.alerts.AlertStatistics;
@@ -16,6 +17,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -34,6 +36,7 @@ public class AlertController {
 
     private final AlertTriageService triageService;
     private final AlertStatsService statsService;
+    private final AlertClassificationService classificationService;
     private final AlertApiMapper mapper;
 
     /** Statistiques agrégées du dashboard (timeline 7 jours). */
@@ -63,5 +66,16 @@ public class AlertController {
     public AlertResponse changeStatus(@PathVariable UUID id,
                                       @Valid @RequestBody UpdateAlertStatusRequest request) {
         return mapper.toResponse(triageService.changeStatus(id, request.status()));
+    }
+
+    /**
+     * (Re)classification IA à la demande — utile quand le classifieur était
+     * indisponible à l'ingestion, ou après réentraînement du modèle.
+     * 503 AI_UNAVAILABLE si le classifieur ne répond pas.
+     */
+    @PostMapping("/{id}/classify")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SOC_MANAGER', 'SOC_ANALYST')")
+    public AlertResponse classify(@PathVariable UUID id) {
+        return mapper.toResponse(classificationService.classifyNow(id));
     }
 }
