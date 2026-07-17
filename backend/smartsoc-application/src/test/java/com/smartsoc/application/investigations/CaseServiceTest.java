@@ -197,6 +197,97 @@ class CaseServiceTest {
     }
 
     @Test
+    void assignmentLifecycleIsTraced() {
+        Case investigation = openCase();
+        when(caseRepository.findById(investigation.getId()))
+                .thenReturn(Optional.of(investigation));
+        when(caseRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        Case assigned = service.assign(investigation.getId(), "  Analyst01 ", "manager");
+        assertThat(assigned.getAssigneeUsername()).isEqualTo("analyst01");
+
+        Case unassigned = service.unassign(investigation.getId(), "manager");
+        assertThat(unassigned.getAssigneeUsername()).isNull();
+
+        ArgumentCaptor<CaseTimelineEntry> captor =
+                ArgumentCaptor.forClass(CaseTimelineEntry.class);
+        verify(caseRepository, org.mockito.Mockito.times(2)).addTimelineEntry(captor.capture());
+        assertThat(captor.getAllValues()).extracting(CaseTimelineEntry::type)
+                .containsExactly(CaseEventType.ASSIGNED, CaseEventType.UNASSIGNED);
+    }
+
+    @Test
+    void statusChangeIsTracedWithBothStates() {
+        Case investigation = openCase();
+        when(caseRepository.findById(investigation.getId()))
+                .thenReturn(Optional.of(investigation));
+        when(caseRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        service.changeStatus(investigation.getId(),
+                com.smartsoc.domain.investigations.CaseStatus.IN_PROGRESS, "analyst01");
+
+        CaseTimelineEntry entry = lastTimelineEntry();
+        assertThat(entry.type()).isEqualTo(CaseEventType.STATUS_CHANGED);
+        assertThat(entry.message()).contains("OPEN").contains("IN_PROGRESS");
+    }
+
+    @Test
+    void incidentAndAlertLinksAreTracedAndUnlinked() {
+        Case investigation = openCase();
+        Incident incident = Incident.open("INC-2026-0009", "Exfiltration", null, Severity.HIGH);
+        com.smartsoc.domain.alerts.Alert alert = com.smartsoc.domain.alerts.Alert.ingest(
+                com.smartsoc.domain.alerts.Alert.IngestionData.builder()
+                        .source("wazuh").externalId("evt-9").title("alerte")
+                        .severity(Severity.HIGH).detectedAt(java.time.Instant.now()).build());
+        when(caseRepository.findById(investigation.getId()))
+                .thenReturn(Optional.of(investigation));
+        when(incidentRepository.findById(incident.getId())).thenReturn(Optional.of(incident));
+        when(alertRepository.findById(alert.getId())).thenReturn(Optional.of(alert));
+
+        service.linkIncident(investigation.getId(), incident.getId(), "a");
+        service.unlinkIncident(investigation.getId(), incident.getId(), "a");
+        service.linkAlert(investigation.getId(), alert.getId(), "a");
+        service.unlinkAlert(investigation.getId(), alert.getId(), "a");
+
+        verify(caseRepository).linkIncident(investigation.getId(), incident.getId());
+        verify(caseRepository).unlinkIncident(investigation.getId(), incident.getId());
+        verify(caseRepository).linkAlert(investigation.getId(), alert.getId());
+        verify(caseRepository).unlinkAlert(investigation.getId(), alert.getId());
+        ArgumentCaptor<CaseTimelineEntry> captor =
+                ArgumentCaptor.forClass(CaseTimelineEntry.class);
+        verify(caseRepository, org.mockito.Mockito.times(4)).addTimelineEntry(captor.capture());
+        assertThat(captor.getAllValues()).extracting(CaseTimelineEntry::type)
+                .containsExactly(CaseEventType.INCIDENT_LINKED, CaseEventType.INCIDENT_UNLINKED,
+                        CaseEventType.ALERT_LINKED, CaseEventType.ALERT_UNLINKED);
+    }
+
+    @Test
+    void detailReadsResolveLinkedEntitiesAndFollowUps() {
+        Case investigation = openCase();
+        Incident incident = Incident.open("INC-2026-0010", "Latéralisation", null, Severity.LOW);
+        when(caseRepository.findById(investigation.getId()))
+                .thenReturn(Optional.of(investigation));
+        when(caseRepository.findLinkedIncidentIds(investigation.getId()))
+                .thenReturn(java.util.List.of(incident.getId()));
+        when(incidentRepository.findById(incident.getId())).thenReturn(Optional.of(incident));
+        when(caseRepository.findLinkedAlertIds(investigation.getId()))
+                .thenReturn(java.util.List.of());
+        when(caseRepository.findFollowUps(investigation.getId()))
+                .thenReturn(java.util.List.of());
+        when(caseRepository.findTasks(investigation.getId()))
+                .thenReturn(java.util.List.of());
+        when(caseRepository.findTimeline(investigation.getId()))
+                .thenReturn(java.util.List.of());
+
+        assertThat(service.getLinkedIncidents(investigation.getId()))
+                .extracting(Incident::getReference).containsExactly("INC-2026-0010");
+        assertThat(service.getLinkedAlerts(investigation.getId())).isEmpty();
+        assertThat(service.getFollowUps(investigation.getId())).isEmpty();
+        assertThat(service.getTasks(investigation.getId())).isEmpty();
+        assertThat(service.getTimeline(investigation.getId())).isEmpty();
+    }
+
+    @Test
     void unknownCaseIs404() {
         UUID unknown = UUID.randomUUID();
         when(caseRepository.findById(unknown)).thenReturn(Optional.empty());

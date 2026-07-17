@@ -29,6 +29,7 @@ import static org.assertj.core.api.Assertions.assertThat;
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = {
                 "smartsoc.security.bootstrap-admin.password=IntegrationTest123!",
+                "smartsoc.security.ingest.api-key=test-ingest-key-0123456789abcdef",
         })
 @Import(TestcontainersConfiguration.class)
 class InvestigationApiIntegrationTest {
@@ -168,6 +169,55 @@ class InvestigationApiIntegrationTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
+    void assignmentLinksAndTaskEditionAreExposed() {
+        String admin = adminToken();
+        String caseId = createCase(admin, "Cas de travail");
+
+        // Assignation / désassignation.
+        Map<String, Object> assigned = exchange(HttpMethod.PUT, url(caseId, "/assignee"),
+                admin, Map.of("username", "Analyst01"), Map.class).getBody();
+        assertThat(assigned.get("assigneeUsername")).isEqualTo("analyst01");
+        Map<String, Object> unassigned = exchange(HttpMethod.DELETE, url(caseId, "/assignee"),
+                admin, null, Map.class).getBody();
+        assertThat(unassigned.get("assigneeUsername")).isNull();
+
+        // Liaison puis déliaison d'un incident et d'une alerte réels.
+        Map<String, Object> incident = exchange(HttpMethod.POST, "/api/v1/incidents", admin,
+                Map.of("title", "Incident à lier", "severity", "LOW"), Map.class).getBody();
+        String alertId = ingestAlert();
+        exchange(HttpMethod.POST, url(caseId, "/incidents/" + incident.get("id")), admin,
+                null, Void.class);
+        exchange(HttpMethod.POST, url(caseId, "/alerts/" + alertId), admin, null, Void.class);
+
+        Map<String, Object> detail = exchange(HttpMethod.GET, url(caseId, ""), admin,
+                null, Map.class).getBody();
+        assertThat((java.util.List<Map<String, Object>>) detail.get("linkedIncidents"))
+                .extracting(i -> i.get("id")).containsExactly(incident.get("id"));
+        assertThat((java.util.List<Map<String, Object>>) detail.get("linkedAlerts"))
+                .extracting(a -> a.get("id")).containsExactly(alertId);
+
+        exchange(HttpMethod.DELETE, url(caseId, "/incidents/" + incident.get("id")), admin,
+                null, Void.class);
+        exchange(HttpMethod.DELETE, url(caseId, "/alerts/" + alertId), admin, null, Void.class);
+        Map<String, Object> emptied = exchange(HttpMethod.GET, url(caseId, ""), admin,
+                null, Map.class).getBody();
+        assertThat((java.util.List<?>) emptied.get("linkedIncidents")).isEmpty();
+        assertThat((java.util.List<?>) emptied.get("linkedAlerts")).isEmpty();
+
+        // Édition de tâche hors statut : titre + assignation.
+        Map<String, Object> task = exchange(HttpMethod.POST, url(caseId, "/tasks"), admin,
+                Map.of("title", "Vérifier les IOC"), Map.class).getBody();
+        Map<String, Object> edited = exchange(HttpMethod.PATCH,
+                url(caseId, "/tasks/" + task.get("id")), admin,
+                Map.of("title", "Vérifier les IOC MISP", "assignee", "Analyst01"),
+                Map.class).getBody();
+        assertThat(edited.get("title")).isEqualTo("Vérifier les IOC MISP");
+        assertThat(edited.get("assigneeUsername")).isEqualTo("analyst01");
+        assertThat(edited.get("status")).isEqualTo("TODO");
+    }
+
+    @Test
     void unknownCaseIs404() {
         ResponseEntity<String> response = exchange(HttpMethod.GET,
                 url(UUID.randomUUID().toString(), ""), adminToken(), null, String.class);
@@ -184,6 +234,19 @@ class InvestigationApiIntegrationTest {
         Map<String, Object> body = exchange(HttpMethod.POST, INVESTIGATIONS, token,
                 Map.of("title", title, "priority", "MEDIUM"), Map.class).getBody();
         return (String) body.get("id");
+    }
+
+    private String ingestAlert() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("X-API-Key", "test-ingest-key-0123456789abcdef");
+        Map<String, Object> alert = rest.postForEntity("/api/v1/ingest/alerts",
+                new HttpEntity<>(Map.of(
+                        "source", "wazuh", "externalId", "evt-case-api-" + UUID.randomUUID(),
+                        "title", "Alerte à lier au cas", "severity", "HIGH",
+                        "detectedAt", java.time.Instant.now().toString()), headers),
+                Map.class).getBody();
+        return (String) alert.get("id");
     }
 
     private String adminToken() {

@@ -4,6 +4,8 @@ import com.smartsoc.domain.alerts.Severity;
 import com.smartsoc.domain.common.BusinessRuleViolationException;
 import org.junit.jupiter.api.Test;
 
+import java.util.UUID;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -145,6 +147,54 @@ class CaseTest {
                 .isInstanceOf(BusinessRuleViolationException.class);
         assertThatThrownBy(() -> CaseTask.create(investigation.getId(), " "))
                 .isInstanceOf(BusinessRuleViolationException.class);
+    }
+
+    @Test
+    void taskCanBeRenamedAndReassigned() {
+        CaseTask task = CaseTask.create(UUID.randomUUID(), "Analyser les logs");
+
+        task.rename("  Analyser les logs proxy  ");
+        assertThat(task.getTitle()).isEqualTo("Analyser les logs proxy");
+
+        task.assignTo("  Analyst01 ");
+        assertThat(task.getAssigneeUsername()).isEqualTo("analyst01");
+        task.unassign();
+        assertThat(task.getAssigneeUsername()).isNull();
+
+        assertThatThrownBy(() -> task.rename(" "))
+                .isInstanceOf(BusinessRuleViolationException.class);
+        assertThatThrownBy(() -> task.assignTo(" "))
+                .isInstanceOf(BusinessRuleViolationException.class);
+        assertThatThrownBy(() -> task.updateStatus(null))
+                .isInstanceOf(BusinessRuleViolationException.class);
+    }
+
+    @Test
+    void timelineEntryCarriesItsFacts() {
+        UUID caseId = UUID.randomUUID();
+        CaseTimelineEntry entry = CaseTimelineEntry.of(
+                caseId, CaseEventType.NOTE_ADDED, "Analyse en cours", "analyst01");
+
+        assertThat(entry.id()).isNotNull();
+        assertThat(entry.caseId()).isEqualTo(caseId);
+        assertThat(entry.type()).isEqualTo(CaseEventType.NOTE_ADDED);
+        assertThat(entry.message()).isEqualTo("Analyse en cours");
+        assertThat(entry.author()).isEqualTo("analyst01");
+        assertThat(entry.occurredAt()).isNotNull();
+    }
+
+    @Test
+    void eventTypesMatchTheValidatedAuditVocabulary() {
+        // La liste validée en conception : tout ajout/retrait doit être un
+        // choix explicite (contrainte SQL ck_case_timeline_type à aligner).
+        assertThat(CaseEventType.values()).extracting(Enum::name).containsExactly(
+                "CREATED", "STATUS_CHANGED", "ASSIGNED", "UNASSIGNED",
+                "INCIDENT_LINKED", "INCIDENT_UNLINKED",
+                "ALERT_LINKED", "ALERT_UNLINKED",
+                "TASK_ADDED", "TASK_UPDATED", "TASK_COMPLETED",
+                "NOTE_ADDED", "CLOSED", "FOLLOW_UP_OPENED");
+        assertThat(CaseEventType.valueOf("FOLLOW_UP_OPENED"))
+                .isEqualTo(CaseEventType.FOLLOW_UP_OPENED);
     }
 
     @Test
