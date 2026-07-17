@@ -1,0 +1,212 @@
+openapi: 3.1.0
+
+# ============================================================
+# SmartSOC — Contrat d'intégration n°2 : agent IA conversationnel
+# ------------------------------------------------------------
+# Ce fichier est LA référence commune entre la plateforme
+# SmartSOC (cliente) et le service d'agent conversationnel SOC
+# (fournisseur, développé hors de ce dépôt — ADR-005, ADR-008).
+#
+# Le service IA implémente cette API ; le backend SmartSOC la
+# consomme via un client OpenFeign résilient et l'expose aux
+# analystes derrière sa propre API authentifiée (JWT + RBAC).
+# Toute évolution du contrat passe par une PR sur ce fichier et
+# un bump de `info.version`.
+# ============================================================
+
+info:
+  title: SmartSOC AI Assistant API
+  description: |
+    API de l'assistant conversationnel SOC (agent basé LLM, Ollama par
+    défaut — ADR-003). L'analyste dialogue depuis la console SmartSOC ;
+    le backend relaie la conversation à ce service.
+
+    **Sans état côté service** : chaque requête porte l'historique complet
+    de la conversation. La plateforme (ou son frontend) est propriétaire du
+    stockage des conversations ; le service IA n'en conserve aucune. Cela
+    permet de remplacer ou redémarrer le service sans perte.
+
+    **Contexte métier optionnel** : la plateforme peut joindre l'essentiel
+    d'une alerte ou d'un incident pour ancrer la réponse. Tout enrichissement
+    supplémentaire (RAG, tools) se fait côté service IA en LECTURE SEULE via
+    l'API backend (ADR-003) — jamais d'écriture directe.
+
+    **Contraintes non fonctionnelles côté plateforme** : timeout d'appel
+    30 s (génération LLM), circuit breaker, dégradation gracieuse — la
+    console affiche « assistant indisponible » sans bloquer le reste.
+  version: 1.0.0
+  contact:
+    name: Équipe SmartSOC — plateforme
+  license:
+    name: MIT
+    identifier: MIT
+
+servers:
+  - url: http://localhost:8001
+    description: Développement local (URL réelle injectée par configuration côté plateforme)
+
+security:
+  - apiKey: []
+
+tags:
+  - name: chat
+    description: Dialogue analyste ↔ assistant
+  - name: monitoring
+    description: Santé du service et du modèle
+
+paths:
+  /api/v1/chat:
+    post:
+      tags: [chat]
+      operationId: chat
+      summary: Poursuit une conversation d'assistance SOC
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatRequest'
+      responses:
+        '200':
+          description: Réponse générée
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatResponse'
+        '400':
+          description: Requête invalide (historique vide, rôle inconnu…)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: Clé d'API absente ou invalide
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '503':
+          description: Modèle LLM indisponible
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
+  /api/v1/health:
+    get:
+      tags: [monitoring]
+      operationId: getHealth
+      summary: Santé du service et modèle LLM actif
+      security: []
+      responses:
+        '200':
+          description: Service opérationnel
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        '503':
+          description: Service hors d'état de répondre (statut DOWN)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+components:
+  securitySchemes:
+    apiKey:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: >
+        Clé partagée fournie par configuration des deux côtés
+        (variable d'environnement, jamais dans le code).
+
+  schemas:
+    ChatRequest:
+      type: object
+      required: [messages]
+      properties:
+        messages:
+          type: array
+          minItems: 1
+          description: >
+            Historique complet de la conversation, du plus ancien au plus
+            récent. Le dernier message est celui de l'analyste.
+          items:
+            $ref: '#/components/schemas/ChatMessage'
+        context:
+          $ref: '#/components/schemas/ChatContext'
+
+    ChatMessage:
+      type: object
+      required: [role, content]
+      properties:
+        role:
+          type: string
+          enum: [user, assistant]
+          description: user = analyste SmartSOC, assistant = agent IA.
+        content:
+          type: string
+          maxLength: 32768
+
+    ChatContext:
+      type: object
+      description: >
+        Ancrage métier optionnel de la conversation. Champs volontairement
+        dénormalisés : le service IA n'a pas besoin de rappeler l'API
+        backend pour les cas simples.
+      properties:
+        alertId:
+          type: [string, 'null']
+          format: uuid
+          description: Alerte SmartSOC discutée, le cas échéant.
+        incidentId:
+          type: [string, 'null']
+          format: uuid
+          description: Incident SmartSOC discuté, le cas échéant.
+        summary:
+          type: [string, 'null']
+          maxLength: 8192
+          description: >
+            Résumé textuel du contexte préparé par la plateforme
+            (titre, sévérité, hôte, techniques MITRE…).
+
+    ChatResponse:
+      type: object
+      required: [reply, model, generatedAt]
+      properties:
+        reply:
+          type: string
+          description: Réponse de l'assistant, en Markdown.
+        model:
+          type: string
+          description: Modèle LLM ayant généré la réponse (auditabilité).
+          examples: [ollama/llama3.1:8b]
+        generatedAt:
+          type: string
+          format: date-time
+          description: Horodatage de génération (UTC).
+
+    HealthResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [UP, DEGRADED, DOWN]
+        model:
+          type: [string, 'null']
+          description: Modèle LLM actuellement servi.
+
+    ApiError:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          description: Code d'erreur stable, exploitable par programme.
+          examples: [MODEL_UNAVAILABLE]
+        message:
+          type: string
+          description: Message lisible par un humain.

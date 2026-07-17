@@ -145,6 +145,7 @@ ai-service/
 | [ADR-005](adr/ADR-005-standalone-platform-integration-contracts.md) | Plateforme autonome, intégrations externes par contrats | ✅ Accepté |
 | [ADR-006](adr/ADR-006-soc-on-azure-multi-account.md) | SOC sur Azure multi-comptes relié par overlay WireGuard | ✅ Accepté |
 | [ADR-007](adr/ADR-007-backend-serves-spa.md) | Spring Boot sert la SPA React (un seul service, sans Nginx) | ✅ Accepté |
+| [ADR-008](adr/ADR-008-ai-integration-architecture.md) | Architecture d'intégration des services IA (contrats, ports, simulation) | ✅ Accepté |
 
 Le SOC déployé sur Azure fait l'objet d'une conception détaillée dédiée :
 [`docs/architecture/soc/SOC-ARCHITECTURE.md`](soc/SOC-ARCHITECTURE.md).

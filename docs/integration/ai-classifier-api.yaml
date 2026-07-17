@@ -1,0 +1,220 @@
+openapi: 3.1.0
+
+# ============================================================
+# SmartSOC — Contrat d'intégration n°1 : classifieur TP/FP
+# ------------------------------------------------------------
+# Ce fichier est LA référence commune entre la plateforme
+# SmartSOC (cliente) et le service IA de classification
+# (fournisseur, développé hors de ce dépôt — ADR-005, ADR-008).
+#
+# Le service IA implémente cette API ; le backend SmartSOC la
+# consomme via un client OpenFeign résilient. Toute évolution
+# du contrat passe par une PR sur ce fichier et un bump de
+# `info.version` (versionnement sémantique).
+# ============================================================
+
+info:
+  title: SmartSOC AI Classifier API
+  description: |
+    API de classification True Positive / False Positive des alertes de
+    sécurité. Le backend SmartSOC envoie les caractéristiques normalisées
+    d'une alerte ; le service répond un verdict et un score de confiance.
+
+    **Sémantique du score** : probabilité que l'alerte soit un vrai positif,
+    dans [0, 1]. Le seuil de décision appartient au modèle (côté service IA),
+    jamais à la plateforme : le verdict est donc toujours explicite dans la
+    réponse.
+
+    **Contraintes non fonctionnelles côté plateforme** (pour information du
+    fournisseur) : timeout d'appel 5 s, circuit breaker, dégradation gracieuse
+    — une alerte reste entièrement traitable sans score IA.
+  version: 1.0.0
+  contact:
+    name: Équipe SmartSOC — plateforme
+  license:
+    name: MIT
+    identifier: MIT
+
+servers:
+  - url: http://localhost:8000
+    description: Développement local (URL réelle injectée par configuration côté plateforme)
+
+security:
+  - apiKey: []
+
+tags:
+  - name: classification
+    description: Scoring TP/FP d'une alerte
+  - name: monitoring
+    description: Santé du service et du modèle
+
+paths:
+  /api/v1/classifications:
+    post:
+      tags: [classification]
+      operationId: classifyAlert
+      summary: Classe une alerte en vrai/faux positif
+      description: |
+        Appel synchrone et sans état : chaque requête contient toutes les
+        caractéristiques nécessaires. Le service ne lit ni n'écrit jamais
+        dans la base SmartSOC (accès lecture seule via l'API backend si un
+        enrichissement est nécessaire — ADR-003).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AlertClassificationRequest'
+      responses:
+        '200':
+          description: Classification produite
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertClassificationResponse'
+        '400':
+          description: Requête invalide (champ manquant ou mal formé)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: Clé d'API absente ou invalide
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '503':
+          description: Modèle indisponible (chargement, réentraînement…)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
+  /api/v1/health:
+    get:
+      tags: [monitoring]
+      operationId: getHealth
+      summary: Santé du service et version du modèle chargé
+      security: []
+      responses:
+        '200':
+          description: Service opérationnel
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        '503':
+          description: Service hors d'état de répondre (statut DOWN)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+components:
+  securitySchemes:
+    apiKey:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: >
+        Clé partagée fournie par configuration des deux côtés
+        (variable d'environnement, jamais dans le code).
+
+  schemas:
+    AlertClassificationRequest:
+      type: object
+      description: >
+        Caractéristiques normalisées de l'alerte, alignées sur le modèle
+        de domaine SmartSOC (Alert). Le payload brut de l'outil source est
+        transmis tel quel pour laisser le modèle exploiter des champs
+        spécifiques (feature engineering côté service IA).
+      required: [alertId, source, title, severity, detectedAt]
+      properties:
+        alertId:
+          type: string
+          format: uuid
+          description: Identifiant SmartSOC de l'alerte (traçabilité).
+        source:
+          type: string
+          description: Outil source normalisé (wazuh, suricata, …).
+          examples: [wazuh]
+        title:
+          type: string
+          description: Titre normalisé de l'alerte.
+        description:
+          type: [string, 'null']
+          description: Description longue, si fournie par la source.
+        severity:
+          type: string
+          enum: [CRITICAL, HIGH, MEDIUM, LOW, INFO]
+          description: Sévérité normalisée SmartSOC.
+        hostname:
+          type: [string, 'null']
+          description: Hôte concerné.
+        ruleId:
+          type: [string, 'null']
+          description: Identifiant de la règle de détection source.
+        mitreTechniques:
+          type: array
+          items:
+            type: string
+          description: Techniques MITRE ATT&CK associées (ex. T1110).
+          examples: [["T1110", "T1078"]]
+        detectedAt:
+          type: string
+          format: date-time
+          description: Horodatage de détection par l'outil source (UTC).
+        rawPayload:
+          type: [string, 'null']
+          description: Événement brut intégral (JSON sérialisé) de l'outil source.
+
+    AlertClassificationResponse:
+      type: object
+      required: [alertId, verdict, score, modelVersion, classifiedAt]
+      properties:
+        alertId:
+          type: string
+          format: uuid
+          description: Rappel de l'identifiant reçu (corrélation).
+        verdict:
+          type: string
+          enum: [TRUE_POSITIVE, FALSE_POSITIVE]
+          description: Verdict du modèle (aligné sur l'énum AiVerdict de SmartSOC).
+        score:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: Probabilité que l'alerte soit un vrai positif.
+          examples: [0.87]
+        modelVersion:
+          type: string
+          description: Version du modèle ayant produit le verdict (auditabilité).
+          examples: [tp-fp-classifier-2026.07.1]
+        classifiedAt:
+          type: string
+          format: date-time
+          description: Horodatage de la classification (UTC).
+
+    HealthResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [UP, DEGRADED, DOWN]
+        modelVersion:
+          type: [string, 'null']
+          description: Version du modèle actuellement chargé.
+
+    ApiError:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          description: Code d'erreur stable, exploitable par programme.
+          examples: [INVALID_REQUEST]
+        message:
+          type: string
+          description: Message lisible par un humain.
