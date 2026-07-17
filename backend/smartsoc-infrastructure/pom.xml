@@ -51,8 +51,20 @@
             <groupId>org.mapstruct</groupId>
             <artifactId>mapstruct</artifactId>
         </dependency>
-        <!-- Feign and WebSocket starters will be added by the feature PRs
-             that introduce the integrations. -->
+        <!-- Clients IA externes (ADR-008) : Feign en mode live,
+             circuit breaker Resilience4j (annotations + AOP). -->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-openfeign</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-spring-boot3</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aop</artifactId>
+        </dependency>
 
         <!-- Test only -->
         <dependency>

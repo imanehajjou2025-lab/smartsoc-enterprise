@@ -1,5 +1,6 @@
 package com.smartsoc.api.common.error;
 
+import com.smartsoc.application.ai.AiServiceUnavailableException;
 import com.smartsoc.domain.common.BusinessRuleViolationException;
 import com.smartsoc.domain.common.DomainException;
 import com.smartsoc.domain.common.ResourceNotFoundException;
@@ -72,6 +73,17 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 HttpStatus.UNAUTHORIZED, "Invalid username or password");
         problem.setTitle("Authentication failed");
         problem.setProperty(PROPERTY_CODE, "AUTHENTICATION_FAILED");
+        problem.setProperty(PROPERTY_TIMESTAMP, Instant.now());
+        return problem;
+    }
+
+    /** Classifieur IA injoignable sur une demande explicite (ADR-008). */
+    @ExceptionHandler(AiServiceUnavailableException.class)
+    public ProblemDetail handleAiServiceUnavailable(AiServiceUnavailableException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage());
+        problem.setTitle("AI service unavailable");
+        problem.setProperty(PROPERTY_CODE, ex.getCode());
         problem.setProperty(PROPERTY_TIMESTAMP, Instant.now());
         return problem;
     }

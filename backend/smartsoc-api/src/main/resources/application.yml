@@ -23,6 +23,15 @@ spring:
           time_zone: UTC
   flyway:
     enabled: true
+  cloud:
+    openfeign:
+      client:
+        config:
+          # Timeouts du classifieur TP/FP (ADR-008) : jamais plus de 5 s
+          # d'attente — au-delà, dégradation gracieuse (alerte sans score).
+          ai-classifier:
+            connect-timeout: 2000
+            read-timeout: 5000
 
 server:
   port: ${BACKEND_PORT:8080}
@@ -67,3 +76,23 @@ smartsoc:
       # Cle d'API des webhooks d'ingestion (outils SOC).
       # Vide = ingestion desactivee (la plateforme fonctionne sans SOC).
       api-key: ${SMARTSOC_INGEST_API_KEY:}
+  ai:
+    # simulation (defaut) = stubs embarques, plateforme demontrable seule ;
+    # live = clients Feign vers les vrais services IA (ADR-008).
+    # Brancher les vraies IA = changer ces variables, zero ligne de code.
+    mode: ${SMARTSOC_AI_MODE:simulation}
+    classifier:
+      url: ${SMARTSOC_AI_CLASSIFIER_URL:http://localhost:8000}
+      api-key: ${SMARTSOC_AI_CLASSIFIER_API_KEY:}
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      # Classifieur TP/FP : apres 50% d'echecs sur 10 appels, le circuit
+      # s'ouvre 30 s — les alertes restent traitables sans score (ADR-008).
+      aiClassifier:
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 2
