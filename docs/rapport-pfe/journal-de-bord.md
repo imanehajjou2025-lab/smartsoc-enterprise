@@ -811,6 +811,22 @@ notes) que l'entité ne peut pas protéger. API `/api/v1/investigations` :
 **Méthode.** Travail découpé en 8 lots de 1 à 5 fichiers, chacun revu et
 validé avant le suivant — revue humaine complète de chaque couche.
 
+**Difficulté : le gate SonarCloud bloque la PR.** Première CI presque
+verte, mais quality gate en échec : **75,1 % de couverture sur le
+nouveau code, seuil 80 %**. L'analyse fichier par fichier (API
+SonarCloud) a localisé les manques : traces d'assignation/statut/
+liaisons de `CaseService` (39 lignes), branches rename/assign de
+`CaseTask`, 4 endpoints de liaison du controller jamais appelés, énum
+`CaseEventType` non exercée. **Solution :** un commit de tests
+uniquement (aucun code de production modifié) — dont un test qui
+verrouille le **vocabulaire d'audit à 14 événements** (tout ajout/
+retrait devient un choix explicite, aligné sur la contrainte SQL) —
+couverture remontée à **96,6 %**, gate vert. **Leçon :** après Trivy
+(PR #44), deuxième garde-fou de la chaîne DevSecOps qui bloque
+réellement un merge — le seuil de 80 % n'est pas décoratif, il a forcé
+la couverture des chemins d'API secondaires (désassignation,
+déliaisons) qu'on aurait sinon livrés non testés.
+
 **Vérification.** Domaine : 9 tests (immutabilité du cas clos testée
 mutation par mutation). Application : 8 tests (types et auteurs des
 traces capturés, follow-up tracé des deux côtés). Persistance : 7 tests
