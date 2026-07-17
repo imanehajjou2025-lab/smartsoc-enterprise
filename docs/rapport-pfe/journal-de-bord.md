@@ -773,5 +773,54 @@ Trivy local puis CI complète sur la PR.
 
 ---
 
-*Prochaines entrées : agent conversationnel (même patron port/simulation/
-live), frontend IA, connecteurs SOC, moteur SOAR, déploiement Azure.*
+## 2026-07-18 — Jalon Investigations V1 — backend complet (PR #45)
+
+**Contexte.** Réorientation validée en équipe : les modules métier du SOC
+(investigations, actifs, CTI, MITRE, hunting, SOAR, rapports) sont
+développés AVANT l'assistant IA conversationnel, qui viendra en dernier
+pour exploiter toutes les capacités de la plateforme via des contrats
+stables, sans retouche à chaque nouveau module.
+
+**Réalisé.** Le contexte `investigations` de bout en bout (domaine →
+migration V5 → adaptateurs → service → API), avec `Case` comme entité
+métier interne (vocabulaire TheHive) et « Investigations » comme nom
+fonctionnel. Trois décisions structurantes validées en conception :
+- **Cycle `OPEN → IN_PROGRESS → CLOSED`, CLOSED strictement terminal** :
+  pas de réouverture — la reprise d'enquête passe par un **cas de suivi**
+  (`openFollowUp`) référençant l'origine (`origin_case_id`
+  auto-référencé), qui doit être CLOSED. Traçabilité d'audit : un dossier
+  clôturé n'est jamais modifié.
+- **Clôture = acte formel** : endpoint dédié `/close`, conclusion
+  obligatoire (interdit aussi par `transitionTo(CLOSED)`), et contrainte
+  SQL `ck_cases_closure` — la règle est gravée dans la base, pas
+  seulement dans le code.
+- **Timeline propre au cas** (14 types d'événements, de CREATED à
+  FOLLOW_UP_OPENED) : chaque action d'API inscrit sa trace avec
+  l'analyste authentifié — matière des audits, des rapports et des
+  futurs tools de l'assistant.
+
+Le cas regroupe **incidents ET alertes** (liaisons N↔N idempotentes,
+`ON CONFLICT DO NOTHING`) et porte une **checklist** de tâches
+(TODO/IN_PROGRESS/DONE, `completedAt` tracé). Référence `CASE-YYYY-NNNN`
+par séquence PostgreSQL. La garde d'immutabilité du cas clôturé est
+étendue par le service aux opérations satellites (liaisons, tâches,
+notes) que l'entité ne peut pas protéger. API `/api/v1/investigations` :
+16 endpoints, RBAC identique aux incidents, réutilisation des contrats
+`IncidentResponse`/`AlertResponse` existants.
+
+**Méthode.** Travail découpé en 8 lots de 1 à 5 fichiers, chacun revu et
+validé avant le suivant — revue humaine complète de chaque couche.
+
+**Vérification.** Domaine : 9 tests (immutabilité du cas clos testée
+mutation par mutation). Application : 8 tests (types et auteurs des
+traces capturés, follow-up tracé des deux côtés). Persistance : 7 tests
+d'intégration sur PostgreSQL réel (V5 + `ddl-auto: validate`, contrainte
+de clôture, liaisons idempotentes avec vraies FK, chaîne de suivi). API :
+5 tests E2E (cycle complet avec timeline exacte dans l'ordre des faits,
+422 sur cas clos, follow-up refusé avant clôture puis accepté, ouverture
+depuis incident, RBAC VIEWER → 403).
+
+---
+
+*Prochaines entrées : frontend Investigations, module Actifs, CTI,
+MITRE, hunting, SOAR, rapports, puis assistant IA (backend + frontend).*
