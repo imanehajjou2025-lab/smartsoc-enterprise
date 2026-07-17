@@ -56,6 +56,27 @@
         <dependency>
             <groupId>org.springframework.cloud</groupId>
             <artifactId>spring-cloud-starter-openfeign</artifactId>
+            <exclusions>
+                <!-- Chiffrement de configuration Spring Cloud (encrypt.*) :
+                     fonctionnalité inutilisée, et bcprov 1.80 porte le
+                     CVE-2025-14813 (CRITICAL). Surface supprimee plutot que
+                     patchee ; a reintroduire si la fonctionnalite est un
+                     jour adoptee. -->
+                <exclusion>
+                    <groupId>org.bouncycastle</groupId>
+                    <artifactId>bcprov-jdk18on</artifactId>
+                </exclusion>
+                <!-- commons-fileupload 1.5 porte le CVE-2025-48976 (HIGH).
+                     Il n'est charge par feign-form-spring que pour LIRE du
+                     multipart, jamais utilise ici (clients IA = JSON pur).
+                     feign-form-spring lui-meme doit rester : la classe
+                     FeignClientsConfiguration de Spring Cloud reference son
+                     SpringFormEncoder a l'introspection du contexte. -->
+                <exclusion>
+                    <groupId>commons-fileupload</groupId>
+                    <artifactId>commons-fileupload</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>io.github.resilience4j</groupId>

@@ -730,5 +730,48 @@ X-API-Key transmis, payload conforme, service down → 503 + alerte intacte.
 
 ---
 
+## 2026-07-17 — Le gate Trivy bloque le merge : la chaîne DevSecOps fait son travail (PR #44)
+
+**Difficulté.** CI de la PR #44 verte partout (build, 83 tests, SonarCloud,
+CodeQL) **sauf le gate Trivy** : l'image Docker est refusée pour une
+vulnérabilité CRITICAL. Diagnostic mené en local (scan Trivy du fat jar,
+scan de l'image de base, `dependency:tree`) :
+
+- **CVE-2025-14813** (CRITICAL, CVSS 4.0 = 9.3) — `bcprov-jdk18on:1.80`
+  (Bouncy Castle), faille CWE-327 dans le chiffrement GOST ; arrivé en
+  transitif par `spring-cloud-starter-openfeign` → `spring-cloud-starter`
+  (support du chiffrement de configuration `encrypt.*`, inutilisé) ;
+- **CVE-2025-48976** (HIGH, CVSS 7.5) — `commons-fileupload:1.5`, DoS
+  multipart ; transitif via `feign-form-spring` (multipart Feign, inutilisé
+  — nos clients IA n'échangent que du JSON) ;
+- l'image de base `eclipse-temurin:21-jre-alpine` : **0 CRITICAL** sur les
+  73 paquets OS — le problème venait bien des jars introduits par la PR,
+  pas d'un CVE préexistant sur `develop`.
+
+**Solution retenue : réduire la surface d'attaque plutôt que patcher.**
+Les deux bibliothèques n'apportant aucune fonctionnalité à SmartSOC,
+exclusion Maven de `bcprov-jdk18on` et de `commons-fileupload` (versions
+corrigées 1.80.2+/1.6.0 disponibles mais inutiles ici). Subtilité
+découverte en re-testant : impossible d'exclure `feign-form-spring` en
+entier — la classe `FeignClientsConfiguration` de Spring Cloud référence
+son `SpringFormEncoder` à l'introspection du contexte ; seule sa
+transitive `commons-fileupload` est exclue. **Ce sont les tests
+d'intégration WireMock du mode live qui ont attrapé cette régression
+immédiatement** — la preuve par l'exemple de leur valeur.
+
+**Leçons.**
+- Un starter Spring Cloud embarque des capacités (crypto de config,
+  multipart) qu'on n'a pas demandées : les inventorier et retirer ce qui
+  ne sert pas.
+- Le gate « CRITICAL = merge bloqué » a fonctionné exactement comme conçu :
+  la vulnérabilité n'a jamais atteint `develop`.
+
+**Vérification.** `clean verify` : 83 tests verts (WireMock inclus) ;
+`dependency:tree` : plus aucune occurrence des deux artefacts ; fat jar :
+0 fichier `bcprov*`/`commons-fileupload*` dans `BOOT-INF/lib` ; re-scan
+Trivy local puis CI complète sur la PR.
+
+---
+
 *Prochaines entrées : agent conversationnel (même patron port/simulation/
 live), frontend IA, connecteurs SOC, moteur SOAR, déploiement Azure.*
