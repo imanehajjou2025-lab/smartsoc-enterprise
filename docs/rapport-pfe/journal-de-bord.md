@@ -651,5 +651,46 @@ inscrit « OPEN → INVESTIGATING » dans la timeline et met à jour les boutons
 
 ---
 
-*Prochaines entrées : connecteurs SOC (interface commune, ADR-005), moteur
-SOAR, contrats IA, déploiement Azure.*
+## 2026-07-17 — Jalon IA C1 — contrats d'intégration des services IA (PR #43, ADR-008)
+
+**Contexte.** Les deux services IA du projet (classifieur TP/FP et agent
+conversationnel SOC) sont développés séparément, hors dépôt, puis intégrés
+à la plateforme (ADR-005). Pour que les deux équipes avancent en parallèle
+sans se bloquer, la frontière doit être fixée **avant** toute
+implémentation : c'est l'objet de ce jalon, purement contractuel.
+
+**Réalisé.** Deux contrats **OpenAPI 3.1** publiés dans `docs/integration/`,
+désormais référence commune versionnée (semver) :
+- `ai-classifier-api.yaml` — scoring d'une alerte : la plateforme envoie
+  les caractéristiques normalisées (alignées sur l'entité `Alert`), le
+  service répond **verdict explicite + score [0,1] + version du modèle**.
+- `ai-assistant-api.yaml` — chat **sans état** : l'historique complet est
+  porté par chaque requête (la plateforme reste propriétaire des
+  conversations), contexte métier optionnel (alerte/incident).
+**ADR-008** fixe l'architecture d'intégration côté plateforme : un **port**
+applicatif par service IA, deux adaptateurs par port (`simulation` par
+défaut — stub embarqué, plateforme démoable seule ; `live` — client
+OpenFeign, URL et clé d'API par variables d'environnement), timeouts
+5 s / 30 s, circuit breaker, et **IA jamais sur le chemin critique**
+(classification asynchrone après réponse au webhook). README d'intégration
+avec outillage pour l'équipe IA (préview Swagger, génération de squelette
+FastAPI, tests de conformité Schemathesis).
+
+**Choix.**
+- **Le seuil de décision TP/FP appartient au modèle**, pas à la plateforme :
+  le verdict est toujours explicite dans la réponse, le score n'est jamais
+  interprété côté SmartSOC — on peut réentraîner le modèle sans toucher à
+  la plateforme.
+- **Assistant sans état côté service** : redémarrage ou remplacement du
+  service IA sans perte de conversation ; le service n'est jamais exposé
+  au frontend, la plateforme le proxifie derrière JWT + RBAC.
+
+**Vérification.** Les deux specs passent `redocly lint` (0 erreur) ;
+alignement contrôlé avec le domaine existant (`Severity`, `AiVerdict`,
+invariant score ∈ [0,1] de `Alert.applyAiAssessment`).
+
+---
+
+*Prochaines entrées : intégration backend du classifieur (port + stub +
+Feign), assistant conversationnel, frontend IA, connecteurs SOC, moteur
+SOAR, déploiement Azure.*
