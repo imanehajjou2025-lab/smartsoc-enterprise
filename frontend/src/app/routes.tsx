@@ -2,6 +2,7 @@ import { createBrowserRouter, Navigate } from 'react-router-dom';
 import UsersPage from '../features/admin/UsersPage';
 import AlertsPage from '../features/alerts/AlertsPage';
 import IncidentsPage from '../features/incidents/IncidentsPage';
+import InvestigationsPage from '../features/investigations/InvestigationsPage';
 import DashboardPage from '../features/dashboard/DashboardPage';
 import LoginPage from '../features/auth/LoginPage';
 import { RequireAuth, RequireRole } from '../features/auth/guards';
@@ -28,16 +29,7 @@ export const router = createBrowserRouter([
           { path: 'dashboard', element: <DashboardPage /> },
           { path: 'alerts', element: <AlertsPage /> },
           { path: 'incidents', element: <IncidentsPage /> },
-          {
-            path: 'investigations',
-            element: (
-              <PageStub
-                title="Investigations"
-                description="Cas d'investigation : tâches, observables, notes d'analyste."
-                milestone="jalon Incidents"
-              />
-            ),
-          },
+          { path: 'investigations', element: <InvestigationsPage /> },
           {
             path: 'assets',
             element: (

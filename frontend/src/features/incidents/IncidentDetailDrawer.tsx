@@ -7,13 +7,16 @@ import Divider from '@mui/material/Divider';
 import Drawer from '@mui/material/Drawer';
 import IconButton from '@mui/material/IconButton';
 import LinkOffIcon from '@mui/icons-material/LinkOff';
+import TravelExploreIcon from '@mui/icons-material/TravelExplore';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { useAppSelector } from '../../app/hooks';
 import { problemDetail } from '../../shared/api/client';
 import { SeverityChip } from '../alerts/chips';
+import { openCaseFromIncident } from '../investigations/investigationsApi';
 import { IncidentStatusChip, INCIDENT_STATUS_LABELS } from './incidentChips';
 import {
   ALLOWED_TRANSITIONS,
@@ -48,6 +51,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function IncidentDetailDrawer({ incidentId, onClose }: Props) {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const role = useAppSelector((state) => state.auth.user?.role);
   const canWrite = role === 'ADMIN' || role === 'SOC_MANAGER' || role === 'SOC_ANALYST';
   const [assignee, setAssignee] = useState('');
@@ -90,9 +94,23 @@ function IncidentDetailDrawer({ incidentId, onClose }: Props) {
     mutationFn: (alertId: string) => unlinkAlertFromIncident(incidentId!, alertId),
     onSuccess: invalidate,
   });
+  // Miroir de l'escalade alerte → incident : ouvre un cas d'enquête
+  // depuis l'incident, le lie, et emmène l'analyste sur le module.
+  const openCaseMutation = useMutation({
+    mutationFn: () => openCaseFromIncident(incidentId!),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['investigations'] });
+      onClose();
+      navigate('/investigations');
+    },
+  });
 
   const mutationError =
-    statusMutation.error ?? assignMutation.error ?? noteMutation.error ?? unlinkMutation.error;
+    statusMutation.error ??
+    assignMutation.error ??
+    noteMutation.error ??
+    unlinkMutation.error ??
+    openCaseMutation.error;
 
   return (
     <Drawer anchor="right" open={Boolean(incidentId)} onClose={onClose}>
@@ -127,6 +145,17 @@ function IncidentDetailDrawer({ incidentId, onClose }: Props) {
 
             {canWrite && (
               <>
+                <Button
+                  size="small"
+                  variant="contained"
+                  startIcon={<TravelExploreIcon />}
+                  disabled={openCaseMutation.isPending}
+                  onClick={() => openCaseMutation.mutate()}
+                  sx={{ mb: 2 }}
+                >
+                  {openCaseMutation.isPending ? 'Ouverture…' : 'Ouvrir un cas'}
+                </Button>
+
                 <Field label="Changer le statut">
                   <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
                     {ALLOWED_TRANSITIONS[data.incident.status].map((target) => (
