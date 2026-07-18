@@ -231,9 +231,7 @@ function CaseDetailDrawer({ caseId, onClose }: Props) {
                 <Field label="Affectation">
                   {data.investigation.assigneeUsername ? (
                     <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-                      <Typography variant="body2">
-                        {data.investigation.assigneeUsername}
-                      </Typography>
+                      <Typography variant="body2">{data.investigation.assigneeUsername}</Typography>
                       <Button
                         size="small"
                         onClick={() => unassignMutation.mutate()}

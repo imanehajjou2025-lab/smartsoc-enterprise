@@ -56,8 +56,8 @@ function CloseCaseDialog({
         <DialogTitle>Clôturer {reference}</DialogTitle>
         <DialogContent>
           <DialogContentText sx={{ mb: 2 }}>
-            La clôture est définitive : le dossier devient immuable. Si l'enquête doit
-            reprendre, un cas de suivi sera ouvert depuis ce dossier.
+            La clôture est définitive : le dossier devient immuable. Si l'enquête doit reprendre, un
+            cas de suivi sera ouvert depuis ce dossier.
           </DialogContentText>
           {mutation.isError && (
             <Alert severity="error" sx={{ mb: 2 }}>
