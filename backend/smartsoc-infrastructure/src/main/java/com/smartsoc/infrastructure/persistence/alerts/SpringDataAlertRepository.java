@@ -25,7 +25,7 @@ public interface SpringDataAlertRepository
     List<Object[]> countGroupedBySource();
 
     @Query(value = """
-            select cast(date_trunc('day', detected_at) as date) as day, count(*)
+            select cast(date_trunc('day', detected_at AT TIME ZONE 'UTC') as date) as day, count(*)
             from alerts where detected_at >= :from
             group by day order by day
             """, nativeQuery = true)
