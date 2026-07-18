@@ -838,5 +838,56 @@ depuis incident, RBAC VIEWER → 403).
 
 ---
 
+## 2026-07-18 — Bug de fuseau horaire détecté par un run de nuit, invisible en CI UTC (PR #46)
+
+**Difficulté.** Lors du `clean verify` du module Investigations lancé à
+00:50 (heure locale, UTC+2), `AlertStatsIntegrationTest` — un test du
+module alertes qui passait depuis des semaines — échoue : le bucket
+« aujourd'hui » de la timeline 7 jours du dashboard est à 0 alors que
+3 alertes viennent d'être ingérées.
+
+**Diagnostic.** La fenêtre de 7 jours est construite en **UTC** côté
+Java (`LocalDate.now(ZoneOffset.UTC)`), mais le SQL
+`date_trunc('day', detected_at)` sur un `timestamptz` est évalué dans
+le **fuseau de session PostgreSQL**, que le driver pgJDBC aligne sur
+celui de la JVM (UTC+2 en local). Entre 22 h et minuit UTC, une alerte
+« d'aujourd'hui UTC » est donc datée « demain » par le SQL — hors
+fenêtre, comptée nulle part. Conséquences réelles : en production, la
+courbe du dashboard aurait perdu les alertes du soir chaque nuit ; et
+**la CI GitHub, dont les runners vivent en UTC (JVM UTC = session
+UTC), ne pouvait par construction jamais détecter ce bug** — seul un
+run local nocturne pouvait le révéler.
+
+**Correctif** (une ligne) : `date_trunc('day', detected_at AT TIME
+ZONE 'UTC')` — le bucket devient indépendant du fuseau de session,
+aligné sur la fenêtre Java.
+
+**Test de non-régression déterministe** (exigence de revue) : la CI
+UTC doit désormais couvrir ce cas pour toujours. Le nouveau test force
+un fuseau de session non-UTC sur CHAQUE connexion du pool via
+`spring.datasource.hikari.connection-init-sql=SET TIME ZONE
+'Europe/Paris'` (plus fiable que changer le fuseau de la JVM, fragile
+avec le cache de contexte Spring), et ingère une alerte témoin datée
+**hier 23:30 UTC** — toujours dans la fenêtre, toujours « demain » en
+heure de Paris. Assertion par delta sur le bucket d'hier : immunisée
+contre les alertes des autres tests, indépendante de l'heure réelle.
+
+**Preuves (sorties conservées).** Sans correctif : nouveau test rouge
+(`expected: 1L but was: 0L`) et ancien test rouge en conditions réelles
+à 01:46 locale. Avec correctif : nouveau test vert, et l'ancien test
+vert exécuté à **01:59:53 locale (23:59:53 UTC)** — dans les dernières
+secondes de la fenêtre pathologique qui le faisait échouer 13 minutes
+plus tôt.
+
+**Leçons.**
+- Un `timestamptz` ne porte pas de fuseau : toute fonction de date SQL
+  le convertit dans le fuseau de session — expliciter `AT TIME ZONE`
+  dès qu'un calcul de calendrier traverse la frontière Java/SQL.
+- Une CI verte ne prouve que ce que son environnement exerce : les
+  runners UTC masquaient structurellement le cas ; le test force
+  désormais l'environnement pathologique au lieu de le subir.
+
+---
+
 *Prochaines entrées : frontend Investigations, module Actifs, CTI,
 MITRE, hunting, SOAR, rapports, puis assistant IA (backend + frontend).*
