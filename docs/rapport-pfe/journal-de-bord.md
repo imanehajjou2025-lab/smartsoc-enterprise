@@ -889,5 +889,59 @@ plus tôt.
 
 ---
 
-*Prochaines entrées : frontend Investigations, module Actifs, CTI,
-MITRE, hunting, SOAR, rapports, puis assistant IA (backend + frontend).*
+## 2026-07-18 — Jalon Investigations V2 — module frontend (PR #47)
+
+**Réalisé.** Le module Investigations de la console, miroir strict des
+conventions du module Incidents (fonctions async sur le client axios
+partagé + TanStack Query, jamais de nouveau paradigme de fetch) :
+- `investigationsApi.ts` : types alignés champ par champ sur les DTOs
+  backend (vérifié en réel contre l'API : les 11 clés de `Case`, le
+  champ `investigation` du détail), `ALLOWED_TRANSITIONS` miroir du
+  cycle de vie du domaine ;
+- liste filtrée/paginée (statut, priorité), dialogue de création
+  (réutilisé en mode « cas de suivi » avec titre pré-rempli) ;
+- **tiroir de détail** : transitions (la clôture ne passe QUE par le
+  dialogue à conclusion obligatoire, bouton désactivé si vide),
+  checklist interactive (`completedAt` affiché), liaisons
+  incidents/alertes avec déliaison, timeline des 14 événements avec
+  auteur, **badge « Cas clôturé — immuable »** avec disparition de tous
+  les contrôles d'écriture sur un cas CLOSED, chaîne origine ↔ suivis ;
+- bouton **« Ouvrir un cas »** dans le tiroir d'incident (miroir de
+  l'escalade alerte → incident) : crée le cas, le lie, redirige.
+
+**Vérification E2E réelle** (navigateur → backend Docker reconstruit
+avec l'API #45) : cycle complet prouvé par les séquences réseau —
+création (201, référence `CASE-2026-0001` par la séquence V5),
+transition, tâche créée puis cochée, note, timeline exacte
+`CREATED → STATUS_CHANGED → TASK_ADDED → TASK_COMPLETED → NOTE_ADDED`
+avec auteur ; clôture (conclusion vide refusée, 200 puis cas figé) ;
+**test d'immuabilité en concurrence réelle** : cas clôturé par API dans
+le dos de l'UI puis note envoyée depuis le tiroir périmé → 422
+`CASE_CLOSED` affiché proprement (message du ProblemDetail, pas
+d'erreur brute) ; follow-up 201 avec `originCaseId`, listé dans
+`followUps` de l'origine avec trace `FOLLOW_UP_OPENED`. Console
+vérifiée **à froid sur un onglet neuf : zéro erreur, zéro
+avertissement**. 18 tests frontend (2 nouveaux, avec le piège des
+libellés « Ouvert » / « Ouvert le » couvert par correspondance exacte).
+
+**Difficultés débusquées par la vérification navigateur — deux bugs
+qu'aucun test unitaire n'aurait vus :**
+- *followUps périmés* : après l'ouverture d'un cas de suivi, le
+  dialogue n'invalidait que la liste (`['investigations']`) — le tiroir
+  du cas d'origine, resté monté, affichait un cache périmé sans le
+  nouveau suivi ni la trace `FOLLOW_UP_OPENED`. **Solution :**
+  invalider aussi le préfixe `['investigation']` (tous les détails).
+  **Leçon :** une mutation doit invalider toutes les vues qui montrent
+  la donnée, pas seulement celle qui a déclenché l'action.
+- *`inputProps` fantôme* : la prop `inputProps` du Checkbox, retirée de
+  l'API MUI v7, fuyait telle quelle vers le DOM (avertissement React).
+  **Solution :** `slotProps={{ input: … }}`, l'API actuelle. **Leçon :**
+  les exemples mémorisés d'une version antérieure d'une bibliothèque se
+  périment ; seule la console du navigateur l'a signalé — d'où la
+  valeur de la règle « console propre à froid prouvée, pas supposée »
+  ajoutée à la revue de chaque lot frontend.
+
+---
+
+*Prochaines entrées : module Actifs, CTI, MITRE, hunting, SOAR,
+rapports, puis assistant IA (backend + frontend).*
