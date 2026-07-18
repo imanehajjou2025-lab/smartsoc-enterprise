@@ -6,6 +6,7 @@ import com.smartsoc.domain.alerts.AlertRepository;
 import com.smartsoc.domain.alerts.AlertStatistics;
 import com.smartsoc.domain.alerts.AlertStatus;
 import com.smartsoc.domain.alerts.Severity;
+import com.smartsoc.domain.common.PageQuery;
 import com.smartsoc.domain.common.PageResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -71,6 +72,19 @@ public class AlertRepositoryAdapter implements AlertRepository {
                 page.getTotalElements(),
                 query.page().page(),
                 query.page().size());
+    }
+
+    @Override
+    public PageResult<Alert> findByNormalizedHostname(String normalizedHostname, PageQuery page) {
+        // Le tri (detected_at desc) vit dans la requête native : le
+        // Pageable ne porte que la pagination.
+        Page<AlertJpaEntity> result = springDataRepository.findByNormalizedHostname(
+                normalizedHostname, PageRequest.of(page.page(), page.size()));
+        return new PageResult<>(
+                result.getContent().stream().map(mapper::toDomain).toList(),
+                result.getTotalElements(),
+                page.page(),
+                page.size());
     }
 
     @Override

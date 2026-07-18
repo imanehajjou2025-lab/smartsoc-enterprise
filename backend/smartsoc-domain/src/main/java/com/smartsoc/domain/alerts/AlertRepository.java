@@ -1,5 +1,6 @@
 package com.smartsoc.domain.alerts;
 
+import com.smartsoc.domain.common.PageQuery;
 import com.smartsoc.domain.common.PageResult;
 
 import java.util.Optional;
@@ -19,4 +20,13 @@ public interface AlertRepository {
 
     /** Statistiques agrégées ; timeline sur les {@code timelineDays} derniers jours. */
     AlertStatistics statistics(int timelineDays);
+
+    /**
+     * Corrélation actifs ↔ alertes : alertes dont le hostname, normalisé
+     * côté SQL (les alertes stockent la valeur brute de la source),
+     * correspond au hostname déjà normalisé d'un actif. Le total de la
+     * page EST le compteur de corrélation — même prédicat, jamais un
+     * count séparé qui pourrait diverger.
+     */
+    PageResult<Alert> findByNormalizedHostname(String normalizedHostname, PageQuery page);
 }

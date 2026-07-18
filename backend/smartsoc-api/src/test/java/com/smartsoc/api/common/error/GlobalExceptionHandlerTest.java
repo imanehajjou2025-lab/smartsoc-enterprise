@@ -1,6 +1,7 @@
 package com.smartsoc.api.common.error;
 
 import com.smartsoc.domain.common.BusinessRuleViolationException;
+import com.smartsoc.domain.common.DuplicateResourceException;
 import com.smartsoc.domain.common.ResourceNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -27,6 +28,21 @@ class GlobalExceptionHandlerTest {
         assertThat(problem.getTitle()).isEqualTo("Resource not found");
         assertThat(problem.getDetail()).contains("Alert").contains("42");
         assertThat(problem.getProperties()).containsEntry("code", "RESOURCE_NOT_FOUND");
+        assertThat(problem.getProperties()).containsKey("timestamp");
+    }
+
+    @Test
+    void duplicateResourceIsTranslatedTo409WithStableCode() {
+        // Contrat du frontend : le code ASSET_ALREADY_EXISTS dans le
+        // ProblemDetail permet d'afficher « ce hostname existe déjà ».
+        ProblemDetail problem = handler.handleDuplicateResource(
+                new DuplicateResourceException("ASSET_ALREADY_EXISTS",
+                        "An asset already exists for hostname 'srv-web-01'"));
+
+        assertThat(problem.getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
+        assertThat(problem.getTitle()).isEqualTo("Resource conflict");
+        assertThat(problem.getDetail()).contains("srv-web-01");
+        assertThat(problem.getProperties()).containsEntry("code", "ASSET_ALREADY_EXISTS");
         assertThat(problem.getProperties()).containsKey("timestamp");
     }
 

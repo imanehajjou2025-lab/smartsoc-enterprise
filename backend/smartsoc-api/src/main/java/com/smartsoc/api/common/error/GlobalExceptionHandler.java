@@ -3,6 +3,7 @@ package com.smartsoc.api.common.error;
 import com.smartsoc.application.ai.AiServiceUnavailableException;
 import com.smartsoc.domain.common.BusinessRuleViolationException;
 import com.smartsoc.domain.common.DomainException;
+import com.smartsoc.domain.common.DuplicateResourceException;
 import com.smartsoc.domain.common.ResourceNotFoundException;
 import com.smartsoc.domain.identity.InvalidRefreshTokenException;
 import lombok.extern.slf4j.Slf4j;
@@ -86,6 +87,12 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         problem.setProperty(PROPERTY_CODE, ex.getCode());
         problem.setProperty(PROPERTY_TIMESTAMP, Instant.now());
         return problem;
+    }
+
+    /** Conflit d'unicité (ex. hostname d'actif déjà inventorié) → 409. */
+    @ExceptionHandler(DuplicateResourceException.class)
+    public ProblemDetail handleDuplicateResource(DuplicateResourceException ex) {
+        return problemOf(HttpStatus.CONFLICT, "Resource conflict", ex);
     }
 
     @ExceptionHandler(BusinessRuleViolationException.class)
