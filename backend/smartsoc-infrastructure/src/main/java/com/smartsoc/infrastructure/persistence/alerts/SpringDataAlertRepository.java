@@ -1,5 +1,7 @@
 package com.smartsoc.infrastructure.persistence.alerts;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
@@ -30,4 +32,19 @@ public interface SpringDataAlertRepository
             group by day order by day
             """, nativeQuery = true)
     List<Object[]> countPerDaySince(@Param("from") Instant from);
+
+    // Corrélation actifs <-> alertes. Le prédicat lower(trim(hostname))
+    // est EXACTEMENT celui de l'index fonctionnel V6
+    // ix_alerts_hostname_normalized (sinon l'index est mort) ; la
+    // countQuery de pagination reprend le même prédicat — le total de la
+    // page est le compteur de corrélation, aucune requête séparée.
+    @Query(value = """
+            select * from alerts
+            where lower(trim(hostname)) = :hostname
+            order by detected_at desc
+            """,
+            countQuery = "select count(*) from alerts where lower(trim(hostname)) = :hostname",
+            nativeQuery = true)
+    Page<AlertJpaEntity> findByNormalizedHostname(@Param("hostname") String hostname,
+                                                  Pageable pageable);
 }
