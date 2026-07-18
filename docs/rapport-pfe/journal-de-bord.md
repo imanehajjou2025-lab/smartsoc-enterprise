@@ -943,5 +943,71 @@ qu'aucun test unitaire n'aurait vus :**
 
 ---
 
-*Prochaines entrées : module Actifs, CTI, MITRE, hunting, SOAR,
+## 2026-07-18 — Jalon Actifs A1 — backend complet (PR #48)
+
+**Réalisé.** Le contexte `assets` de bout en bout : l'inventaire des
+actifs supervisés qui donne son contexte métier au SOC — quand
+`srv-web-01` lève une alerte, l'analyste voit criticité, exposition et
+propriétaire de la machine. Entité `Asset` (hostname **immuable et
+normalisé** = clé de corrélation, cycle ACTIVE ⇄ DECOMMISSIONED sans
+suppression physique, actif décommissionné en lecture seule), migration
+**V6** avec les règles gravées en SQL
+(`ck_assets_hostname_normalized`, `ck_assets_decommission`), API
+`/api/v1/assets` (7 endpoints, RBAC habituel, endpoints d'état dédiés
+`decommission`/`reactivate` sur le patron de `close`), et la
+**corrélation alertes ↔ actifs** par hostname.
+
+**Un bug de la famille « silencieuse » évité AVANT d'exister.** La revue
+de conception a repéré que l'ingestion normalise `source` mais stocke le
+`hostname` BRUT de l'outil SOC : une jointure en égalité stricte aurait
+affiché « 0 alerte corrélée » sur tout actif dont les alertes arrivent
+en majuscules ou avec espaces — même famille que le bug de fuseau
+horaire (PR #46) : faux en silence, invisible en conditions de test
+naïves. Traitement complet :
+- jointure normalisée côté SQL (`lower(trim(hostname)) = :hostname`),
+  mot pour mot le prédicat de l'**index fonctionnel**
+  `ix_alerts_hostname_normalized` créé par V6 — preuve `EXPLAIN
+  ANALYZE` sur 20 003 lignes : Bitmap Index Scan, 0,089 ms, les trois
+  variantes brutes (`SRV-WEB-01  `, `srv-web-01`, ` Srv-Web-01`)
+  rattachées ;
+- le compteur de corrélation EST le total de la même requête paginée
+  (même prédicat dans la countQuery) — aucun count séparé qui puisse
+  diverger ;
+- **piège `Locale.ROOT`** : `toLowerCase()` sans locale dépend de la
+  JVM (en locale turque, le I divergerait du `lower()` SQL) —
+  normalisation Java figée sur `Locale.ROOT` pour correspondre
+  exactement au SQL. Même classe de bug environnemental que le fuseau.
+
+**Choix de conception.**
+- **`AssetCriticality` dédiée**, pas la `Severity` des alertes : la
+  sévérité qualifie une détection, la criticité qualifie un bien —
+  et INFO n'aurait aucun sens pour un actif. Le tri « criticité la
+  plus haute d'abord » repose sur un CASE ordinal (l'ordre alphabétique
+  mettrait LOW avant MEDIUM), avec la garde JPA sur la requête de
+  comptage.
+- **Limitation FQDN actée** : `srv-web-01` ≠ `srv-web-01.corp.local`,
+  pas de rapprochement flou — en SOC, un faux rattachement est pire
+  qu'une absence. Si le Wazuh réel mélange les formes, l'évolution
+  sera une liste d'alias explicites par actif.
+- **Conflit d'unicité en 409, typé** : nouvelle
+  `DuplicateResourceException` de domaine (miroir de
+  `ResourceNotFoundException`) mappée 409 Conflict RFC 9457 — un
+  doublon de hostname n'est pas une violation de cycle de vie (422),
+  et l'exception est réutilisable telle quelle par les futurs contextes.
+
+**Vérification.** Preuve `EXPLAIN` (Index Scan, jamais de Seq Scan) ;
+tests domaine (normalisation majuscules/espaces, immutabilité du
+hostname, lecture seule du décommissionné), application (clé normalisée
+transmise au port, 0 alerte sans erreur, doublon même à casse
+différente y compris sous course), intégration API E2E sur PostgreSQL
+réel : 201 puis **409 à casse différente** (corps RFC 9457 avec
+`ASSET_ALREADY_EXISTS`), corrélation d'une alerte ingérée par le vrai
+webhook avec `hostname` brut majuscules+espace, tri
+CRITICAL → HIGH → MEDIUM → LOW sur données réelles, cycle
+décommission/réactivation avec corrélation toujours lisible, RBAC
+VIEWER → 403.
+
+---
+
+*Prochaines entrées : frontend Actifs, CTI, MITRE, hunting, SOAR,
 rapports, puis assistant IA (backend + frontend).*
