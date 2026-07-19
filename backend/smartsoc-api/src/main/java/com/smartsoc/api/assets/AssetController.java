@@ -76,6 +76,16 @@ public class AssetController {
         return mapper.toResponse(assetService.getAsset(id));
     }
 
+    /**
+     * Résolution exacte par hostname (ex. depuis le tiroir d'une alerte).
+     * La valeur reçue est normalisée côté serveur (domaine) ; 404 =
+     * aucun actif inventorié pour ce hostname.
+     */
+    @GetMapping("/by-hostname/{hostname}")
+    public AssetResponse getByHostname(@PathVariable String hostname) {
+        return mapper.toResponse(assetService.getByHostname(hostname));
+    }
+
     @PutMapping("/{id}")
     @PreAuthorize(WRITE_ROLES)
     public AssetResponse update(@PathVariable UUID id,

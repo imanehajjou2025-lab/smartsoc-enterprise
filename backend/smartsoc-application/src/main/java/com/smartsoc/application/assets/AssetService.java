@@ -122,6 +122,19 @@ public class AssetService {
     }
 
     /**
+     * Résolution par clé de corrélation : le client envoie la valeur
+     * telle qu'il la connaît (ex. hostname brut d'une alerte), la
+     * normalisation appartient au serveur. 404 = « aucun actif
+     * inventorié pour ce hostname » — une information métier.
+     */
+    @Transactional(readOnly = true)
+    public Asset getByHostname(String rawHostname) {
+        String hostname = Asset.normalizeHostname(rawHostname);
+        return assetRepository.findByHostname(hostname)
+                .orElseThrow(() -> new ResourceNotFoundException("Asset", hostname));
+    }
+
+    /**
      * Alertes corrélées à l'actif : jointure normalisée côté SQL sur le
      * hostname (les alertes stockent la valeur brute de la source). Le
      * total de la page est LE compteur de corrélation — même prédicat.
