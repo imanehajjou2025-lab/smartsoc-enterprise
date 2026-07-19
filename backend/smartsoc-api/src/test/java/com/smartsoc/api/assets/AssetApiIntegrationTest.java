@@ -139,6 +139,35 @@ class AssetApiIntegrationTest {
     }
 
     @Test
+    void resolvesAssetByRawHostnameNormalizedServerSide() {
+        String admin = adminToken();
+        String hostname = "srv-lookup-" + suffix();
+        Map<String, Object> created = exchange(HttpMethod.POST, ASSETS, admin,
+                assetPayload(hostname, "HIGH"), Map.class).getBody();
+
+        // Le client envoie la valeur brute (majuscules + espaces),
+        // URL-encodée ; la normalisation appartient au serveur. URI.create
+        // évite le double-encodage du %20 par TestRestTemplate.
+        String rawEncoded = java.net.URLEncoder.encode(
+                " " + hostname.toUpperCase() + " ", java.nio.charset.StandardCharsets.UTF_8)
+                .replace("+", "%20");
+        HttpHeaders authHeaders = new HttpHeaders();
+        authHeaders.setBearerAuth(admin);
+        Map<String, Object> resolved = rest.exchange(
+                java.net.URI.create(rest.getRootUri() + ASSETS + "/by-hostname/" + rawEncoded),
+                HttpMethod.GET, new HttpEntity<>(authHeaders), Map.class).getBody();
+
+        assertThat(resolved.get("id")).isEqualTo(created.get("id"));
+        assertThat(resolved.get("hostname")).isEqualTo(hostname);
+
+        // 404 = information métier : aucun actif inventorié pour ce hostname.
+        ResponseEntity<String> unknown = exchange(HttpMethod.GET,
+                ASSETS + "/by-hostname/hote-inconnu-" + suffix(), admin, null, String.class);
+        assertThat(unknown.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(unknown.getBody()).contains("RESOURCE_NOT_FOUND");
+    }
+
+    @Test
     void viewerCanReadButCannotWrite() {
         String admin = adminToken();
         String viewer = "viewer." + UUID.randomUUID().toString().substring(0, 8);

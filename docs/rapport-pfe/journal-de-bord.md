@@ -1009,5 +1009,55 @@ VIEWER → 403.
 
 ---
 
-*Prochaines entrées : frontend Actifs, CTI, MITRE, hunting, SOAR,
-rapports, puis assistant IA (backend + frontend).*
+## 2026-07-19 — Jalon Actifs A2 — module frontend et corrélation visible (PR #49)
+
+**Réalisé.** Le module Actifs de la console, en 6 lots revus : inventaire
+filtré (recherche, type, criticité, exposition, statut ; tri serveur par
+rang de criticité), dialogues d'enregistrement/édition (le hostname est
+absent du type d'édition — `Omit<…, 'hostname'>` : l'immutabilité est
+dans le compilateur), fiche d'actif avec cycle décommission/réactivation
+(badge « Lecture seule », historique de corrélation préservé) et alertes
+corrélées paginées dont le totalElements EST le compteur. Chips :
+`CriticalityChip` dédiée mais couleurs de la palette partagée (un
+CRITICAL se lit pareil partout), `ExposureChip` avec « Exposé Internet »
+en chip pleine rouge — l'information qui fait réagir un analyste.
+**Le 409 du backend devient un message métier** (« Un actif est déjà
+inventorié pour ce hostname ») via le statut HTTP, prouvé en réel à
+casse différente.
+
+**La corrélation visible des deux côtés.** Côté actif : les alertes du
+hostname (prouvé en réel : 1 alerte ingérée par le vrai webhook en
+majuscules+espace + 3 alertes historiques du même hôte rattachées par la
+jointure normalisée). Côté alerte : **enrichissement progressif** du
+tiroir — un lookup `by-hostname` (valeur brute envoyée, normalisation
+serveur, `encodeURIComponent` pour le chemin) fait apparaître une puce
+cliquable colorée par criticité menant à `/assets?selected={id}`.
+Décisions de comportement validées en revue :
+- **le 404 est une information métier** (« aucun actif inventorié ») :
+  retry conditionnel qui l'exclut, aucun message, console propre —
+  prouvé sur onglet neuf (« No console logs », une seule requête) ;
+- **pas de scintillement** : seule `data` est consommée (ni spinner ni
+  placeholder), le tiroir d'alerte s'ouvre aussi vite qu'avant ;
+- **lien profond robuste à froid** : `/assets?selected={id}` collé dans
+  un onglet neuf ouvre le bon tiroir (état initial lu depuis l'URL) ;
+  un id inexistant referme silencieusement le tiroir et nettoie l'URL
+  (`replace`) — liste affichée, zéro erreur.
+
+**Difficulté d'outillage.** Deux pièges d'encodage découverts en testant
+réellement l'endpoint `by-hostname` : `URLEncoder` encode l'espace en
+`+` (sémantique query string, pas chemin) et `TestRestTemplate`
+ré-encode un chemin déjà encodé (`%20` → `%2520`) — résolus par `%20`
+explicite et `URI.create()`. Côté navigateur, `encodeURIComponent` fait
+le bon choix nativement — la valeur du miroir test-réel/client-réel.
+
+**Vérification.** 20 tests frontend verts (2 nouveaux) ; preuves
+navigateur en conditions réelles sur le backend Docker : enregistrement
+201 + 409 à casse différente avec message dédié, corrélation (4),
+cycle décommission/réactivation en séquence réseau, les trois scénarios
+du lien alerte ↔ actif ci-dessus, console propre à froid sur onglet
+neuf à chaque étape.
+
+---
+
+*Prochaines entrées : CTI, MITRE, hunting, SOAR, rapports, puis
+assistant IA (backend + frontend).*

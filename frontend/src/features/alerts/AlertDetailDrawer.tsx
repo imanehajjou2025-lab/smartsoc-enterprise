@@ -7,10 +7,15 @@ import Drawer from '@mui/material/Drawer';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import ArrowOutwardIcon from '@mui/icons-material/ArrowOutward';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import DnsIcon from '@mui/icons-material/Dns';
+import axios from 'axios';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { useAppSelector } from '../../app/hooks';
 import { problemDetail } from '../../shared/api/client';
+import { severityColors } from '../../app/theme';
+import { getAssetByHostname } from '../assets/assetsApi';
+import { ExposureChip } from '../assets/assetChips';
 import { escalateFromAlert } from '../incidents/incidentsApi';
 import {
   ALLOWED_TRANSITIONS,
@@ -71,6 +76,19 @@ function AlertDetailDrawer({ alert, onClose, onUpdated }: Props) {
       onClose();
       navigate('/incidents');
     },
+  });
+
+  // Enrichissement progressif : la puce d'actif n'apparaît QUE si le
+  // hostname est inventorié. Un 404 est une information métier (« aucun
+  // actif ») : pas de retry, pas de message, pas d'état de chargement —
+  // le tiroir s'ouvre aussi vite qu'avant.
+  const { data: linkedAsset } = useQuery({
+    queryKey: ['asset-by-hostname', alert?.hostname],
+    queryFn: () => getAssetByHostname(alert!.hostname!),
+    enabled: Boolean(alert?.hostname),
+    retry: (failureCount, error) =>
+      !(axios.isAxiosError(error) && error.response?.status === 404) && failureCount < 2,
+    staleTime: 60_000,
   });
 
   const transitions = alert ? ALLOWED_TRANSITIONS[alert.status] : [];
@@ -157,7 +175,40 @@ function AlertDetailDrawer({ alert, onClose, onUpdated }: Props) {
           </Field>
           {alert.hostname && (
             <Field label="Actif concerné">
-              <Typography variant="body2">{alert.hostname}</Typography>
+              <Stack
+                direction="row"
+                spacing={1}
+                useFlexGap
+                sx={{ alignItems: 'center', flexWrap: 'wrap' }}
+              >
+                <Typography variant="body2">{alert.hostname}</Typography>
+                {linkedAsset && (
+                  <>
+                    <Chip
+                      icon={<DnsIcon />}
+                      label={linkedAsset.displayName}
+                      size="small"
+                      clickable
+                      onClick={() => {
+                        onClose();
+                        navigate(`/assets?selected=${linkedAsset.id}`);
+                      }}
+                      sx={{
+                        color:
+                          severityColors[
+                            linkedAsset.criticality.toLowerCase() as
+                              'critical' | 'high' | 'medium' | 'low'
+                          ],
+                        fontWeight: 600,
+                      }}
+                      variant="outlined"
+                    />
+                    {linkedAsset.exposure === 'INTERNET_FACING' && (
+                      <ExposureChip exposure={linkedAsset.exposure} />
+                    )}
+                  </>
+                )}
+              </Stack>
             </Field>
           )}
           {alert.ruleId && (
