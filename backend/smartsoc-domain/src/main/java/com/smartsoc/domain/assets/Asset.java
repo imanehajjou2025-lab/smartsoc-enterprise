@@ -1,13 +1,13 @@
 package com.smartsoc.domain.assets;
 
 import com.smartsoc.domain.common.BusinessRuleViolationException;
+import com.smartsoc.domain.common.TextNormalization;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 
 import java.time.Instant;
-import java.util.Locale;
 import java.util.UUID;
 
 /**
@@ -128,16 +128,16 @@ public class Asset {
 
     /**
      * Normalisation de la clé de corrélation : minuscules, sans espaces.
-     * Locale.ROOT obligatoire : la normalisation Java doit correspondre
-     * exactement au lower(trim(...)) SQL, indépendant de la locale —
-     * en locale turque, toLowerCase() sans locale divergerait sur le I.
+     * Délègue à la primitive partagée du domaine — la règle Locale.ROOT
+     * (correspondance exacte avec le lower(trim(...)) SQL) est décrite et
+     * garantie à un seul endroit, pour tous les contextes.
      */
     public static String normalizeHostname(String hostname) {
         if (hostname == null || hostname.isBlank()) {
             throw new BusinessRuleViolationException("INVALID_ASSET",
                     "Field 'hostname' must not be blank");
         }
-        return hostname.trim().toLowerCase(Locale.ROOT);
+        return TextNormalization.lowerTrim(hostname);
     }
 
     private void requireActive() {
@@ -148,6 +148,6 @@ public class Asset {
     }
 
     private static String blankToNull(String value) {
-        return value == null || value.isBlank() ? null : value.trim();
+        return TextNormalization.blankToNull(value);
     }
 }
