@@ -2,6 +2,7 @@ import { createBrowserRouter, Navigate } from 'react-router-dom';
 import UsersPage from '../features/admin/UsersPage';
 import AlertsPage from '../features/alerts/AlertsPage';
 import IncidentsPage from '../features/incidents/IncidentsPage';
+import AssetsPage from '../features/assets/AssetsPage';
 import InvestigationsPage from '../features/investigations/InvestigationsPage';
 import DashboardPage from '../features/dashboard/DashboardPage';
 import LoginPage from '../features/auth/LoginPage';
@@ -30,16 +31,7 @@ export const router = createBrowserRouter([
           { path: 'alerts', element: <AlertsPage /> },
           { path: 'incidents', element: <IncidentsPage /> },
           { path: 'investigations', element: <InvestigationsPage /> },
-          {
-            path: 'assets',
-            element: (
-              <PageStub
-                title="Actifs"
-                description="Inventaire des actifs supervisés, criticité et exposition."
-                milestone="jalon Actifs"
-              />
-            ),
-          },
+          { path: 'assets', element: <AssetsPage /> },
           {
             path: 'intelligence',
             element: (
