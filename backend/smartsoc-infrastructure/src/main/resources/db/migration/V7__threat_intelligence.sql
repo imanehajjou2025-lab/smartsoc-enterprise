@@ -84,5 +84,9 @@ CREATE INDEX ix_indicators_last_seen   ON indicators (last_seen DESC);
 -- Le filtre d'activite porte sur la fenetre de validite des IOC non
 -- revoques : index partiel, les revoques n'ont pas a etre parcourus.
 CREATE INDEX ix_indicators_valid_until ON indicators (valid_until) WHERE revoked = false;
--- Recherche par tag (operateur de containment JSONB).
-CREATE INDEX ix_indicators_tags ON indicators USING gin (tags jsonb_path_ops);
+-- Recherche par tag. Classe d'operateurs par DEFAUT (jsonb_ops) et non
+-- jsonb_path_ops : la recherche teste l'appartenance d'une chaine au
+-- tableau (operateur ?, via jsonb_exists), que jsonb_path_ops ne sait pas
+-- servir -- il ne couvre que le containment @>. Index un peu plus gros,
+-- mais qui repond effectivement a la requete ecrite.
+CREATE INDEX ix_indicators_tags ON indicators USING gin (tags);
