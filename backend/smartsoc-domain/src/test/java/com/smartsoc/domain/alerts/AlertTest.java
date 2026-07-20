@@ -109,6 +109,34 @@ class AlertTest {
     }
 
     @Test
+    void mitreTechniquesAreProtectedExactlyLikeObservables() {
+        // Même défaut, même correctif : le champ est parallèle à
+        // observables (final, List.copyOf dans ingest(), exposé par le
+        // @Getter de Lombok). Rien ne justifie que deux collections de la
+        // même entité offrent des garanties différentes selon le chemin
+        // de construction.
+        List<String> listeModifiable = new ArrayList<>(List.of("T1110"));
+        Alert relue = Alert.ingest(sampleData().build()).toBuilder()
+                .mitreTechniques(listeModifiable)
+                .build();
+
+        List<String> exposee = relue.getMitreTechniques();
+
+        assertThatThrownBy(() -> exposee.add("T1078"))
+                .isInstanceOf(UnsupportedOperationException.class);
+        assertThat(relue.getMitreTechniques()).containsExactly("T1110");
+    }
+
+    @Test
+    void anAlertBuiltWithoutMitreTechniquesNeverExposesNull() {
+        Alert sansListe = Alert.ingest(sampleData().build()).toBuilder()
+                .mitreTechniques(null)
+                .build();
+
+        assertThat(sansListe.getMitreTechniques()).isNotNull().isEmpty();
+    }
+
+    @Test
     void anAlertBuiltWithoutObservablesNeverExposesNull() {
         // Robustesse du même accesseur : une alerte construite hors
         // ingest() peut avoir un champ null ; l'appelant doit recevoir

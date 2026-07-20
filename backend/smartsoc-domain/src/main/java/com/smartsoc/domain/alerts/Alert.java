@@ -108,7 +108,30 @@ public class Alert {
      * chemin par lequel elle a été obtenue.
      */
     public List<Observable> getObservables() {
-        return observables == null ? List.of() : Collections.unmodifiableList(observables);
+        return readOnly(observables);
+    }
+
+    /**
+     * Techniques ATT&CK, en lecture seule.
+     *
+     * <p>Exactement la même protection, pour exactement la même raison :
+     * ce champ est le jumeau structurel d'{@code observables}. CodeQL n'a
+     * signalé que le second parce qu'il ne remonte que les alertes du
+     * code NOUVEAU d'une pull request — l'ancienneté d'un défaut ne le
+     * rend pas moins réel. Deux collections de la même entité n'ont
+     * aucune raison d'offrir des garanties différentes.
+     */
+    public List<String> getMitreTechniques() {
+        return readOnly(mitreTechniques);
+    }
+
+    /**
+     * Vue non modifiable, tolérante au null : un chemin de construction
+     * inhabituel ne doit pas se transformer en NullPointerException
+     * différé chez l'appelant.
+     */
+    private static <T> List<T> readOnly(List<T> values) {
+        return values == null ? List.of() : Collections.unmodifiableList(values);
     }
 
     /** Transition de triage, gardée par le cycle de vie (voir AlertStatus). */
