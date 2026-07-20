@@ -112,18 +112,16 @@ public record Observable(IndicatorType type, String value) {
             if (raw == null) {
                 rejected.add(new Rejection(index, null, null, INVALID,
                         "Observable entry is null"));
-                continue;
-            }
-            if (accepted.size() >= MAX_PER_ALERT) {
+            } else if (accepted.size() >= MAX_PER_ALERT) {
                 rejected.add(new Rejection(index, raw.type(), raw.value(), "TOO_MANY_OBSERVABLES",
                         "At most %d observables are kept per alert".formatted(MAX_PER_ALERT)));
-                continue;
-            }
-            try {
-                accepted.add(of(raw.type(), raw.value()));
-            } catch (DomainException e) {
-                rejected.add(new Rejection(index, raw.type(), raw.value(),
-                        rejectionCode(raw.type()), e.getMessage()));
+            } else {
+                try {
+                    accepted.add(of(raw.type(), raw.value()));
+                } catch (DomainException e) {
+                    rejected.add(new Rejection(index, raw.type(), raw.value(),
+                            rejectionCode(raw.type()), e.getMessage()));
+                }
             }
         }
         return new ParseResult(List.copyOf(accepted), List.copyOf(rejected));

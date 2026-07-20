@@ -117,14 +117,17 @@ class ThreatIntelApiIntegrationTest {
         ResponseEntity<Map> reponse = ingest(alertPayload(suffix()));
         assertThat(reponse.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         String id = (String) reponse.getBody().get("id");
-        assertThat(reponse.getBody().get("observables")).isEqualTo(List.of());
+        assertThat((Map<String, Object>) reponse.getBody())
+                .containsEntry("observables", List.of());
 
         // Consultation ordinaire : rien n'a changé pour le lecteur, et le
         // compte rendu d'ingestion est ABSENT du JSON (pas présent à null).
         Map<String, Object> relu = get(admin, "/api/v1/alerts/" + id);
-        assertThat(relu).containsEntry("id", id).containsEntry("severity", "HIGH");
-        assertThat(relu.get("observables")).isEqualTo(List.of());
-        assertThat(relu).doesNotContainKey("observableReport");
+        assertThat(relu)
+                .containsEntry("id", id)
+                .containsEntry("severity", "HIGH")
+                .containsEntry("observables", List.of())
+                .doesNotContainKey("observableReport");
 
         // Enrichissement : 200 avec deux listes vides. Une alerte sans
         // observable est normale, elle n'est simplement pas enrichie.
@@ -201,14 +204,14 @@ class ThreatIntelApiIntegrationTest {
 
         // Deux appels d'affilée rendent la même corrélation : le calcul à
         // la lecture est reproductible.
-        assertThat(second.get("matches")).isEqualTo(premier.get("matches"));
+        assertThat(second).containsEntry("matches", premier.get("matches"));
 
         // Et l'alerte n'a pas bougé : ni statut, ni date, ni observable.
         // Il n'existe d'ailleurs aucune colonne d'enrichissement à faire
         // bouger — c'est l'absence d'état qui rend l'effet de bord
         // impossible, pas seulement interdit.
         for (String champ : CHAMPS_STABLES) {
-            assertThat(apres.get(champ)).as("champ %s", champ).isEqualTo(avant.get(champ));
+            assertThat(apres).as("champ %s", champ).containsEntry(champ, avant.get(champ));
         }
     }
 

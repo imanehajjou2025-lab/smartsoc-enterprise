@@ -48,8 +48,7 @@ class ObservableTest {
         Observable domaine = Observable.of(IndicatorType.DOMAIN, "evil.com");
         Observable memeDomaine = Observable.of(IndicatorType.DOMAIN, "EVIL[.]COM");
 
-        assertThat(memeDomaine).isEqualTo(domaine);
-        assertThat(memeDomaine.hashCode()).isEqualTo(domaine.hashCode());
+        assertThat(memeDomaine).isEqualTo(domaine).hasSameHashCodeAs(domaine);
         assertThat(Observable.of(IndicatorType.URL, "http://evil.com/a"))
                 .isNotEqualTo(domaine);
     }
