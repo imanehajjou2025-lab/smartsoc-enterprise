@@ -6,10 +6,24 @@ Chaque fichier est la référence commune : le fournisseur implémente le
 contrat, la plateforme le consomme — aucune des deux équipes ne dépend du
 code de l'autre.
 
+## Contrats sortants — la plateforme appelle (OpenAPI)
+
 | Fichier | Système externe | Fournisseur | Statut |
 | --- | --- | --- | --- |
 | [`ai-classifier-api.yaml`](ai-classifier-api.yaml) | Classifieur TP/FP (ML) | équipe IA | v1.0.0 |
 | [`ai-assistant-api.yaml`](ai-assistant-api.yaml) | Agent conversationnel SOC (LLM) | équipe IA | v1.0.0 |
+
+## Contrats entrants — les outils SOC poussent (webhooks)
+
+Ceux-là vont dans l'autre sens : c'est l'outil externe qui appelle
+SmartSOC. La plateforme n'ouvre aucune connexion vers eux et ne détient
+aucun de leurs identifiants (ADR-005, ADR-009). Authentification commune
+par `X-API-Key` sur `/api/v1/ingest/**`.
+
+| Document | Endpoint | Producteurs visés |
+| --- | --- | --- |
+| [`alert-ingestion.md`](alert-ingestion.md) | `POST /api/v1/ingest/alerts` | Wazuh, Suricata, Shuffle, connecteurs |
+| [`cti-ioc-ingestion.md`](cti-ioc-ingestion.md) | `POST /api/v1/ingest/iocs` | MISP, OTX, flux CTI via Shuffle |
 
 ## Règles du jeu
 
