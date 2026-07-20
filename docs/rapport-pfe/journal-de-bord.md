@@ -1274,6 +1274,127 @@ check — tous au vert.
 
 ---
 
-*Prochaines entrées : CTI-2 (observables d'alerte et enrichissement),
-puis frontend CTI, MITRE, hunting, SOAR, rapports, et enfin l'assistant
-IA (backend + frontend).*
+## 2026-07-20 — Jalon CTI C2 — observables d'alerte et enrichissement (PR en cours)
+
+**Réalisé.** Le chaînon qui donne sa valeur au référentiel : les alertes
+déclarent désormais leurs **observables** (IP, domaine, URL, hash), et la
+plateforme les rapproche du référentiel IOC **dans les deux sens** —
+alerte → IOC pour le triage, IOC → alertes pour le retro-hunt.
+
+**Une seule normalisation, appelée et non recopiée.** `Observable` vit
+dans le contexte `intelligence`, avec `IndicatorType`, et sa valeur est
+produite par `IndicatorType.normalize()` — le même code exactement que
+pour un IOC. Le test central ne fige aucune chaîne attendue : il
+**compare les deux chemins** type par type
+(`Observable.of(t, v).value()` contre `t.normalize(v)`). Une seconde
+implémentation qui apparaîtrait un jour casserait le test immédiatement,
+là où une assertion sur `"evil.com"` ne l'aurait pas vue.
+
+**Tolérance par élément, jusque dans le contrat.** Un observable mal
+formé est écarté **individuellement** et l'alerte est créée quand même :
+perdre une détection à cause d'un champ annexe serait un très mauvais
+échange. Le producteur reçoit un `observableReport` avec ses deux
+compteurs et le détail par entrée. Le champ **`code` est contractuel et
+stable** (`INVALID_SHA256`, `TOO_MANY_OBSERVABLES`…), dérivé du type
+annoncé ; le `message` reste informatif — un producteur qui l'analyserait
+se lierait à une formulation plutôt qu'à une règle. Un test parcourt les
+huit valeurs de l'énumération pour que la convention tienne même si un
+type est ajouté plus tard.
+
+**La règle métier vit dans le SQL, pas après.** Le filtre d'activité
+(`revoked = false AND (valid_until IS NULL OR valid_until > :at)`) est
+dans la requête ; l'adaptateur ne fait qu'un `map(mapper::toDomain)`,
+sans `filter` ni `removeIf`. Il n'y a rien à oublier de filtrer parce
+qu'il n'y a rien à filtrer. Prouvé sur 20 003 IOC : les trois couples
+`(type, valeur)` de l'alerte témoin correspondent (requête témoin sans
+filtre : 3 lignes) mais la requête complète n'en rend **qu'une**.
+
+**Cohérence temporelle garantie par le type.** L'enrichissement est
+calculé à la lecture ; un indicateur pourrait donc expirer *pendant* le
+traitement d'une requête et se retrouver actif pour le SQL puis périmé
+dans la réponse. La parade retenue n'est pas une convention de passage
+de paramètre : `ThreatIntelEnrichment` **transporte** l'instant qui a
+servi au filtre SQL, et `ThreatIntelApiMapper` n'accepte **aucun**
+paramètre `Instant` — son unique source est celui que porte
+l'enrichissement. Il n'existe pas de signature permettant de calculer un
+statut à un autre moment.
+
+> **Une règle ArchUnit aurait été le mauvais outil.** Interdire
+> `Instant.now()` dans la couche API paraissait plus rigoureux, mais
+> c'était faux : les horodatages RFC 9457 du gestionnaire d'erreurs et
+> les TTL de jetons en ont un besoin légitime. Une règle qui casse du
+> code sain pour protéger un cas particulier donne une impression de
+> rigueur sans en avoir la substance. Le typage, lui, s'applique
+> exactement là où le risque existe.
+
+**Choix de persistance, et deux corrections venues de la mesure.** Table
+dédiée `alert_observables` (V8) plutôt que JSONB — contrairement aux
+techniques MITRE, on **joint** sur ces valeurs. Clé primaire
+`(alert_id, type, value)` qui dédoublonne en base, contrainte de
+normalisation identique à `indicators.value` (exception URL comprise), et
+index dédié `(type, value)` : la clé primaire commence par `alert_id` et
+n'aurait pas servi le sens IOC → alertes.
+- **LAZY → EAGER** : l'adaptateur convertit l'entité en objet de domaine
+  dès la sortie du dépôt, donc la collection est toujours parcourue ; en
+  LAZY, tout appelant hors transaction levait une
+  `LazyInitializationException`. Compter sur « il y a toujours une
+  transaction » était une hypothèse fragile — les trois tests de
+  persistance l'ont démentie.
+- **`@Fetch(SUBSELECT)` mesuré plutôt qu'affirmé** : sur une requête de
+  liste, Hibernate émet
+  `select … from alert_observables where alert_id in (select id from alerts where …)`,
+  soit **une** requête complémentaire pour toute la page au lieu d'une
+  par alerte. Le N+1 sur l'écran le plus consulté du SOC est écarté.
+
+**Plans d'exécution.** Sens alerte → IOC : les couples cherchés sont
+recomposés en table par `unnest` de deux tableaux parallèles, si bien que
+le moteur voit une jointure ordinaire — `Index Scan using
+ux_indicators_identity`, 12 buffers, 0,061 ms sur 20 003 IOC. Une longue
+disjonction de `OR`, la formulation naïve, aurait dégénéré dès qu'une
+alerte cite beaucoup d'observables. Sens IOC → alertes : `Index Scan
+using ix_alert_observables_identity` pour la liste **et** pour la
+`countQuery`, qui reprend le même prédicat — le total de la page est le
+compteur, il ne peut pas diverger.
+
+**Un trou de robustesse trouvé sur mon propre travail.** Le tableau
+`observables` du payload n'était borné qu'**après** désérialisation, par
+la règle métier de 100. Un producteur pouvait donc envoyer un million
+d'entrées que Jackson aurait intégralement matérialisées. Même classe de
+problème que les expressions régulières non bornées de CTI-1 : une
+donnée externe sans plafond. Corrigé par deux bornes de **natures
+différentes** — 100 (métier, tolérance, l'alerte est conservée) et 1000
+(anti-abus, `400` avant désérialisation). L'écart entre les deux est
+intentionnel : un dépassement ordinaire ne doit jamais faire perdre une
+alerte.
+
+**Une intuition démentie par la mesure.** Je soupçonnais qu'une simple
+transition de triage provoquerait un `DELETE` + `INSERT` complet de la
+collection d'observables. Les requêtes réellement émises disent le
+contraire : seul `update alerts` part, `alert_observables` n'est pas
+touchée. La raison tient au `equals`/`hashCode` de l'embeddable, mis en
+place pour le dédoublonnage du `Set` — Hibernate s'en sert pour constater
+que la collection n'a pas changé. Un choix fait pour une raison en a
+réglé une autre ; rien à corriger.
+
+**Vérification.** 7 tests E2E sur PostgreSQL réel : tolérance avec code
+de rejet typé, rejeu qui resurface l'erreur de mapping, alerte **sans**
+observable strictement inchangée (ingestion, consultation, et
+enrichissement à `200` avec deux listes vides), corrélation ne rendant
+que l'IOC actif alors que le périmé et le révoqué correspondent aussi,
+les observables sans correspondance conservés dans la réponse,
+retro-hunt sur trois alertes antérieures à l'IOC, pagination, et
+historique toujours consultable après révocation. Les **15 tests
+d'intégration d'alertes existants passent sans modification** — la
+preuve directe qu'un producteur d'avant CTI-2 est intact.
+
+*Incident de test à noter : la première version du contrôle « aucun effet
+de bord » comparait l'alerte entière avant et après. Elle échouait — non
+pas à cause de l'enrichissement, mais parce que le **classifieur IA
+écrit de façon asynchrone** après l'ingestion (jalon IA). Le test compare
+désormais les champs stables, en excluant explicitement `aiScore` et
+`aiVerdict` avec la raison écrite dans le code.*
+
+---
+
+*Prochaines entrées : frontend CTI, MITRE, hunting, SOAR, rapports, et
+enfin l'assistant IA (backend + frontend).*
