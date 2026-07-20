@@ -1059,5 +1059,158 @@ neuf à chaque étape.
 
 ---
 
-*Prochaines entrées : CTI, MITRE, hunting, SOAR, rapports, puis
-assistant IA (backend + frontend).*
+## 2026-07-20 — Jalon CTI C1 — référentiel des IOC, backend (PR en cours)
+
+**Réalisé.** Le socle du contexte `intelligence` : l'entité `Indicator`,
+son schéma (**V7**), son adaptateur de persistance et son service
+applicatif. Le module donne au SOC sa mémoire du renseignement — quand
+une alerte cite une adresse ou un hash, l'analyste doit savoir si cet
+observable est déjà connu comme malveillant.
+
+**Le point dur, trouvé avant d'écrire une ligne.** Une alerte SmartSOC ne
+contient AUCUN observable : `Alert` porte `hostname`, `ruleId`,
+`mitreTechniques` et `rawPayload`, mais ni IP, ni hash, ni domaine. Or un
+IOC n'est que cela. Sans observable, « enrichissement des alertes par
+IOC » n'a rien à corréler. Deux voies, une seule tenable :
+- extraire les observables de `rawPayload` par expressions régulières —
+  **rejeté** : dépendant du format de chaque outil, et une regex d'IP
+  attrape aussi bien la version d'un agent qu'un identifiant de règle.
+  C'est exactement la doctrine posée sur les actifs (FQDN) : *un faux
+  rattachement est pire qu'une absence* ;
+- **étendre le contrat d'ingestion** d'un champ `observables` optionnel
+  et typé, déclaré par le producteur qui, lui, connaît son format.
+Retenu : la seconde. Additive et rétrocompatible — les producteurs
+actuels ne subissent aucune régression — et c'est la raison pour laquelle
+l'enrichissement fait l'objet d'une PR distincte : il touche un contrat
+public.
+
+**Identité contre métadonnées.** La séparation structure toute l'entité :
+l'**identité métier** est le couple (type, valeur normalisée), `final`,
+jamais modifiée ; les **métadonnées CTI** (confiance, TLP, source, tags,
+fenêtre de validité, dates d'observation) sont volatiles et rafraîchies à
+chaque passage du flux. `refreshFrom()` vérifie l'identité avant tout et
+lève `INDICATOR_IDENTITY_MISMATCH` : une observation qui ne porte pas
+exactement le même couple parle d'un autre indicateur, et le signaler
+vaut mieux qu'écraser silencieusement une clé de corrélation.
+
+**Quatre bugs silencieux verrouillés par des tests.** Tous de la même
+famille que le fuseau horaire (PR #46) et la casse du hostname (PR #48) :
+ils ne lèvent aucune erreur, ils produisent « 0 IOC corrélé ».
+- *Normalisation dépendante de la locale* : en locale turque,
+  `"I".toLowerCase()` donne `ı` — la clé Java divergerait du `lower()`
+  SQL. Test exécuté sous `Locale.setDefault("tr")`. La primitive
+  `TextNormalization` (Locale.ROOT) est désormais partagée, et `Asset`
+  y délègue au lieu de porter sa propre copie de la règle.
+- *Notation défangée* : MISP et les analystes écrivent `1.2.3[.]4`,
+  `hxxp://`, `contact[at]evil[.]com`. Stocké tel quel, un IOC défangé ne
+  correspond à aucun observable réel — il n'alerte jamais. Le refangage
+  est la première étape de la normalisation.
+- *Identité réduite à la valeur* : la corrélation compare toujours le
+  COUPLE (type, valeur). Prouvé jusqu'en base — `('IPV4','45.83.12.7')`
+  et `('DOMAIN','45.83.12.7')` coexistent, un second `IPV4` identique est
+  refusé par `ux_indicators_identity`.
+- *Expiration* : `EXPIRED` n'est **pas** une colonne, il se déduit de
+  `valid_until` à la lecture. Une colonne de statut exigerait un batch de
+  péremption ; le jour où ce batch prend du retard, des IOC périmés
+  continuent d'enrichir en se déclarant actifs. Déduire supprime le batch
+  ET la classe de bug. Seule la révocation est un fait stocké — décision
+  d'analyste, qui survit aux ré-observations du flux.
+
+**Normalisation par type, avec ses exceptions assumées.** Un hash se met
+en minuscules sans réserve (les exports MISP les sortent en majuscules) ;
+une URL non — `/Login` et `/login` sont deux ressources, seuls le schéma
+et l'hôte sont insensibles à la casse. L'IPv6 est canonicalisé
+(`2001:DB8::1` et sa forme développée sont la même adresse et doivent
+produire la même clé), via `InetAddress` mais **gardé par une regex de
+littéral** pour qu'aucune résolution DNS ne soit possible depuis le
+domaine. La contrainte SQL `ck_indicators_value_normalized` grave la
+règle en base avec son exception URL explicite ; elle reste un plancher,
+le domaine demeure l'autorité.
+
+**Un décalage attrapé par la vérification, pas par la relecture.** Le
+premier passage de Flyway V1→V7 avec `ddl-auto=validate` a échoué :
+`wrong column type encountered in column [confidence] : found [int2
+(SMALLINT)], but expecting [integer (INTEGER)]`. J'avais écrit `SMALLINT`
+par réflexe d'économie alors que le domaine porte un `int`. Corrigé en
+`INTEGER`, l'échelle 0-100 restant garantie par la contrainte, qui est le
+vrai garde-fou.
+
+**Recherche par tag : quand un index ne sert à rien (lot 3bis).** Le
+filtre par tag doit être EXACT — un `like` sur le texte JSON rattacherait
+le tag `c2` à `c2-proxy`. La forme fonction `jsonb_exists(tags, :tag)`
+donne bien ce résultat exact, mais **n'emprunte jamais l'index GIN** :
+PostgreSQL ne fait correspondre un index qu'à une expression d'OPÉRATEUR,
+jamais à l'appel de fonction équivalent. Vérifié en forçant la main au
+planificateur — avec `enable_seqscan = off`, le plan reste un Seq Scan
+annoté `Disabled: true`, faute de toute alternative.
+
+L'opérateur natif `?` de PostgreSQL est, lui, inutilisable via JDBC : le
+caractère entre en conflit avec les paramètres liés — c'est précisément
+pour cela que le driver documente `jsonb_exists` comme contournement, et
+c'est ce contournement qui coûte l'index. Reste le containment `@>`, à la
+fois exact et indexable, mais que l'API Criteria ne sait pas émettre.
+Solution retenue : une fonction Hibernate enregistrée **par motif**.
+Contrairement à `cb.function()` qui produit toujours une syntaxe d'appel
+`nom(args)`, un motif est recopié tel quel dans le SQL — le moteur voit
+une vraie expression d'opérateur et l'index redevient éligible.
+
+Mesures sur 20 002 IOC, **même session, caches chauds, exécutions
+alternées** :
+
+```
+AVANT — where jsonb_exists(tags, 'c2')
+ Seq Scan on indicators (actual rows=1.00 loops=1)
+   Filter: jsonb_exists(tags, 'c2'::text)
+   Rows Removed by Filter: 20001
+   Buffers: shared hit=397
+ Execution Time: 3,129 ms  (répétitions : 3,409 / 3,602 ms)
+
+APRÈS — where (tags @> cast('["c2"]' as jsonb)) = true
+ Bitmap Heap Scan on indicators (actual rows=1.00 loops=1)
+   Recheck Cond: (tags @> '["c2"]'::jsonb)
+   Heap Blocks: exact=1
+   Buffers: shared hit=53
+   ->  Bitmap Index Scan on ix_indicators_tags (actual rows=1.00 loops=1)
+         Index Cond: (tags @> '["c2"]'::jsonb)
+ Execution Time: 1,160 ms  (répétitions : 1,105 / 0,916 ms)
+```
+
+**L'argument robuste n'est pas le temps** (≈ 3× à ce volume, sur une base
+de test chargée en mémoire), **c'est le changement de plan** : la lecture
+intégrale de la table disparaît. 20 001 lignes parcourues puis jetées →
+0 ; 397 buffers → 53. C'est ce coût-là qui croît linéairement avec le
+référentiel — un MISP abonné aux flux ouverts dépasse rapidement le
+million d'IOC, où le Seq Scan est cinquante fois plus lourd tandis que le
+parcours d'index ne bouge quasiment pas.
+
+> **Note de méthode — pourquoi ces chiffres remplacent les premiers.**
+> La première mesure annonçait 4,053 ms → 0,118 ms, soit un gain de 34×.
+> Elle était fausse comme comparaison : les deux valeurs provenaient de
+> **sessions différentes, avec des états de cache différents** — le
+> « avant » lisait la table à froid, l'« après » profitait d'un index
+> déjà chaud. Le protocole a été refait dans une session unique, caches
+> chauds, en alternant les deux formes et en répétant chaque mesure.
+> Le gain réel est plus modeste, et l'argument déplacé du temps vers le
+> plan d'exécution et les buffers — deux métriques qui, elles, ne
+> dépendent pas de l'état du cache. Un chiffre spectaculaire mais non
+> reproductible n'a aucune valeur dans un rapport : mieux vaut un gain
+> honnête et un raisonnement qui tient.
+
+**Vérification.** Rendu SQL réellement émis par Hibernate, relevé dans
+les logs : `where (tags @> cast('["c2"]' as jsonb)) and 1=1` — Hibernate
+absorbe même le `= true`. Exactitude confirmée (`c2` ne remonte pas
+`c2-proxy`). Le tag finissant en **littéral SQL inliné** et non en
+paramètre lié, une charge hostile a été testée (`x') = true or 1=1 --`) :
+l'apostrophe est doublée par Hibernate, la charge reste enfermée dans la
+chaîne JSON, 0 résultat — pas d'injection. Les sept contraintes de V7 ont
+été exercées une à une sur PostgreSQL réel (majuscules refusées hors URL,
+URL à chemin capitalisé acceptée, doublon d'identité refusé, même valeur
+sous un autre type acceptée, révocation sans motif refusée, `last_seen`
+antérieur refusé). Tests : 50 domaine, 31 application, 8 infrastructure,
+plus l'ArchUnit qui confirme que le domaine reste sans framework —
+`java.net`, utilisé pour la canonicalisation IPv6, n'y est pas interdit.
+
+---
+
+*Prochaines entrées : CTI (API et enrichissement, puis frontend), MITRE,
+hunting, SOAR, rapports, puis assistant IA (backend + frontend).*
