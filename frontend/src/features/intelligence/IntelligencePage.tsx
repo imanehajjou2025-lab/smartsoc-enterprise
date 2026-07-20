@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import CircularProgress from '@mui/material/CircularProgress';
@@ -24,6 +25,7 @@ import {
   IOC_STATUS_LABELS,
   IOC_TYPE_LABELS,
 } from './iocChips';
+import IocDetailDrawer from './IocDetailDrawer';
 import { listIocs, type IndicatorStatus, type IndicatorType } from './intelligenceApi';
 
 const TYPES: IndicatorType[] = ['IPV4', 'IPV6', 'DOMAIN', 'URL', 'MD5', 'SHA1', 'SHA256', 'EMAIL'];
@@ -43,6 +45,18 @@ function IntelligencePage() {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
   const [size, setSize] = useState(25);
+  // Lien profond /intelligence?selected={id} (ex. depuis le tiroir d'une
+  // alerte enrichie, ou URL partagée) : le tiroir s'ouvre dès le premier
+  // rendu.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [selectedId, setSelectedId] = useState<string | null>(searchParams.get('selected'));
+
+  const closeDrawer = () => {
+    setSelectedId(null);
+    if (searchParams.has('selected')) {
+      setSearchParams({}, { replace: true });
+    }
+  };
 
   const { data, isPending, isError, error } = useQuery({
     queryKey: ['iocs', { type, status, feedSource, tag, minConfidence, search, page, size }],
@@ -181,7 +195,12 @@ function IntelligencePage() {
                 </TableRow>
               )}
               {data.items.map((ioc) => (
-                <TableRow key={ioc.id} hover>
+                <TableRow
+                  key={ioc.id}
+                  hover
+                  sx={{ cursor: 'pointer' }}
+                  onClick={() => setSelectedId(ioc.id)}
+                >
                   <TableCell>
                     <IocTypeChip type={ioc.type} />
                   </TableCell>
@@ -231,6 +250,8 @@ function IntelligencePage() {
           />
         </TableContainer>
       )}
+
+      <IocDetailDrawer iocId={selectedId} onClose={closeDrawer} />
     </Box>
   );
 }
