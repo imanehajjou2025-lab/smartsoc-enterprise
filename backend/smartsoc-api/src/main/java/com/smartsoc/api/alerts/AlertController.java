@@ -3,9 +3,12 @@ package com.smartsoc.api.alerts;
 import com.smartsoc.api.alerts.dto.AlertDtos.AlertResponse;
 import com.smartsoc.api.alerts.dto.AlertDtos.UpdateAlertStatusRequest;
 import com.smartsoc.api.common.dto.PageResponse;
+import com.smartsoc.api.intelligence.ThreatIntelApiMapper;
+import com.smartsoc.api.intelligence.dto.ThreatIntelDtos.ThreatIntelResponse;
 import com.smartsoc.application.ai.AlertClassificationService;
 import com.smartsoc.application.alerts.AlertStatsService;
 import com.smartsoc.application.alerts.AlertTriageService;
+import com.smartsoc.application.intelligence.AlertEnrichmentService;
 import com.smartsoc.domain.alerts.AlertStatistics;
 import com.smartsoc.domain.alerts.AlertQuery;
 import com.smartsoc.domain.alerts.AlertStatus;
@@ -37,7 +40,9 @@ public class AlertController {
     private final AlertTriageService triageService;
     private final AlertStatsService statsService;
     private final AlertClassificationService classificationService;
+    private final AlertEnrichmentService enrichmentService;
     private final AlertApiMapper mapper;
+    private final ThreatIntelApiMapper threatIntelMapper;
 
     /** Statistiques agrégées du dashboard (timeline 7 jours). */
     @GetMapping("/stats")
@@ -59,6 +64,23 @@ public class AlertController {
     @GetMapping("/{id}")
     public AlertResponse get(@PathVariable UUID id) {
         return mapper.toResponse(triageService.getAlert(id));
+    }
+
+    /**
+     * Enrichissement CTI de l'alerte : ses observables, et les
+     * indicateurs ACTIFS qui leur correspondent.
+     *
+     * <p>Strictement en lecture — rien n'est écrit, ni statut, ni date,
+     * ni compteur. La corrélation est calculée à la demande (ADR-009),
+     * si bien qu'un indicateur déclaré après l'alerte y apparaît sans
+     * qu'aucun traitement de rattrapage ait eu lieu.
+     *
+     * <p>Une alerte sans observable répond 200 avec deux listes vides :
+     * ce n'est pas une anomalie, simplement une alerte non enrichie.
+     */
+    @GetMapping("/{id}/threat-intel")
+    public ThreatIntelResponse threatIntel(@PathVariable UUID id) {
+        return threatIntelMapper.toResponse(enrichmentService.enrich(id));
     }
 
     @PatchMapping("/{id}/status")
