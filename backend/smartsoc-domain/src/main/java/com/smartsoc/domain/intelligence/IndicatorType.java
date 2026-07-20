@@ -52,9 +52,6 @@ public enum IndicatorType {
     // --- Formats acceptés (validation stricte : un IOC douteux n'entre pas) ---
     private static final Pattern IPV4_FORMAT = Pattern.compile(
             "^((25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)\\.){3}(25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)$");
-    /** Littéral IPv6 uniquement : garantit qu'InetAddress ne fera JAMAIS de résolution DNS. */
-    private static final Pattern IPV6_LITERAL = Pattern.compile(
-            "^[0-9a-f:]*:[0-9a-f:]*(?:\\.\\d{1,3}){0,3}$", Pattern.CASE_INSENSITIVE);
     /**
      * UN label de domaine, borné. La validation d'un nom complet se fait
      * label par label EN BOUCLE, jamais par une expression à groupe
@@ -65,11 +62,20 @@ public enum IndicatorType {
      */
     private static final Pattern DOMAIN_LABEL =
             Pattern.compile("[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?");
-    private static final Pattern EMAIL_FORMAT = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
     private static final Pattern HEX = Pattern.compile("^[0-9a-f]+$");
+
+    // Libellés attendus, factorisés : ils servent aussi bien au message
+    // d'erreur qu'à la lecture des règles de validation.
+    private static final String EXPECTED_IPV4 = "a dotted-quad IPv4 address";
+    private static final String EXPECTED_IPV6 = "an IPv6 literal";
+    private static final String EXPECTED_DOMAIN = "a domain name";
+    private static final String EXPECTED_URL = "an absolute URL (scheme://host/…)";
+    private static final String EXPECTED_EMAIL = "an email address";
 
     /** Longueur maximale d'un nom de domaine complet (RFC 1035). */
     private static final int MAX_DOMAIN_LENGTH = 253;
+    /** Longueur maximale d'un littéral IPv6 (avec queue IPv4 éventuelle). */
+    private static final int MAX_IPV6_LENGTH = 45;
     /** Garde de longueur du domaine, alignée sur la colonne indicators.value. */
     private static final int MAX_VALUE_LENGTH = 2048;
 
@@ -104,7 +110,7 @@ public enum IndicatorType {
     private String normalizeIpv4(String value) {
         String normalized = value.trim();
         if (!IPV4_FORMAT.matcher(normalized).matches()) {
-            throw invalid(value, "a dotted-quad IPv4 address");
+            throw invalid(value, EXPECTED_IPV4);
         }
         return normalized;
     }
@@ -120,14 +126,43 @@ public enum IndicatorType {
      */
     private String normalizeIpv6(String value) {
         String candidate = TextNormalization.lowerTrim(value);
-        if (!IPV6_LITERAL.matcher(candidate).matches()) {
-            throw invalid(value, "an IPv6 literal");
+        if (!isIpv6Literal(candidate)) {
+            throw invalid(value, EXPECTED_IPV6);
         }
         try {
             return InetAddress.getByName(candidate).getHostAddress().toLowerCase(Locale.ROOT);
         } catch (UnknownHostException e) {
-            throw invalid(value, "an IPv6 literal");
+            throw invalid(value, EXPECTED_IPV6);
         }
+    }
+
+    /**
+     * Vrai si la chaîne ne peut être QU'un littéral IPv6 : uniquement des
+     * chiffres hexadécimaux, « : » et « . », et au moins un « : ».
+     *
+     * <p>Vérification caractère par caractère plutôt qu'expression
+     * régulière : un motif à deux répétitions non bornées de part et
+     * d'autre d'un « : » rétro-suit de façon super-linéaire
+     * (java:S8786), et l'entrée vient d'un flux CTI externe. Une boucle
+     * est linéaire par construction.
+     *
+     * <p>Aucun nom d'hôte ne peut contenir « : » — c'est ce qui garantit
+     * qu'{@code InetAddress} ne fera jamais de résolution DNS.
+     */
+    private static boolean isIpv6Literal(String candidate) {
+        if (candidate.isEmpty() || candidate.length() > MAX_IPV6_LENGTH) {
+            return false;
+        }
+        boolean hasColon = false;
+        for (int i = 0; i < candidate.length(); i++) {
+            char c = candidate.charAt(i);
+            if (c == ':') {
+                hasColon = true;
+            } else if (c != '.' && (c < '0' || c > '9') && (c < 'a' || c > 'f')) {
+                return false;
+            }
+        }
+        return hasColon;
     }
 
     private String normalizeDomain(String value) {
@@ -139,23 +174,36 @@ public enum IndicatorType {
         }
         normalized = normalized.substring(0, end);
 
-        if (normalized.length() > MAX_DOMAIN_LENGTH
-                || IPV4_FORMAT.matcher(normalized).matches()) {
-            throw invalid(value, "a domain name");
+        if (!isValidDomain(normalized)) {
+            throw invalid(value, EXPECTED_DOMAIN);
         }
-        // Validation label par label, en boucle : voir DOMAIN_LABEL — une
-        // expression à groupe répété serait un risque de débordement de pile
-        // sur une entrée longue, et l'entrée vient d'un flux externe.
-        String[] labels = normalized.split("\\.", -1);
+        return normalized;
+    }
+
+    /**
+     * Nom de domaine valide : longueur bornée, au moins deux labels, et
+     * chaque label conforme — vérifié EN BOUCLE (voir {@link #DOMAIN_LABEL}).
+     * Une adresse IPv4 n'est pas un domaine.
+     *
+     * <p>Extrait en méthode car le domaine d'une adresse e-mail EST un
+     * domaine : une seule implémentation de la règle, pas deux qui
+     * pourraient diverger.
+     */
+    private static boolean isValidDomain(String candidate) {
+        if (candidate.isEmpty() || candidate.length() > MAX_DOMAIN_LENGTH
+                || IPV4_FORMAT.matcher(candidate).matches()) {
+            return false;
+        }
+        String[] labels = candidate.split("\\.", -1);
         if (labels.length < 2) {
-            throw invalid(value, "a domain name");
+            return false;
         }
         for (String label : labels) {
             if (!DOMAIN_LABEL.matcher(label).matches()) {
-                throw invalid(value, "a domain name");
+                return false;
             }
         }
-        return normalized;
+        return true;
     }
 
     /**
@@ -168,7 +216,7 @@ public enum IndicatorType {
         String normalized = value.trim();
         int schemeEnd = normalized.indexOf("://");
         if (schemeEnd <= 0) {
-            throw invalid(value, "an absolute URL (scheme://host/…)");
+            throw invalid(value, EXPECTED_URL);
         }
         String scheme = normalized.substring(0, schemeEnd).toLowerCase(Locale.ROOT);
         String rest = normalized.substring(schemeEnd + 3);
@@ -182,7 +230,7 @@ public enum IndicatorType {
         }
         String authority = rest.substring(0, tailStart).toLowerCase(Locale.ROOT);
         if (authority.isEmpty()) {
-            throw invalid(value, "an absolute URL (scheme://host/…)");
+            throw invalid(value, EXPECTED_URL);
         }
         return scheme + "://" + authority + rest.substring(tailStart);
     }
@@ -209,8 +257,23 @@ public enum IndicatorType {
      */
     private String normalizeEmail(String value) {
         String normalized = TextNormalization.lowerTrim(value);
-        if (!EMAIL_FORMAT.matcher(normalized).matches()) {
-            throw invalid(value, "an email address");
+        int at = normalized.indexOf('@');
+        // Une seule arobase, une partie locale et un domaine non vides.
+        if (at <= 0 || at != normalized.lastIndexOf('@') || at == normalized.length() - 1) {
+            throw invalid(value, EXPECTED_EMAIL);
+        }
+        String local = normalized.substring(0, at);
+        for (int i = 0; i < local.length(); i++) {
+            if (Character.isWhitespace(local.charAt(i))) {
+                throw invalid(value, EXPECTED_EMAIL);
+            }
+        }
+        // Le domaine d'une adresse EST un domaine : même règle, une seule
+        // implémentation. Découpage explicite plutôt qu'expression
+        // régulière — « [^@\s]+@[^@\s]+\.[^@\s]+ » rétro-suit de façon
+        // super-linéaire sur une entrée longue (java:S8786).
+        if (!isValidDomain(normalized.substring(at + 1))) {
+            throw invalid(value, EXPECTED_EMAIL);
         }
         return normalized;
     }
