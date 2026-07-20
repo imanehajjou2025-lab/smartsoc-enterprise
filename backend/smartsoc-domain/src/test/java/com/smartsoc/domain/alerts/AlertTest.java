@@ -1,6 +1,8 @@
 package com.smartsoc.domain.alerts;
 
 import com.smartsoc.domain.common.BusinessRuleViolationException;
+import com.smartsoc.domain.intelligence.IndicatorType;
+import com.smartsoc.domain.intelligence.Observable;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
@@ -40,6 +42,46 @@ class AlertTest {
         assertThat(alert.getMitreTechniques()).containsExactly("T1110");
         assertThat(alert.getAiScore()).isNull();
         assertThat(alert.getAiVerdict()).isNull();
+    }
+
+    @Test
+    void anAlertWithoutObservablesKeepsWorkingExactlyAsBefore() {
+        // Rétrocompatibilité stricte du contrat d'ingestion : les
+        // producteurs actuels ne déclarent pas d'observables. Liste vide,
+        // jamais null, aucune régression.
+        Alert alert = sampleAlert();
+
+        assertThat(alert.getObservables()).isNotNull().isEmpty();
+    }
+
+    @Test
+    void declaredObservablesAreCarriedByTheAlert() {
+        // Les observables sont DÉCLARÉS par le producteur, jamais extraits
+        // de rawPayload (ADR-009) : ici l'alerte cite explicitement le
+        // domaine et l'IP contactés.
+        Observable domaine = Observable.of(IndicatorType.DOMAIN, "evil-c2[.]com");
+        Observable ip = Observable.of(IndicatorType.IPV4, "45.83.12.7");
+
+        Alert alert = Alert.ingest(sampleData()
+                .observables(List.of(domaine, ip)).build());
+
+        assertThat(alert.getObservables()).containsExactly(domaine, ip);
+        // Valeurs déjà normalisées par le type au moment de la construction.
+        assertThat(alert.getObservables().getFirst().value()).isEqualTo("evil-c2.com");
+    }
+
+    @Test
+    void theObservableListOfAnAlertIsImmutable() {
+        // Une alerte est une pièce d'evidence : ce qu'elle cite ne se
+        // réécrit pas après coup.
+        Alert alert = Alert.ingest(sampleData()
+                .observables(List.of(Observable.of(IndicatorType.IPV4, "45.83.12.7")))
+                .build());
+        List<Observable> observables = alert.getObservables();
+        Observable autre = Observable.of(IndicatorType.DOMAIN, "evil.com");
+
+        assertThatThrownBy(() -> observables.add(autre))
+                .isInstanceOf(UnsupportedOperationException.class);
     }
 
     @Test

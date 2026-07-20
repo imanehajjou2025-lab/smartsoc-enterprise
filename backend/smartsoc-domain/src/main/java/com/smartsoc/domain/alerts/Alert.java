@@ -1,6 +1,7 @@
 package com.smartsoc.domain.alerts;
 
 import com.smartsoc.domain.common.BusinessRuleViolationException;
+import com.smartsoc.domain.intelligence.Observable;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -34,6 +35,15 @@ public class Alert {
     private final String hostname;
     private final String ruleId;
     private final List<String> mitreTechniques;
+    /**
+     * Observables cités par l'événement — la clé de corrélation avec le
+     * référentiel CTI. Déclarés par le producteur, jamais devinés à
+     * partir de rawPayload (ADR-009) : une extraction par expressions
+     * régulières fabriquerait de faux rattachements, et en SOC un faux
+     * rattachement coûte plus cher qu'une absence. Liste vide par défaut,
+     * donc les producteurs qui n'en déclarent pas sont inchangés.
+     */
+    private final List<Observable> observables;
     private final String rawPayload;
     private Double aiScore;
     private AiVerdict aiVerdict;
@@ -50,6 +60,7 @@ public class Alert {
             String hostname,
             String ruleId,
             List<String> mitreTechniques,
+            List<Observable> observables,
             String rawPayload) {
     }
 
@@ -78,6 +89,8 @@ public class Alert {
                 .ruleId(data.ruleId())
                 .mitreTechniques(data.mitreTechniques() == null
                         ? List.of() : List.copyOf(data.mitreTechniques()))
+                .observables(data.observables() == null
+                        ? List.of() : List.copyOf(data.observables()))
                 .rawPayload(data.rawPayload())
                 .build();
     }
