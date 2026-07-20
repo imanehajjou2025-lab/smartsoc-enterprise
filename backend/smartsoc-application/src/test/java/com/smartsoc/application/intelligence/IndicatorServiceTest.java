@@ -8,10 +8,10 @@ import com.smartsoc.domain.intelligence.Indicator;
 import com.smartsoc.domain.intelligence.IndicatorRepository;
 import com.smartsoc.domain.intelligence.IndicatorType;
 import com.smartsoc.domain.intelligence.TlpMarking;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -22,7 +22,6 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -40,12 +39,8 @@ class IndicatorServiceTest {
     @Mock
     private IndicatorRepository indicatorRepository;
 
+    @InjectMocks
     private IndicatorService service;
-
-    @BeforeEach
-    void setUp() {
-        service = new IndicatorService(indicatorRepository);
-    }
 
     private static Indicator.Observation.ObservationBuilder observation() {
         return Indicator.Observation.builder()
@@ -80,7 +75,7 @@ class IndicatorServiceTest {
 
         // Sans normalisation AVANT la recherche, l'IOC déjà connu ne serait
         // jamais retrouvé et un doublon naîtrait à chaque passage du flux.
-        verify(indicatorRepository).findByIdentity(eq(IndicatorType.DOMAIN), eq("evil.com"));
+        verify(indicatorRepository).findByIdentity(IndicatorType.DOMAIN, "evil.com");
     }
 
     @Test
@@ -122,9 +117,13 @@ class IndicatorServiceTest {
         when(indicatorRepository.findByIdentity(IndicatorType.DOMAIN, "evil.com"))
                 .thenReturn(Optional.of(existing));
 
-        assertThatThrownBy(() -> service.declare(new DeclareIndicatorCommand(
+        // Même identité, écrite en majuscules et défangée. La commande est
+        // construite hors de la lambda : seul declare() peut lever.
+        DeclareIndicatorCommand memeIoc = new DeclareIndicatorCommand(
                 IndicatorType.DOMAIN, "  EVIL[.]COM  ", 80, TlpMarking.AMBER,
-                null, Set.of(), null)))
+                null, Set.of(), null);
+
+        assertThatThrownBy(() -> service.declare(memeIoc))
                 .isInstanceOf(DuplicateResourceException.class)
                 .hasMessageContaining("evil.com");
 

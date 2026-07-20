@@ -70,17 +70,19 @@ class IocApiIntegrationTest {
                 ioc("SHA256", hashInvalide, 50, run),
                 ioc("URL", urlDefangee, 70, run)));
 
-        assertThat(report.get("received")).isEqualTo(3);
-        assertThat(report.get("created")).isEqualTo(2);
-        assertThat(report.get("updated")).isEqualTo(0);
-        assertThat(report.get("rejected")).isEqualTo(1);
+        assertThat(report)
+                .containsEntry("received", 3)
+                .containsEntry("created", 2)
+                .containsEntry("updated", 0)
+                .containsEntry("rejected", 1);
 
         // Le rejet est nommé : position, valeur fautive et code stable.
         var errors = (List<Map<String, Object>>) report.get("errors");
         assertThat(errors).hasSize(1);
-        assertThat(errors.getFirst().get("index")).isEqualTo(1);
-        assertThat(errors.getFirst().get("value")).isEqualTo(hashInvalide);
-        assertThat(errors.getFirst().get("code")).isEqualTo("INVALID_INDICATOR");
+        assertThat(errors.getFirst())
+                .containsEntry("index", 1)
+                .containsEntry("value", hashInvalide)
+                .containsEntry("code", "INVALID_INDICATOR");
         assertThat((String) errors.getFirst().get("message")).contains("SHA256");
 
         // Les deux valides sont bien dans le référentiel, et le troisième
@@ -100,8 +102,7 @@ class IocApiIntegrationTest {
 
         Map<String, Object> first = pushFeed("misp", List.of(
                 iocAt("DOMAIN", value, 40, run, firstSeen)));
-        assertThat(first.get("created")).isEqualTo(1);
-        assertThat(first.get("updated")).isEqualTo(0);
+        assertThat(first).containsEntry("created", 1).containsEntry("updated", 0);
 
         Map<String, Object> before = onlyItem(searchByTag(admin, run));
         String id = (String) before.get("id");
@@ -111,19 +112,21 @@ class IocApiIntegrationTest {
         Instant lastSeen = Instant.now();
         Map<String, Object> second = pushFeed("otx", List.of(
                 iocAt("DOMAIN", "C2-" + run.toUpperCase() + "[.]NET", 95, run, lastSeen)));
-        assertThat(second.get("created")).isEqualTo(0);
-        assertThat(second.get("updated")).isEqualTo(1);
-        assertThat(second.get("rejected")).isEqualTo(0);
+        assertThat(second)
+                .containsEntry("created", 0)
+                .containsEntry("updated", 1)
+                .containsEntry("rejected", 0);
 
         // AUCUN second enregistrement : toujours un seul IOC pour ce tag.
         Map<String, Object> page = searchByTag(admin, run);
         assertThat(((Number) page.get("totalElements")).longValue()).isEqualTo(1);
 
         Map<String, Object> after = onlyItem(page);
-        assertThat(after.get("id")).isEqualTo(id);
-        assertThat(after.get("value")).isEqualTo(value);
-        assertThat(after.get("confidence")).isEqualTo(95);
-        assertThat(after.get("feedSource")).isEqualTo("otx");
+        assertThat(after)
+                .containsEntry("id", id)
+                .containsEntry("value", value)
+                .containsEntry("confidence", 95)
+                .containsEntry("feedSource", "otx");
         // La première observation est conservée, la dernière avance.
         assertThat(Instant.parse((String) after.get("firstSeen")))
                 .isCloseTo(firstSeen, within(1000));
@@ -161,13 +164,11 @@ class IocApiIntegrationTest {
         // leur statut DÉDUIT et, pour le révoqué, sa justification.
         Map<String, Object> expired = exchange(HttpMethod.GET,
                 IOCS + "/" + expiredId, admin, null, Map.class).getBody();
-        assertThat(expired.get("status")).isEqualTo("EXPIRED");
-        assertThat(expired.get("revoked")).isEqualTo(false);
+        assertThat(expired).containsEntry("status", "EXPIRED").containsEntry("revoked", false);
 
         Map<String, Object> revoked = exchange(HttpMethod.GET,
                 IOCS + "/" + revokedId, admin, null, Map.class).getBody();
-        assertThat(revoked.get("status")).isEqualTo("REVOKED");
-        assertThat(revoked.get("revoked")).isEqualTo(true);
+        assertThat(revoked).containsEntry("status", "REVOKED").containsEntry("revoked", true);
         assertThat((String) revoked.get("revocationReason")).contains("faux positif");
         assertThat(revoked.get("revokedAt")).isNotNull();
 
@@ -193,13 +194,13 @@ class IocApiIntegrationTest {
 
         // Le flux repousse l'indicateur avec une confiance maximale.
         Map<String, Object> report = pushFeed("misp", List.of(ioc("DOMAIN", value, 100, run)));
-        assertThat(report.get("updated")).isEqualTo(1);
+        assertThat(report).containsEntry("updated", 1);
 
         // La décision d'analyste prime : toujours révoqué, toujours hors
         // des recherches d'indicateurs actifs.
         Map<String, Object> after = exchange(HttpMethod.GET,
                 IOCS + "/" + id, admin, null, Map.class).getBody();
-        assertThat(after.get("status")).isEqualTo("REVOKED");
+        assertThat(after).containsEntry("status", "REVOKED");
         assertThat(totalOf(exchange(HttpMethod.GET,
                 IOCS + "?tag=" + run + "&status=ACTIVE", admin, null, Map.class).getBody()))
                 .isZero();
@@ -214,7 +215,7 @@ class IocApiIntegrationTest {
         ResponseEntity<Map> created = exchange(HttpMethod.POST, IOCS, admin,
                 declarePayload(value, run), Map.class);
         assertThat(created.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-        assertThat(created.getBody().get("feedSource")).isEqualTo("manual");
+        assertThat((Map<String, Object>) created.getBody()).containsEntry("feedSource", "manual");
 
         // Même identité en majuscules + défangée + espaces.
         ResponseEntity<String> duplicate = exchange(HttpMethod.POST, IOCS, admin,

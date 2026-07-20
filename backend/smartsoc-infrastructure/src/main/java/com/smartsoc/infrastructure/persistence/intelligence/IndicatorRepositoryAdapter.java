@@ -21,6 +21,12 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class IndicatorRepositoryAdapter implements IndicatorRepository {
 
+    // Noms d'attributs JPA employés par les Specifications. Nommés une
+    // fois : une faute de frappe dans un littéral répété ne se verrait
+    // qu'à l'exécution.
+    private static final String ATTR_REVOKED = "revoked";
+    private static final String ATTR_VALID_UNTIL = "validUntil";
+
     private final SpringDataIndicatorRepository springDataRepository;
     private final IndicatorJpaMapper mapper;
 

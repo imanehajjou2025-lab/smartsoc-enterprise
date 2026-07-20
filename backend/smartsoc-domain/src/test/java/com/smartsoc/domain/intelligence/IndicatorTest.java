@@ -55,12 +55,18 @@ class IndicatorTest {
 
     @Test
     void declareRequiresValueSourceAndSaneConfidence() {
-        assertThatThrownBy(() -> Indicator.declare(observation().value(" ").build()))
+        // Observations construites HORS des lambdas : seul declare() peut
+        // lever, donc l'assertion ne peut pas porter sur autre chose.
+        Indicator.Observation sansValeur = observation().value(" ").build();
+        Indicator.Observation sansSource = observation().feedSource(" ").build();
+        Indicator.Observation confianceHorsEchelle = observation().confidence(101).build();
+
+        assertThatThrownBy(() -> Indicator.declare(sansValeur))
                 .isInstanceOf(BusinessRuleViolationException.class);
-        assertThatThrownBy(() -> Indicator.declare(observation().feedSource(" ").build()))
+        assertThatThrownBy(() -> Indicator.declare(sansSource))
                 .isInstanceOf(BusinessRuleViolationException.class)
                 .hasMessageContaining("source");
-        assertThatThrownBy(() -> Indicator.declare(observation().confidence(101).build()))
+        assertThatThrownBy(() -> Indicator.declare(confianceHorsEchelle))
                 .isInstanceOf(BusinessRuleViolationException.class)
                 .hasMessageContaining("Confidence");
     }
@@ -133,10 +139,13 @@ class IndicatorTest {
 
         // Une longueur qui ne colle pas à l'algorithme est une erreur de
         // saisie, pas un IOC : elle n'entre pas dans le référentiel.
-        assertThatThrownBy(() -> IndicatorType.SHA256.normalize("a".repeat(40)))
+        String trenteQuaranteHex = "a".repeat(40);
+        String md5AvecCaracteresNonHex = "zz" + "a".repeat(30);
+
+        assertThatThrownBy(() -> IndicatorType.SHA256.normalize(trenteQuaranteHex))
                 .isInstanceOf(BusinessRuleViolationException.class)
                 .hasMessageContaining("64-character");
-        assertThatThrownBy(() -> IndicatorType.MD5.normalize("zz" + "a".repeat(30)))
+        assertThatThrownBy(() -> IndicatorType.MD5.normalize(md5AvecCaracteresNonHex))
                 .isInstanceOf(BusinessRuleViolationException.class);
     }
 
@@ -235,12 +244,15 @@ class IndicatorTest {
 
         // Même valeur, autre type → autre indicateur : la corrélation se
         // fait sur le COUPLE (type, valeur), jamais sur la valeur seule.
-        assertThatThrownBy(() -> ioc.refreshFrom(observation()
-                .type(IndicatorType.SHA256).value("a".repeat(64)).build()))
+        Indicator.Observation autreType = observation()
+                .type(IndicatorType.SHA256).value("a".repeat(64)).build();
+        Indicator.Observation autreValeur = observation().value("8.8.8.8").build();
+
+        assertThatThrownBy(() -> ioc.refreshFrom(autreType))
                 .isInstanceOf(BusinessRuleViolationException.class)
                 .hasMessageContaining("identity");
 
-        assertThatThrownBy(() -> ioc.refreshFrom(observation().value("8.8.8.8").build()))
+        assertThatThrownBy(() -> ioc.refreshFrom(autreValeur))
                 .isInstanceOf(BusinessRuleViolationException.class)
                 .hasMessageContaining("identity");
     }
