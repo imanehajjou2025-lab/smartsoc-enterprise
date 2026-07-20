@@ -6,6 +6,7 @@ import com.smartsoc.domain.intelligence.Observable;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -82,6 +83,41 @@ class AlertTest {
 
         assertThatThrownBy(() -> observables.add(autre))
                 .isInstanceOf(UnsupportedOperationException.class);
+    }
+
+    @Test
+    void immutabilityHoldsEvenForAnAlertBuiltOutsideIngest() {
+        // Le chemin que le test précédent ne couvrait PAS : une alerte
+        // relue depuis la base est reconstruite par le builder, avec une
+        // liste ordinaire et modifiable. Sans accesseur défensif,
+        // l'entité laisserait réécrire ce qu'elle est censée protéger
+        // (java/internal-representation-exposure).
+        List<Observable> listeModifiable =
+                new ArrayList<>(List.of(Observable.of(IndicatorType.IPV4, "45.83.12.7")));
+        Alert relue = Alert.ingest(sampleData().build()).toBuilder()
+                .observables(listeModifiable)
+                .build();
+
+        List<Observable> exposee = relue.getObservables();
+        Observable autre = Observable.of(IndicatorType.DOMAIN, "evil.com");
+
+        assertThatThrownBy(() -> exposee.add(autre))
+                .isInstanceOf(UnsupportedOperationException.class);
+        // Et modifier la liste d'origine ne change rien à ce que l'alerte
+        // a déjà rendu : la protection n'est pas qu'une apparence.
+        assertThat(relue.getObservables()).hasSize(1);
+    }
+
+    @Test
+    void anAlertBuiltWithoutObservablesNeverExposesNull() {
+        // Robustesse du même accesseur : une alerte construite hors
+        // ingest() peut avoir un champ null ; l'appelant doit recevoir
+        // une liste vide, jamais un NullPointerException différé.
+        Alert sansListe = Alert.ingest(sampleData().build()).toBuilder()
+                .observables(null)
+                .build();
+
+        assertThat(sansListe.getObservables()).isNotNull().isEmpty();
     }
 
     @Test

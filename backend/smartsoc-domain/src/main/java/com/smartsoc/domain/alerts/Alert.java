@@ -8,6 +8,7 @@ import lombok.Builder;
 import lombok.Getter;
 
 import java.time.Instant;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
@@ -93,6 +94,21 @@ public class Alert {
                         ? List.of() : List.copyOf(data.observables()))
                 .rawPayload(data.rawPayload())
                 .build();
+    }
+
+    /**
+     * Observables cités, en lecture seule.
+     *
+     * <p>Accesseur écrit à la main plutôt que généré : {@code ingest()}
+     * construit déjà une liste immuable, mais ce n'est pas le seul chemin
+     * de création — une alerte relue depuis la base passe par le builder,
+     * avec une liste ordinaire. L'entité rendrait alors modifiable ce
+     * qu'elle est censée protéger. Une alerte est une pièce d'evidence :
+     * ce qu'elle cite ne se réécrit pas après coup, quel que soit le
+     * chemin par lequel elle a été obtenue.
+     */
+    public List<Observable> getObservables() {
+        return observables == null ? List.of() : Collections.unmodifiableList(observables);
     }
 
     /** Transition de triage, gardée par le cycle de vie (voir AlertStatus). */
