@@ -1059,7 +1059,7 @@ neuf à chaque étape.
 
 ---
 
-## 2026-07-20 — Jalon CTI C1 — référentiel des IOC, backend (PR en cours)
+## 2026-07-20 — Jalon CTI C1 — référentiel des IOC, backend (PR #50, ADR-009)
 
 **Réalisé.** Le socle du contexte `intelligence` : l'entité `Indicator`,
 son schéma (**V7**), son adaptateur de persistance et son service
@@ -1212,5 +1212,68 @@ plus l'ArchUnit qui confirme que le domaine reste sans framework —
 
 ---
 
-*Prochaines entrées : CTI (API et enrichissement, puis frontend), MITRE,
-hunting, SOAR, rapports, puis assistant IA (backend + frontend).*
+### Durcissement après revue SonarCloud (même jalon)
+
+La première analyse de la PR a bloqué sur **`java:S5998`** (MAJOR, typée
+BUG) : l'expression de validation des domaines répétait un GROUPE, or le
+moteur d'expressions régulières de Java récurse à chaque répétition. Un
+nom à un millier de labels faisait **déborder la pile** — et la valeur
+arrive d'un flux CTI externe, jusqu'à 2048 caractères. C'était un déni de
+service offert au producteur du flux.
+
+Le correctif appliqué, le gate est repassé au vert — **et c'est ce vert
+qui a failli clore l'affaire trop tôt**. En ouvrant la liste complète des
+issues, deux **`java:S8786`** subsistaient : `IPV6_LITERAL` et
+`EMAIL_FORMAT` rétro-suivaient de façon super-linéaire sur les mêmes
+données externes. Elles ne bloquaient pas parce que Sonar les classe en
+CODE_SMELL, et que `new_reliability_rating` ne compte que les BUG.
+
+**Décision : les corriger malgré le gate vert.** La classification d'un
+outil décrit une forme, pas un contexte. Ces motifs s'appliquent à
+`indicators.value`, fournie par un tiers via un webhook public — ce que
+l'outil ne peut pas savoir. Corollaire de méthode : la même cause avait
+produit un BUG *et* deux CODE_SMELL ; ne traiter que le BUG, c'était
+corriger un tiers d'un défaut unique.
+
+| Avant | Après |
+| --- | --- |
+| groupe répété `(?:…)+` → récursion, débordement de pile | boucle sur les labels, pile constante |
+| `[0-9a-f:]*:[0-9a-f:]*` → rétro-suivi super-linéaire | parcours caractère par caractère, un seul passage |
+| `[^@\s]+@[^@\s]+\.[^@\s]+` → rétro-suivi | découpage sur `@`, puis `isValidDomain()` |
+| aucune borne de taille dans le domaine | 2048 par valeur, 253 par domaine, 45 par IPv6 |
+
+Trois acquis : plus aucune expression à rétro-suivi non borné sur une
+donnée externe (temps de validation prévisible quelle que soit
+l'entrée) ; les gardes de longueur vivent **dans le domaine**, donc tout
+futur appelant en hérite ; et le domaine d'une adresse e-mail est validé
+par `isValidDomain()` — une seule règle, deux implémentations ne peuvent
+plus diverger. Un IOC hostile est rejeté en **temps linéaire**.
+
+Les 35 *code smells* de tests ont été traités dans la foulée (`S5778` :
+les arguments des lambdas `assertThatThrownBy` sont construits avant la
+lambda, pour qu'un test ne puisse pas passer au vert parce que le
+*builder* a levé ; `S5838`, `S9024`, `S6068`, `S1192`). **Aucune
+exclusion, aucun `NOSONAR`** : zéro issue introduite par la PR au final.
+
+**Deux checks vérifiés plutôt que crus sur parole.** Gitleaks a échoué
+deux fois sur un `503` de l'API GitHub — l'outil n'avait jamais scanné.
+Un `503` n'est pas une preuve d'absence de fuite : scan rejoué en local
+avec l'image officielle sur **toutes les refs**, 77 commits (le total
+sans les 40 commits de merge, qui n'introduisent aucun contenu),
+`no leaks found`. Le check GitHub est repassé au vert ensuite,
+confirmant l'incident de plateforme. Le check `Trivy` affichait
+`neutral` (« 2 configurations not found ») : lecture du journal du job
+faite — l'image est bien construite et scannée, la barrière sur les
+CRITICAL passe, le SARIF est envoyé et traité ; le `neutral` ne porte
+que sur le récapitulatif agrégé de GitHub Code Scanning.
+
+**CI finale** : Build & Test, Quality analysis, SonarCloud (gate OK,
+couverture du code nouveau **84,8 %**, duplication 0 %, 0 issue),
+CodeQL (« no new alerts »), Trivy, Gitleaks, dependency-review, sanity
+check — tous au vert.
+
+---
+
+*Prochaines entrées : CTI-2 (observables d'alerte et enrichissement),
+puis frontend CTI, MITRE, hunting, SOAR, rapports, et enfin l'assistant
+IA (backend + frontend).*
