@@ -5,6 +5,7 @@ import com.smartsoc.domain.intelligence.Indicator;
 import com.smartsoc.domain.intelligence.IndicatorQuery;
 import com.smartsoc.domain.intelligence.IndicatorRepository;
 import com.smartsoc.domain.intelligence.IndicatorType;
+import com.smartsoc.infrastructure.persistence.common.JsonbFunctionContributor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -57,21 +58,22 @@ public class IndicatorRepositoryAdapter implements IndicatorRepository {
             // Appartenance EXACTE à un tableau JSONB : un « like » sur le
             // texte JSON rattacherait « c2 » à un tag « c2-proxy ».
             //
-            // LIMITE MESURÉE : cette forme FONCTION ne peut pas emprunter
-            // l'index GIN. PostgreSQL ne fait correspondre un index qu'à
-            // une expression d'OPÉRATEUR, jamais à l'appel de fonction
-            // équivalent — vérifié : même avec enable_seqscan=off le plan
-            // reste un Seq Scan « Disabled: true ». Sur 20 002 IOC :
-            // 4,05 ms ici contre 0,118 ms pour « tags @> '[...]' » qui,
-            // lui, prend l'index (Bitmap Index Scan). L'opérateur @> ne
-            // peut pas être émis par l'API Criteria sans enregistrer une
-            // fonction Hibernate rendue en motif SQL — traité à part pour
-            // ne pas mélanger deux sujets dans le même lot.
-            // (L'opérateur natif « ? » est, lui, inutilisable via JDBC :
-            // le caractère entre en conflit avec les paramètres liés.)
+            // Le containment @> est ici préféré à jsonb_exists(tags, :tag)
+            // pour une raison mesurée : un appel de FONCTION n'emprunte
+            // JAMAIS un index GIN — PostgreSQL ne fait correspondre un
+            // index qu'à une expression d'OPÉRATEUR (vérifié : même avec
+            // enable_seqscan=off, la forme fonction reste un Seq Scan
+            // « Disabled: true », faute d'alternative). Sur 20 002 IOC :
+            // 4,053 ms en Seq Scan contre 0,118 ms en Bitmap Index Scan.
+            // L'opérateur natif « ? » de PostgreSQL étant inutilisable via
+            // JDBC (le caractère entre en conflit avec les paramètres
+            // liés), @> est la seule forme à la fois exacte et indexable —
+            // émise par la fonction à motif de JsonbFunctionContributor.
             String tag = query.tag().trim().toLowerCase(Locale.ROOT);
+            String tagAsJsonArray = jsonArrayOf(tag);
             spec = spec.and((root, q, cb) -> cb.isTrue(cb.function(
-                    "jsonb_exists", Boolean.class, root.get("tags"), cb.literal(tag))));
+                    JsonbFunctionContributor.JSONB_ARRAY_CONTAINS, Boolean.class,
+                    root.get("tags"), cb.literal(tagAsJsonArray))));
         }
         if (query.search() != null && !query.search().isBlank()) {
             String pattern = "%" + query.search().trim().toLowerCase(Locale.ROOT) + "%";
@@ -101,6 +103,16 @@ public class IndicatorRepositoryAdapter implements IndicatorRepository {
                 page.getTotalElements(),
                 query.page().page(),
                 query.page().size());
+    }
+
+    /**
+     * Le tag cherché devient un tableau JSONB d'un seul élément, forme
+     * attendue par le containment. L'échappement protège la valeur : un
+     * tag mal formé ne doit pas pouvoir sortir de la chaîne JSON.
+     */
+    private static String jsonArrayOf(String tag) {
+        String escaped = tag.replace("\\", "\\\\").replace("\"", "\\\"");
+        return "[\"" + escaped + "\"]";
     }
 
     /**
