@@ -19,7 +19,9 @@ import java.security.MessageDigest;
 import java.util.List;
 
 /**
- * Authentifie les webhooks d'ingestion par clé d'API (header X-API-Key).
+ * Authentifie TOUS les webhooks d'ingestion par clé d'API (header
+ * X-API-Key) : alertes et indicateurs CTI aujourd'hui, et tout futur
+ * endpoint sous {@code /api/v1/ingest/} sans modification ici.
  * Comparaison en temps constant (MessageDigest.isEqual) : pas d'oracle de
  * timing. En cas d'échec, la requête continue anonyme et se fait refuser
  * par la règle hasRole(INGEST) — 401 RFC 9457 comme le reste de l'API.
@@ -36,7 +38,8 @@ public class IngestApiKeyFilter extends OncePerRequestFilter {
     @PostConstruct
     void warnIfDisabled() {
         if (!properties.enabled()) {
-            log.warn("SMARTSOC_INGEST_API_KEY is not set: the alert ingestion endpoint is disabled.");
+            log.warn("SMARTSOC_INGEST_API_KEY is not set: every /api/v1/ingest/** endpoint "
+                    + "is disabled (alerts and CTI indicators).");
         }
     }
 
