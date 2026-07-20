@@ -8,6 +8,7 @@ import com.smartsoc.domain.alerts.AlertStatus;
 import com.smartsoc.domain.alerts.Severity;
 import com.smartsoc.domain.common.PageQuery;
 import com.smartsoc.domain.common.PageResult;
+import com.smartsoc.domain.intelligence.Observable;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -80,6 +81,26 @@ public class AlertRepositoryAdapter implements AlertRepository {
         // Pageable ne porte que la pagination.
         Page<AlertJpaEntity> result = springDataRepository.findByNormalizedHostname(
                 normalizedHostname, PageRequest.of(page.page(), page.size()));
+        return new PageResult<>(
+                result.getContent().stream().map(mapper::toDomain).toList(),
+                result.getTotalElements(),
+                page.page(),
+                page.size());
+    }
+
+    /**
+     * Retro-hunt : aucun état pré-calculé n'est consulté ici, la
+     * correspondance est établie au moment de la lecture. C'est ce qui
+     * fait qu'un indicateur créé après une alerte la retrouve quand même,
+     * sans travail de rattrapage.
+     */
+    @Override
+    public PageResult<Alert> findByObservable(Observable observable, PageQuery page) {
+        // Le tri (detected_at desc) vit dans la requête native : le
+        // Pageable ne porte que la pagination.
+        Page<AlertJpaEntity> result = springDataRepository.findByObservable(
+                observable.type().name(), observable.value(),
+                PageRequest.of(page.page(), page.size()));
         return new PageResult<>(
                 result.getContent().stream().map(mapper::toDomain).toList(),
                 result.getTotalElements(),
