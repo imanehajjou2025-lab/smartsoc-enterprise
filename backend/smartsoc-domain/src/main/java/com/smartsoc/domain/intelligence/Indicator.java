@@ -53,6 +53,7 @@ public class Indicator {
 
     // ---------- MÉTADONNÉES CTI (rafraîchies par les flux) ----------
     private int confidence;
+    private TlpMarking tlp;
     private String feedSource;
     private String externalId;
     private String description;
@@ -76,6 +77,7 @@ public class Indicator {
             IndicatorType type,
             String value,
             int confidence,
+            TlpMarking tlp,
             String feedSource,
             String externalId,
             String description,
@@ -96,6 +98,7 @@ public class Indicator {
                 .type(observation.type())
                 .value(observation.type().normalize(observation.value()))
                 .confidence(validateConfidence(observation.confidence()))
+                .tlp(observation.tlp() == null ? TlpMarking.DEFAULT : observation.tlp())
                 .feedSource(TextNormalization.lowerTrim(
                         requireFeedSource(observation.feedSource())))
                 .externalId(TextNormalization.blankToNull(observation.externalId()))
@@ -125,6 +128,11 @@ public class Indicator {
         Instant seenAt = observation.observedAt() == null ? Instant.now() : observation.observedAt();
 
         this.confidence = validateConfidence(observation.confidence());
+        // Un flux qui ne remarque pas ne desserre pas le marquage acquis :
+        // on ne relâche jamais une contrainte de diffusion par omission.
+        if (observation.tlp() != null) {
+            this.tlp = observation.tlp();
+        }
         this.feedSource = TextNormalization.lowerTrim(
                 requireFeedSource(observation.feedSource()));
         if (TextNormalization.blankToNull(observation.externalId()) != null) {

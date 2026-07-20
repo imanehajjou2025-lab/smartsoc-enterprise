@@ -65,6 +65,23 @@ class IndicatorTest {
                 .hasMessageContaining("Confidence");
     }
 
+    @Test
+    void tlpDefaultsToAmberAndIsNeverRelaxedByOmission() {
+        // Un flux muet sur le TLP ne rend pas un renseignement librement
+        // diffusable : le défaut est restrictif, et une ré-observation sans
+        // marquage conserve celui déjà acquis.
+        Indicator ioc = Indicator.declare(observation().tlp(null).build());
+        assertThat(ioc.getTlp()).isEqualTo(TlpMarking.AMBER);
+
+        Indicator restricted = Indicator.declare(observation().tlp(TlpMarking.RED).build());
+        restricted.refreshFrom(observation().tlp(null).build());
+        assertThat(restricted.getTlp()).isEqualTo(TlpMarking.RED);
+
+        // Un marquage explicite, lui, fait foi.
+        restricted.refreshFrom(observation().tlp(TlpMarking.GREEN).build());
+        assertThat(restricted.getTlp()).isEqualTo(TlpMarking.GREEN);
+    }
+
     // ------------------------------------------------------------------
     // PIÈGE 1 — normalisation dépendante de la locale de la JVM
     // ------------------------------------------------------------------
