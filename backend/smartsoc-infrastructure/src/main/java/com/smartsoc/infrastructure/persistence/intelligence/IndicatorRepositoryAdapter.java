@@ -131,15 +131,15 @@ public class IndicatorRepositoryAdapter implements IndicatorRepository {
     private static Specification<IndicatorJpaEntity> statusSpecification(IndicatorQuery query) {
         Instant at = query.evaluatedAt();
         return switch (query.status()) {
-            case REVOKED -> (root, q, cb) -> cb.isTrue(root.get("revoked"));
+            case REVOKED -> (root, q, cb) -> cb.isTrue(root.get(ATTR_REVOKED));
             case ACTIVE -> (root, q, cb) -> cb.and(
-                    cb.isFalse(root.get("revoked")),
-                    cb.or(cb.isNull(root.get("validUntil")),
-                            cb.greaterThan(root.get("validUntil"), at)));
+                    cb.isFalse(root.get(ATTR_REVOKED)),
+                    cb.or(cb.isNull(root.get(ATTR_VALID_UNTIL)),
+                            cb.greaterThan(root.get(ATTR_VALID_UNTIL), at)));
             case EXPIRED -> (root, q, cb) -> cb.and(
-                    cb.isFalse(root.get("revoked")),
-                    cb.isNotNull(root.get("validUntil")),
-                    cb.lessThanOrEqualTo(root.get("validUntil"), at));
+                    cb.isFalse(root.get(ATTR_REVOKED)),
+                    cb.isNotNull(root.get(ATTR_VALID_UNTIL)),
+                    cb.lessThanOrEqualTo(root.get(ATTR_VALID_UNTIL), at));
         };
     }
 }
