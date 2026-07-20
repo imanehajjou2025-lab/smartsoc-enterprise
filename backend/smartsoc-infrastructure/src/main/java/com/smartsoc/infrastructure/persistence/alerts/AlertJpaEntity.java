@@ -4,20 +4,28 @@ import com.smartsoc.domain.alerts.AiVerdict;
 import com.smartsoc.domain.alerts.AlertStatus;
 import com.smartsoc.domain.alerts.Severity;
 import com.smartsoc.infrastructure.persistence.common.AbstractAuditableEntity;
+import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.Fetch;
+import org.hibernate.annotations.FetchMode;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Entity
@@ -65,6 +73,32 @@ public class AlertJpaEntity extends AbstractAuditableEntity {
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "mitre_techniques", nullable = false)
     private List<String> mitreTechniques;
+
+    /**
+     * Observables déclarés. Table dédiée et non JSONB comme les
+     * techniques MITRE : on ne joint jamais sur ces dernières, alors que
+     * c'est tout l'usage de celles-ci.
+     *
+     * <p><b>EAGER + SUBSELECT, et non LAZY.</b> L'adaptateur convertit
+     * l'entité en objet de domaine dès la sortie du dépôt, donc la
+     * collection est TOUJOURS parcourue — en LAZY, tout appelant hors
+     * transaction obtenait une {@code LazyInitializationException}
+     * (constaté sur les tests de persistance, qui appellent le dépôt
+     * directement). Compter sur « il y a toujours une transaction »
+     * aurait été une hypothèse fragile.
+     *
+     * <p>Reste le risque du N+1 : une page de 25 alertes ne doit pas
+     * coûter 25 requêtes supplémentaires sur l'écran le plus consulté du
+     * SOC. D'où SUBSELECT, qui charge les observables de TOUTES les
+     * alertes de la requête d'origine en UNE requête complémentaire —
+     * deux requêtes au total au lieu de vingt-six.
+     */
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(
+            name = "alert_observables",
+            joinColumns = @JoinColumn(name = "alert_id"))
+    @Fetch(FetchMode.SUBSELECT)
+    private Set<AlertObservableEmbeddable> observables = new LinkedHashSet<>();
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "raw_payload")

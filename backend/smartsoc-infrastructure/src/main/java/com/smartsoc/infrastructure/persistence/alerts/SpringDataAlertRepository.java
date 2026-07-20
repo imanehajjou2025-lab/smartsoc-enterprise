@@ -47,4 +47,27 @@ public interface SpringDataAlertRepository
             nativeQuery = true)
     Page<AlertJpaEntity> findByNormalizedHostname(@Param("hostname") String hostname,
                                                   Pageable pageable);
+
+    // Corrélation IOC -> alertes (retro-hunt). La jointure porte sur le
+    // COUPLE (type, value), qui est exactement la clé de
+    // ix_alert_observables_identity : la clé primaire de la table
+    // commence par alert_id et ne servirait pas ce sens de lecture.
+    // La countQuery reprend le MÊME prédicat et la même jointure — le
+    // total de la page est le compteur de corrélation, il ne peut pas
+    // diverger de la liste.
+    @Query(value = """
+            select a.* from alerts a
+            join alert_observables o on o.alert_id = a.id
+            where o.type = :type and o.value = :value
+            order by a.detected_at desc
+            """,
+            countQuery = """
+            select count(*) from alerts a
+            join alert_observables o on o.alert_id = a.id
+            where o.type = :type and o.value = :value
+            """,
+            nativeQuery = true)
+    Page<AlertJpaEntity> findByObservable(@Param("type") String type,
+                                          @Param("value") String value,
+                                          Pageable pageable);
 }

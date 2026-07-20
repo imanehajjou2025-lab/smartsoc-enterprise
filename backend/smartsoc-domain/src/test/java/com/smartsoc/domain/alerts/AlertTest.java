@@ -1,9 +1,12 @@
 package com.smartsoc.domain.alerts;
 
 import com.smartsoc.domain.common.BusinessRuleViolationException;
+import com.smartsoc.domain.intelligence.IndicatorType;
+import com.smartsoc.domain.intelligence.Observable;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -40,6 +43,109 @@ class AlertTest {
         assertThat(alert.getMitreTechniques()).containsExactly("T1110");
         assertThat(alert.getAiScore()).isNull();
         assertThat(alert.getAiVerdict()).isNull();
+    }
+
+    @Test
+    void anAlertWithoutObservablesKeepsWorkingExactlyAsBefore() {
+        // Rétrocompatibilité stricte du contrat d'ingestion : les
+        // producteurs actuels ne déclarent pas d'observables. Liste vide,
+        // jamais null, aucune régression.
+        Alert alert = sampleAlert();
+
+        assertThat(alert.getObservables()).isNotNull().isEmpty();
+    }
+
+    @Test
+    void declaredObservablesAreCarriedByTheAlert() {
+        // Les observables sont DÉCLARÉS par le producteur, jamais extraits
+        // de rawPayload (ADR-009) : ici l'alerte cite explicitement le
+        // domaine et l'IP contactés.
+        Observable domaine = Observable.of(IndicatorType.DOMAIN, "evil-c2[.]com");
+        Observable ip = Observable.of(IndicatorType.IPV4, "45.83.12.7");
+
+        Alert alert = Alert.ingest(sampleData()
+                .observables(List.of(domaine, ip)).build());
+
+        assertThat(alert.getObservables()).containsExactly(domaine, ip);
+        // Valeurs déjà normalisées par le type au moment de la construction.
+        assertThat(alert.getObservables().getFirst().value()).isEqualTo("evil-c2.com");
+    }
+
+    @Test
+    void theObservableListOfAnAlertIsImmutable() {
+        // Une alerte est une pièce d'evidence : ce qu'elle cite ne se
+        // réécrit pas après coup.
+        Alert alert = Alert.ingest(sampleData()
+                .observables(List.of(Observable.of(IndicatorType.IPV4, "45.83.12.7")))
+                .build());
+        List<Observable> observables = alert.getObservables();
+        Observable autre = Observable.of(IndicatorType.DOMAIN, "evil.com");
+
+        assertThatThrownBy(() -> observables.add(autre))
+                .isInstanceOf(UnsupportedOperationException.class);
+    }
+
+    @Test
+    void immutabilityHoldsEvenForAnAlertBuiltOutsideIngest() {
+        // Le chemin que le test précédent ne couvrait PAS : une alerte
+        // relue depuis la base est reconstruite par le builder, avec une
+        // liste ordinaire et modifiable. Sans accesseur défensif,
+        // l'entité laisserait réécrire ce qu'elle est censée protéger
+        // (java/internal-representation-exposure).
+        List<Observable> listeModifiable =
+                new ArrayList<>(List.of(Observable.of(IndicatorType.IPV4, "45.83.12.7")));
+        Alert relue = Alert.ingest(sampleData().build()).toBuilder()
+                .observables(listeModifiable)
+                .build();
+
+        List<Observable> exposee = relue.getObservables();
+        Observable autre = Observable.of(IndicatorType.DOMAIN, "evil.com");
+
+        assertThatThrownBy(() -> exposee.add(autre))
+                .isInstanceOf(UnsupportedOperationException.class);
+        // Et modifier la liste d'origine ne change rien à ce que l'alerte
+        // a déjà rendu : la protection n'est pas qu'une apparence.
+        assertThat(relue.getObservables()).hasSize(1);
+    }
+
+    @Test
+    void mitreTechniquesAreProtectedExactlyLikeObservables() {
+        // Même défaut, même correctif : le champ est parallèle à
+        // observables (final, List.copyOf dans ingest(), exposé par le
+        // @Getter de Lombok). Rien ne justifie que deux collections de la
+        // même entité offrent des garanties différentes selon le chemin
+        // de construction.
+        List<String> listeModifiable = new ArrayList<>(List.of("T1110"));
+        Alert relue = Alert.ingest(sampleData().build()).toBuilder()
+                .mitreTechniques(listeModifiable)
+                .build();
+
+        List<String> exposee = relue.getMitreTechniques();
+
+        assertThatThrownBy(() -> exposee.add("T1078"))
+                .isInstanceOf(UnsupportedOperationException.class);
+        assertThat(relue.getMitreTechniques()).containsExactly("T1110");
+    }
+
+    @Test
+    void anAlertBuiltWithoutMitreTechniquesNeverExposesNull() {
+        Alert sansListe = Alert.ingest(sampleData().build()).toBuilder()
+                .mitreTechniques(null)
+                .build();
+
+        assertThat(sansListe.getMitreTechniques()).isNotNull().isEmpty();
+    }
+
+    @Test
+    void anAlertBuiltWithoutObservablesNeverExposesNull() {
+        // Robustesse du même accesseur : une alerte construite hors
+        // ingest() peut avoir un champ null ; l'appelant doit recevoir
+        // une liste vide, jamais un NullPointerException différé.
+        Alert sansListe = Alert.ingest(sampleData().build()).toBuilder()
+                .observables(null)
+                .build();
+
+        assertThat(sansListe.getObservables()).isNotNull().isEmpty();
     }
 
     @Test

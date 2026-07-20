@@ -1,9 +1,12 @@
 package com.smartsoc.api.intelligence;
 
+import com.smartsoc.api.alerts.AlertApiMapper;
+import com.smartsoc.api.alerts.dto.AlertDtos.AlertResponse;
 import com.smartsoc.api.common.dto.PageResponse;
 import com.smartsoc.api.intelligence.dto.IocDtos.DeclareIocRequest;
 import com.smartsoc.api.intelligence.dto.IocDtos.IocResponse;
 import com.smartsoc.api.intelligence.dto.IocDtos.RevokeIocRequest;
+import com.smartsoc.application.intelligence.AlertEnrichmentService;
 import com.smartsoc.application.intelligence.IndicatorService;
 import com.smartsoc.application.intelligence.IndicatorService.DeclareIndicatorCommand;
 import com.smartsoc.domain.common.PageQuery;
@@ -47,7 +50,9 @@ public class IocController {
     private static final String WRITE_ROLES = "hasAnyRole('ADMIN','SOC_MANAGER','SOC_ANALYST')";
 
     private final IndicatorService indicatorService;
+    private final AlertEnrichmentService enrichmentService;
     private final IocApiMapper mapper;
+    private final AlertApiMapper alertMapper;
 
     @PostMapping
     @PreAuthorize(WRITE_ROLES)
@@ -86,6 +91,31 @@ public class IocController {
     @GetMapping("/{id}")
     public IocResponse getIoc(@PathVariable UUID id) {
         return mapper.toResponse(indicatorService.getIndicator(id), Instant.now());
+    }
+
+    /**
+     * Alertes citant cet indicateur — le RETRO-HUNT.
+     *
+     * <p>Strictement en lecture. Comme la correspondance est calculée à
+     * la demande (ADR-009), les alertes ingérées AVANT la création de
+     * l'indicateur remontent ici sans qu'aucun travail de rattrapage ait
+     * été fait. Le total de la page est le compteur de corrélation :
+     * même prédicat que la liste.
+     *
+     * <p>Disponible même sur un indicateur révoqué ou périmé : il est
+     * l'entrée de la requête, pas un résultat, et consulter son
+     * historique est précisément ce qui permet de justifier sa
+     * révocation.
+     */
+    @GetMapping("/{id}/alerts")
+    public PageResponse<AlertResponse> matchingAlerts(
+            @PathVariable UUID id,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "25") int size) {
+
+        return PageResponse.of(
+                enrichmentService.alertsMatching(id, PageQuery.of(page, size)),
+                alertMapper::toResponse);
     }
 
     /** Décision d'analyste : cet IOC n'enrichira plus aucune alerte. */

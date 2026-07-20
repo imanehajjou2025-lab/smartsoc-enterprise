@@ -5,6 +5,7 @@ import com.smartsoc.domain.intelligence.Indicator;
 import com.smartsoc.domain.intelligence.IndicatorQuery;
 import com.smartsoc.domain.intelligence.IndicatorRepository;
 import com.smartsoc.domain.intelligence.IndicatorType;
+import com.smartsoc.domain.intelligence.Observable;
 import com.smartsoc.infrastructure.persistence.common.JsonbFunctionContributor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -13,6 +14,8 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.util.Collection;
+import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
@@ -44,6 +47,28 @@ public class IndicatorRepositoryAdapter implements IndicatorRepository {
     public Optional<Indicator> findByIdentity(IndicatorType type, String normalizedValue) {
         return springDataRepository.findByTypeAndValue(type, normalizedValue)
                 .map(mapper::toDomain);
+    }
+
+    /**
+     * Aucun {@code filter}, aucun {@code removeIf}, aucune vérification
+     * de statut après coup : la requête ne rend que des indicateurs
+     * actifs à {@code evaluatedAt}. Le seul traitement Java est la
+     * conversion en objets de domaine.
+     */
+    @Override
+    public List<Indicator> findActiveMatching(Collection<Observable> observables,
+                                              Instant evaluatedAt) {
+        if (observables == null || observables.isEmpty()) {
+            return List.of();
+        }
+        // Deux tableaux parallèles : unnest les recompose en table côté
+        // PostgreSQL (voir la requête).
+        String[] types = observables.stream().map(o -> o.type().name()).toArray(String[]::new);
+        String[] values = observables.stream().map(Observable::value).toArray(String[]::new);
+
+        return springDataRepository.findActiveMatching(types, values, evaluatedAt).stream()
+                .map(mapper::toDomain)
+                .toList();
     }
 
     @Override
