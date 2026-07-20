@@ -83,7 +83,25 @@ class ObservableTest {
         assertThat(rejet.index()).isEqualTo(1);
         assertThat(rejet.type()).isEqualTo(IndicatorType.SHA256);
         assertThat(rejet.value()).isEqualTo("pas-un-hash");
-        assertThat(rejet.reason()).contains("SHA256");
+        // Le CODE est la partie contractuelle : c'est lui qu'une
+        // intégration teste, jamais le message.
+        assertThat(rejet.code()).isEqualTo("INVALID_SHA256");
+        assertThat(rejet.message()).contains("SHA256");
+    }
+
+    @Test
+    void everyRejectionCodeIsDerivedFromTheDeclaredType() {
+        // Un code par type, stable et prévisible : le producteur peut
+        // brancher un traitement dessus sans lire le message.
+        for (IndicatorType type : IndicatorType.values()) {
+            Observable.ParseResult resultat = Observable.parseTolerant(
+                    List.of(new Observable.Raw(type, "valeur-invalide-pour-tout-type")));
+
+            assertThat(resultat.accepted()).isEmpty();
+            assertThat(resultat.rejected().getFirst().code())
+                    .as("code de rejet pour %s", type)
+                    .isEqualTo("INVALID_" + type.name());
+        }
     }
 
     @Test
@@ -126,6 +144,6 @@ class ObservableTest {
 
         assertThat(resultat.accepted()).hasSize(Observable.MAX_PER_ALERT);
         assertThat(resultat.rejected()).hasSize(5);
-        assertThat(resultat.rejected().getFirst().reason()).contains("At most");
+        assertThat(resultat.rejected().getFirst().code()).isEqualTo("TOO_MANY_OBSERVABLES");
     }
 }

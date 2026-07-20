@@ -3,6 +3,9 @@ package com.smartsoc.api.alerts.ingest;
 import com.smartsoc.api.alerts.AlertApiMapper;
 import com.smartsoc.api.alerts.dto.AlertDtos.AlertResponse;
 import com.smartsoc.api.alerts.dto.AlertDtos.IngestAlertRequest;
+import com.smartsoc.api.alerts.dto.AlertDtos.ObservableRejection;
+import com.smartsoc.api.alerts.dto.AlertDtos.ObservableReport;
+import com.smartsoc.api.alerts.dto.AlertDtos.ObservableRequest;
 import com.smartsoc.api.intelligence.dto.IocDtos.IngestIocBatchRequest;
 import com.smartsoc.api.intelligence.dto.IocDtos.IngestIocBatchResponse;
 import com.smartsoc.api.intelligence.dto.IocDtos.IocIngestionError;
@@ -12,6 +15,7 @@ import com.smartsoc.application.alerts.AlertIngestionService.IngestionResult;
 import com.smartsoc.application.intelligence.IndicatorFeedIngestionService;
 import com.smartsoc.application.intelligence.IndicatorFeedIngestionService.BatchResult;
 import com.smartsoc.application.intelligence.IndicatorFeedIngestionService.FeedObservation;
+import com.smartsoc.domain.intelligence.Observable;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -20,6 +24,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 /**
  * Webhooks d'ingestion pour les outils SOC (authentification : X-API-Key).
@@ -41,6 +47,14 @@ public class IngestController {
     private final AlertApiMapper mapper;
     private final IndicatorFeedIngestionService feedIngestionService;
 
+    /**
+     * Les observables déclarés sont lus avec TOLÉRANCE : les valides
+     * entrent, les autres sont écartés et nommés dans
+     * {@code observableReport}, et l'alerte est créée dans tous les cas.
+     * Un observable mal formé n'est jamais une erreur HTTP — perdre une
+     * détection à cause d'un champ annexe serait un très mauvais échange.
+     * Le statut reste donc 201/200 comme avant.
+     */
     @PostMapping("/alerts")
     public ResponseEntity<AlertResponse> ingestAlert(@Valid @RequestBody IngestAlertRequest request) {
         IngestionResult result = ingestionService.ingest(new IngestAlertCommand(
@@ -53,11 +67,29 @@ public class IngestController {
                 request.hostname(),
                 request.ruleId(),
                 request.mitreTechniques(),
+                toRawObservables(request.observables()),
                 request.rawPayload() == null ? null : request.rawPayload().toString()));
 
         return ResponseEntity
                 .status(result.created() ? HttpStatus.CREATED : HttpStatus.OK)
-                .body(mapper.toResponse(result.alert()));
+                .body(mapper.toResponse(result.alert())
+                        .withObservableReport(toReport(result.observables())));
+    }
+
+    private static List<Observable.Raw> toRawObservables(List<ObservableRequest> declared) {
+        return declared == null ? List.of() : declared.stream()
+                .map(o -> new Observable.Raw(o.type(), o.value()))
+                .toList();
+    }
+
+    private static ObservableReport toReport(Observable.ParseResult result) {
+        return new ObservableReport(
+                result.accepted().size(),
+                result.rejected().size(),
+                result.rejected().stream()
+                        .map(r -> new ObservableRejection(
+                                r.index(), r.type(), r.value(), r.code(), r.message()))
+                        .toList());
     }
 
     /**

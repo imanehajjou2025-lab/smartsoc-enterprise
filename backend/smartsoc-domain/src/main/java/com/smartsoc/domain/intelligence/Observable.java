@@ -66,8 +66,21 @@ public record Observable(IndicatorType type, String value) {
     public record Raw(IndicatorType type, String value) {
     }
 
-    /** Observable écarté, décrit pour que le producteur puisse corriger. */
-    public record Rejection(int index, IndicatorType type, String value, String reason) {
+    /**
+     * Observable écarté, décrit pour que le producteur puisse corriger.
+     *
+     * <p>{@code code} est la partie CONTRACTUELLE : stable, dérivée du
+     * type annoncé, faite pour être testée par une intégration.
+     * {@code message} est informatif et peut évoluer — un producteur qui
+     * l'analyserait se lierait à une formulation, pas à une règle.
+     */
+    public record Rejection(int index, IndicatorType type, String value,
+                            String code, String message) {
+    }
+
+    /** Code de rejet : {@code INVALID_SHA256}, {@code INVALID_DOMAIN}… */
+    private static String rejectionCode(IndicatorType type) {
+        return type == null ? INVALID : "INVALID_" + type.name();
     }
 
     /** Ce qui est retenu, et ce qui est écarté avec son motif. */
@@ -97,18 +110,20 @@ public record Observable(IndicatorType type, String value) {
         for (int index = 0; index < declared.size(); index++) {
             Raw raw = declared.get(index);
             if (raw == null) {
-                rejected.add(new Rejection(index, null, null, "Observable entry is null"));
+                rejected.add(new Rejection(index, null, null, INVALID,
+                        "Observable entry is null"));
                 continue;
             }
             if (accepted.size() >= MAX_PER_ALERT) {
-                rejected.add(new Rejection(index, raw.type(), raw.value(),
+                rejected.add(new Rejection(index, raw.type(), raw.value(), "TOO_MANY_OBSERVABLES",
                         "At most %d observables are kept per alert".formatted(MAX_PER_ALERT)));
                 continue;
             }
             try {
                 accepted.add(of(raw.type(), raw.value()));
             } catch (DomainException e) {
-                rejected.add(new Rejection(index, raw.type(), raw.value(), e.getMessage()));
+                rejected.add(new Rejection(index, raw.type(), raw.value(),
+                        rejectionCode(raw.type()), e.getMessage()));
             }
         }
         return new ParseResult(List.copyOf(accepted), List.copyOf(rejected));
