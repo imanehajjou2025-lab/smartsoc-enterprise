@@ -163,6 +163,35 @@ class IndicatorTest {
     }
 
     @Test
+    void hugeDomainIsRejectedWithoutBlowingTheStack() {
+        // La valeur vient d'un flux CTI externe : un nom à un millier de
+        // labels ferait déborder la pile avec une expression régulière à
+        // groupe répété (java:S5998). La validation se fait en boucle, et
+        // deux gardes de longueur rejettent l'entrée bien avant.
+        String milleLabels = "a.".repeat(1000) + "com";
+        assertThatThrownBy(() -> IndicatorType.DOMAIN.normalize(milleLabels))
+                .isInstanceOf(BusinessRuleViolationException.class);
+
+        String tropLong = "a".repeat(3000) + ".com";
+        assertThatThrownBy(() -> IndicatorType.DOMAIN.normalize(tropLong))
+                .isInstanceOf(BusinessRuleViolationException.class)
+                .hasMessageContaining("2048");
+
+        // Un domaine légitime, lui, passe toujours — y compris avec
+        // plusieurs niveaux et un point final.
+        assertThat(IndicatorType.DOMAIN.normalize("mail.corp.evil.co.uk."))
+                .isEqualTo("mail.corp.evil.co.uk");
+        // Un label ne peut ni commencer ni finir par un tiret.
+        assertThatThrownBy(() -> IndicatorType.DOMAIN.normalize("-evil.com"))
+                .isInstanceOf(BusinessRuleViolationException.class);
+        assertThatThrownBy(() -> IndicatorType.DOMAIN.normalize("evil-.com"))
+                .isInstanceOf(BusinessRuleViolationException.class);
+        // Un nom sans point n'est pas un domaine.
+        assertThatThrownBy(() -> IndicatorType.DOMAIN.normalize("localhost"))
+                .isInstanceOf(BusinessRuleViolationException.class);
+    }
+
+    @Test
     void malformedValuesAreRejectedPerType() {
         assertThatThrownBy(() -> IndicatorType.IPV4.normalize("999.1.1.1"))
                 .isInstanceOf(BusinessRuleViolationException.class);

@@ -55,10 +55,23 @@ public enum IndicatorType {
     /** Littéral IPv6 uniquement : garantit qu'InetAddress ne fera JAMAIS de résolution DNS. */
     private static final Pattern IPV6_LITERAL = Pattern.compile(
             "^[0-9a-f:]*:[0-9a-f:]*(?:\\.\\d{1,3}){0,3}$", Pattern.CASE_INSENSITIVE);
-    private static final Pattern DOMAIN_FORMAT = Pattern.compile(
-            "^(?!-)[a-z0-9-]{1,63}(?<!-)(?:\\.(?!-)[a-z0-9-]{1,63}(?<!-))+$");
+    /**
+     * UN label de domaine, borné. La validation d'un nom complet se fait
+     * label par label EN BOUCLE, jamais par une expression à groupe
+     * répété : le moteur d'expressions régulières de Java récurse à chaque
+     * répétition de groupe, si bien qu'un nom à un millier de labels
+     * ferait déborder la pile. La valeur venant d'un flux CTI externe,
+     * ce serait un déni de service offert au producteur (java:S5998).
+     */
+    private static final Pattern DOMAIN_LABEL =
+            Pattern.compile("[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?");
     private static final Pattern EMAIL_FORMAT = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
     private static final Pattern HEX = Pattern.compile("^[0-9a-f]+$");
+
+    /** Longueur maximale d'un nom de domaine complet (RFC 1035). */
+    private static final int MAX_DOMAIN_LENGTH = 253;
+    /** Garde de longueur du domaine, alignée sur la colonne indicators.value. */
+    private static final int MAX_VALUE_LENGTH = 2048;
 
     /**
      * Normalise une valeur brute selon ce type, ou rejette ce qui n'en est
@@ -120,11 +133,27 @@ public enum IndicatorType {
     private String normalizeDomain(String value) {
         // Le point final d'un FQDN absolu (« evil.com. ») ne change pas le nom.
         String normalized = TextNormalization.lowerTrim(value);
-        while (normalized.endsWith(".")) {
-            normalized = normalized.substring(0, normalized.length() - 1);
+        int end = normalized.length();
+        while (end > 0 && normalized.charAt(end - 1) == '.') {
+            end--;
         }
-        if (!DOMAIN_FORMAT.matcher(normalized).matches() || IPV4_FORMAT.matcher(normalized).matches()) {
+        normalized = normalized.substring(0, end);
+
+        if (normalized.length() > MAX_DOMAIN_LENGTH
+                || IPV4_FORMAT.matcher(normalized).matches()) {
             throw invalid(value, "a domain name");
+        }
+        // Validation label par label, en boucle : voir DOMAIN_LABEL — une
+        // expression à groupe répété serait un risque de débordement de pile
+        // sur une entrée longue, et l'entrée vient d'un flux externe.
+        String[] labels = normalized.split("\\.", -1);
+        if (labels.length < 2) {
+            throw invalid(value, "a domain name");
+        }
+        for (String label : labels) {
+            if (!DOMAIN_LABEL.matcher(label).matches()) {
+                throw invalid(value, "a domain name");
+            }
         }
         return normalized;
     }
@@ -190,6 +219,13 @@ public enum IndicatorType {
         if (rawValue == null || rawValue.isBlank()) {
             throw new BusinessRuleViolationException(INVALID,
                     "An indicator must have a value");
+        }
+        // Le domaine se défend seul : il ne suppose pas que la couche API
+        // a déjà borné la taille (la valeur peut aussi venir d'un test,
+        // d'un import ou d'un futur appelant).
+        if (rawValue.length() > MAX_VALUE_LENGTH) {
+            throw new BusinessRuleViolationException(INVALID,
+                    "An indicator value must not exceed %d characters".formatted(MAX_VALUE_LENGTH));
         }
         return rawValue;
     }
