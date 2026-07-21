@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import AddIcon from '@mui/icons-material/Add';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
 import CircularProgress from '@mui/material/CircularProgress';
 import MenuItem from '@mui/material/MenuItem';
 import Paper from '@mui/material/Paper';
@@ -16,7 +18,9 @@ import TableRow from '@mui/material/TableRow';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { useAppSelector } from '../../app/hooks';
 import { problemDetail } from '../../shared/api/client';
+import DeclareIocDialog from './DeclareIocDialog';
 import {
   ConfidenceBar,
   IocStatusChip,
@@ -45,6 +49,9 @@ function IntelligencePage() {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
   const [size, setSize] = useState(25);
+  const [declareOpen, setDeclareOpen] = useState(false);
+  const role = useAppSelector((state) => state.auth.user?.role);
+  const canWrite = role === 'ADMIN' || role === 'SOC_MANAGER' || role === 'SOC_ANALYST';
   // Lien profond /intelligence?selected={id} (ex. depuis le tiroir d'une
   // alerte enrichie, ou URL partagée) : le tiroir s'ouvre dès le premier
   // rendu.
@@ -72,6 +79,11 @@ function IntelligencePage() {
         <Typography variant="h5" component="h2">
           Threat Intelligence
         </Typography>
+        {canWrite && (
+          <Button variant="contained" startIcon={<AddIcon />} onClick={() => setDeclareOpen(true)}>
+            Déclarer un IOC
+          </Button>
+        )}
       </Box>
 
       <Stack direction="row" spacing={2} useFlexGap sx={{ mb: 2, flexWrap: 'wrap' }}>
@@ -251,6 +263,7 @@ function IntelligencePage() {
         </TableContainer>
       )}
 
+      <DeclareIocDialog open={declareOpen} onClose={() => setDeclareOpen(false)} />
       <IocDetailDrawer iocId={selectedId} onClose={closeDrawer} />
     </Box>
   );
