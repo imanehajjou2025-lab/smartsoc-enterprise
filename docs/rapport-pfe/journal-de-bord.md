@@ -1396,5 +1396,90 @@ désormais les champs stables, en excluant explicitement `aiScore` et
 
 ---
 
-*Prochaines entrées : frontend CTI, MITRE, hunting, SOAR, rapports, et
-enfin l'assistant IA (backend + frontend).*
+## 2026-07-21 — Jalon CTI C3 — module Threat Intelligence, frontend (PR en cours)
+
+**Réalisé.** La console expose enfin le référentiel CTI construit en
+CTI-1/CTI-2 : liste filtrée des IOC, tiroir de détail avec révocation et
+**retro-hunt**, déclaration manuelle, et surtout l'**enrichissement CTI
+du tiroir d'alerte** — le moment où le renseignement devient visible pour
+l'analyste. La route `/intelligence` remplace son `PageStub`.
+
+**Miroir strict du module Actifs** (axios partagé + TanStack Query, jamais
+RTK Query) : liste paginée côté serveur, tiroir, dialogues, chips
+dédiées. Six filtres propres au CTI (recherche, type, statut, source,
+tag, confiance minimale), tous appliqués **par le serveur**.
+
+**Le statut n'est jamais recalculé côté navigateur.** `ACTIVE / EXPIRED /
+REVOKED` est déduit côté backend de `validUntil` à un instant que le
+serveur fixe ; le front l'affiche tel quel. Re-dériver l'expiration en
+JavaScript recréerait exactement le décalage temporel que CTI-2 avait
+fermé par le typage (`ThreatIntelEnrichment` transporte son
+`evaluatedAt`). Le test Vitest fige ce contrat : il fournit des statuts
+dans les données simulées, sans aucune date à interpréter.
+
+**« Feeds » = une colonne et un filtre, pas une entité gérée.** Les flux
+poussent par webhook (ADR-005) ; la console montre *d'où vient* chaque
+IOC (`feedSource`) et permet de filtrer dessus. Il n'y a délibérément
+aucun écran de « connexions MISP » à administrer.
+
+**Enrichissement du tiroir d'alerte.** Chaque observable cité devient une
+puce ; celles qui correspondent à un indicateur **ACTIF** sont rouges et
+cliquables vers `/intelligence?selected={id}`, les autres restent
+discrètes. La correspondance se fait sur le COUPLE (type, valeur), déjà
+normalisé des deux côtés par le serveur. Au passage, le type `Alert` du
+front portait un contrat incomplet : il lui manquait `observables` depuis
+CTI-2 — corrigé.
+
+**Une régression attrapée par le build, pas par la relecture.** Rendre
+`observables` obligatoire sur le type `Alert` cassait les deux fixtures
+d'`AlertsPage.test.tsx`. Le `tsc --noEmit` isolé ne les incluait pas ;
+c'est le **build de production** (qui compile les tests) qui l'a vu. Le
+commit du lot a été amendé avant d'être poussé — pas de commit cassé dans
+l'historique.
+
+**Vérification E2E réelle, contre le backend CTI reconstruit** (Docker
+sur `develop`, 6 IOC de test + alertes ingérées par le webhook) :
+connexion, déclaration d'un IOC, **normalisation** (`"  EVIL-DEMO[.]COM. "`
+→ `evil-demo.com`), **409** sur doublon écrit différemment avec message
+métier, affichage en liste, ouverture du tiroir, **révocation à motif
+obligatoire** (bouton de confirmation inactif tant que le motif est vide,
+puis statut `Révoqué` + `Lecture seule` + motif horodaté), **retro-hunt**
+(l'IOC montre l'alerte qui le cite — y compris sur un indicateur
+révoqué), **enrichissement** (3 observables, 1 seul match rouge cliquable
+car les deux autres sont l'un révoqué et l'autre inconnu), **lien
+profond** `?selected=` qui ouvre le tiroir même à froid après
+rechargement, et **console propre** à chaque étape.
+
+**Filtres prouvés jusqu'au bout de la pile** : `?status=ACTIVE` réduit la
+liste à 4 sur 6 ; `?tag=c2` ne rend qu'un seul IOC — ce qui exerce la
+recherche JSONB `@>` et son index GIN construits en CTI-1, et confirme
+que `c2` n'attrape pas `cobalt-strike`.
+
+> **Incident de méthode — automatisation du navigateur.** Le clic
+> automatisé sur le bouton de connexion ne déclenchait pas le
+> gestionnaire `onSubmit` de React, alors que les valeurs du DOM étaient
+> correctes et le bouton actif. Diagnostic : l'outil d'automatisation ne
+> propageait pas l'état contrôlé de React — **pas un défaut de
+> l'application**. Le login a donc été effectué en pilotant les vrais
+> événements `input` puis le vrai `onSubmit` du formulaire : credentials
+> réels, `POST /auth/login → 200`, jeton réel. L'authentification est
+> donc bien testée ; seul le déclencheur du clic a contourné la
+> limitation de l'outil.
+
+> **Faux positif de diagnostic, tranché par la donnée.** Une première
+> alerte de test ne remontait que 2 observables sur 3. Avant de conclure
+> à un bug, vérification en base : le volume PostgreSQL avait survécu au
+> rebuild et l'alerte **existait déjà** — l'ingestion était un **rejeu
+> idempotent**, qui rapporte ce que le payload contenait sans réécrire
+> les observables stockés. Comportement CTI-2 voulu et déjà testé. Une
+> ré-ingestion avec un `externalId` neuf a rendu `201` et les 3
+> observables. Ni bug frontend, ni bug backend : jeu de données
+> contaminé.
+
+**Vérification finale.** Prettier, Oxlint, `tsc` (exit 0), **Vitest 22
+tests / 9 fichiers**, build de production — tous verts.
+
+---
+
+*Prochaines entrées : MITRE, hunting, SOAR, rapports, et enfin
+l'assistant IA (backend + frontend).*
