@@ -3,6 +3,7 @@ import UsersPage from '../features/admin/UsersPage';
 import AlertsPage from '../features/alerts/AlertsPage';
 import IncidentsPage from '../features/incidents/IncidentsPage';
 import AssetsPage from '../features/assets/AssetsPage';
+import IntelligencePage from '../features/intelligence/IntelligencePage';
 import InvestigationsPage from '../features/investigations/InvestigationsPage';
 import DashboardPage from '../features/dashboard/DashboardPage';
 import LoginPage from '../features/auth/LoginPage';
@@ -32,16 +33,7 @@ export const router = createBrowserRouter([
           { path: 'incidents', element: <IncidentsPage /> },
           { path: 'investigations', element: <InvestigationsPage /> },
           { path: 'assets', element: <AssetsPage /> },
-          {
-            path: 'intelligence',
-            element: (
-              <PageStub
-                title="Threat Intelligence"
-                description="IOC, flux CTI et enrichissement automatique des alertes."
-                milestone="jalon CTI"
-              />
-            ),
-          },
+          { path: 'intelligence', element: <IntelligencePage /> },
           {
             path: 'mitre',
             element: (

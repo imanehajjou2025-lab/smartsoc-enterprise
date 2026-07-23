@@ -1,4 +1,5 @@
 import { api } from '../../shared/api/client';
+import type { Observable } from '../intelligence/intelligenceApi';
 
 export type AlertSeverity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO';
 export type AlertStatus = 'NEW' | 'ACKNOWLEDGED' | 'IN_PROGRESS' | 'RESOLVED' | 'FALSE_POSITIVE';
@@ -17,6 +18,8 @@ export interface Alert {
   hostname: string | null;
   ruleId: string | null;
   mitreTechniques: string[];
+  /** Observables déclarés par la source — la clé de corrélation CTI. */
+  observables: Observable[];
   rawPayload: string | null;
   aiScore: number | null;
   aiVerdict: AiVerdict | null;

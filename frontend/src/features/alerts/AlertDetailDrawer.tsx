@@ -8,6 +8,7 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import ArrowOutwardIcon from '@mui/icons-material/ArrowOutward';
 import DnsIcon from '@mui/icons-material/Dns';
+import GppMaybeIcon from '@mui/icons-material/GppMaybe';
 import axios from 'axios';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
@@ -16,6 +17,7 @@ import { problemDetail } from '../../shared/api/client';
 import { severityColors } from '../../app/theme';
 import { getAssetByHostname } from '../assets/assetsApi';
 import { ExposureChip } from '../assets/assetChips';
+import { getAlertThreatIntel } from '../intelligence/intelligenceApi';
 import { escalateFromAlert } from '../incidents/incidentsApi';
 import {
   ALLOWED_TRANSITIONS,
@@ -88,6 +90,17 @@ function AlertDetailDrawer({ alert, onClose, onUpdated }: Props) {
     enabled: Boolean(alert?.hostname),
     retry: (failureCount, error) =>
       !(axios.isAxiosError(error) && error.response?.status === 404) && failureCount < 2,
+    staleTime: 60_000,
+  });
+
+  // Enrichissement CTI, calculé à la lecture côté serveur. Toujours 200
+  // (deux listes vides si l'alerte ne cite aucun observable) : pas de
+  // gestion de 404, la section n'apparaît que s'il y a quelque chose à
+  // montrer.
+  const { data: threatIntel } = useQuery({
+    queryKey: ['alert-threat-intel', alert?.id],
+    queryFn: () => getAlertThreatIntel(alert!.id),
+    enabled: Boolean(alert?.id),
     staleTime: 60_000,
   });
 
@@ -234,6 +247,55 @@ function AlertDetailDrawer({ alert, onClose, onUpdated }: Props) {
               </Stack>
             </Field>
           )}
+          {threatIntel && threatIntel.observables.length > 0 && (
+            <Field label="Renseignement CTI">
+              {threatIntel.matches.length > 0 && (
+                <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center', mb: 0.75 }}>
+                  <GppMaybeIcon fontSize="small" sx={{ color: severityColors.critical }} />
+                  <Typography
+                    variant="body2"
+                    sx={{ color: severityColors.critical, fontWeight: 600 }}
+                  >
+                    {threatIntel.matches.length} observable(s) correspond(ent) à un indicateur connu
+                  </Typography>
+                </Stack>
+              )}
+              <Stack direction="row" spacing={0.5} useFlexGap sx={{ flexWrap: 'wrap' }}>
+                {threatIntel.observables.map((obs) => {
+                  // La valeur des deux côtés est déjà normalisée par le
+                  // serveur (même règle) : l'égalité stricte du couple
+                  // (type, valeur) suffit à savoir si l'observable est un
+                  // IOC connu.
+                  const match = threatIntel.matches.find(
+                    (ioc) => ioc.type === obs.type && ioc.value === obs.value,
+                  );
+                  return match ? (
+                    <Chip
+                      key={`${obs.type}:${obs.value}`}
+                      label={obs.value}
+                      size="small"
+                      color="error"
+                      clickable
+                      onClick={() => {
+                        onClose();
+                        navigate(`/intelligence?selected=${match.id}`);
+                      }}
+                      sx={{ fontFamily: 'monospace' }}
+                    />
+                  ) : (
+                    <Chip
+                      key={`${obs.type}:${obs.value}`}
+                      label={obs.value}
+                      size="small"
+                      variant="outlined"
+                      sx={{ fontFamily: 'monospace' }}
+                    />
+                  );
+                })}
+              </Stack>
+            </Field>
+          )}
+
           <Field label="Score IA (classifieur TP/FP externe)">
             <Typography
               variant="body2"
