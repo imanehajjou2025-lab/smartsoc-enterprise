@@ -27,7 +27,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * dans la matrice réelle — aucune collision possible avec un futur semis du
  * catalogue.
  */
-@SpringBootTest(properties = "smartsoc.security.bootstrap-admin.password=IntegrationTest123!")
+@SpringBootTest(properties = {
+        "smartsoc.security.bootstrap-admin.password=IntegrationTest123!",
+        // Catalogue vide et déterministe : ce test vérifie l'adaptateur, pas
+        // le semis (couvert par MitreCatalogSeedRunnerIntegrationTest).
+        "smartsoc.mitre.seed-on-startup=false"})
 @Import(TestcontainersConfiguration.class)
 class MitreCatalogPersistenceIntegrationTest {
 

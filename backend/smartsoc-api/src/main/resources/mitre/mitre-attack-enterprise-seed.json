@@ -1,0 +1,206 @@
+{
+  "attackVersion": "16.1",
+  "domain": "enterprise",
+  "techniques": [
+    {
+      "attackId": "T1595",
+      "name": "Active Scanning",
+      "description": "Adversaries probe victim infrastructure through network traffic before compromise.",
+      "url": "https://attack.mitre.org/techniques/T1595/",
+      "tactics": ["reconnaissance"],
+      "deprecated": false
+    },
+    {
+      "attackId": "T1583",
+      "name": "Acquire Infrastructure",
+      "description": "Adversaries buy, lease, or rent infrastructure to stage an operation.",
+      "url": "https://attack.mitre.org/techniques/T1583/",
+      "tactics": ["resource-development"],
+      "deprecated": false
+    },
+    {
+      "attackId": "T1566",
+      "name": "Phishing",
+      "description": "Adversaries send fraudulent messages to gain access or execute code.",
+      "url": "https://attack.mitre.org/techniques/T1566/",
+      "tactics": ["initial-access"],
+      "deprecated": false
+    },
+    {
+      "attackId": "T1190",
+      "name": "Exploit Public-Facing Application",
+      "description": "Adversaries exploit a weakness in an Internet-facing application to gain entry.",
+      "url": "https://attack.mitre.org/techniques/T1190/",
+      "tactics": ["initial-access"],
+      "deprecated": false
+    },
+    {
+      "attackId": "T1059",
+      "name": "Command and Scripting Interpreter",
+      "description": "Adversaries abuse command and script interpreters to execute code.",
+      "url": "https://attack.mitre.org/techniques/T1059/",
+      "tactics": ["execution"],
+      "deprecated": false
+    },
+    {
+      "attackId": "T1059.001",
+      "name": "PowerShell",
+      "description": "Adversaries abuse PowerShell for execution of commands and scripts.",
+      "url": "https://attack.mitre.org/techniques/T1059/001/",
+      "tactics": ["execution"],
+      "deprecated": false
+    },
+    {
+      "attackId": "T1059.003",
+      "name": "Windows Command Shell",
+      "description": "Adversaries abuse cmd.exe to execute commands, scripts, and binaries.",
+      "url": "https://attack.mitre.org/techniques/T1059/003/",
+      "tactics": ["execution"],
+      "deprecated": false
+    },
+    {
+      "attackId": "T1053",
+      "name": "Scheduled Task/Job",
+      "description": "Adversaries schedule tasks to run code at a defined time for execution or persistence.",
+      "url": "https://attack.mitre.org/techniques/T1053/",
+      "tactics": ["execution", "persistence", "privilege-escalation"],
+      "deprecated": false
+    },
+    {
+      "attackId": "T1547",
+      "name": "Boot or Logon Autostart Execution",
+      "description": "Adversaries configure system settings to run code automatically at boot or logon.",
+      "url": "https://attack.mitre.org/techniques/T1547/",
+      "tactics": ["persistence", "privilege-escalation"],
+      "deprecated": false
+    },
+    {
+      "attackId": "T1548",
+      "name": "Abuse Elevation Control Mechanism",
+      "description": "Adversaries bypass elevation controls to obtain higher privileges.",
+      "url": "https://attack.mitre.org/techniques/T1548/",
+      "tactics": ["privilege-escalation", "defense-evasion"],
+      "deprecated": false
+    },
+    {
+      "attackId": "T1027",
+      "name": "Obfuscated Files or Information",
+      "description": "Adversaries encode or encrypt files and payloads to hinder detection.",
+      "url": "https://attack.mitre.org/techniques/T1027/",
+      "tactics": ["defense-evasion"],
+      "deprecated": false
+    },
+    {
+      "attackId": "T1078",
+      "name": "Valid Accounts",
+      "description": "Adversaries use legitimate credentials to blend in and maintain access.",
+      "url": "https://attack.mitre.org/techniques/T1078/",
+      "tactics": ["defense-evasion", "persistence", "privilege-escalation", "initial-access"],
+      "deprecated": false
+    },
+    {
+      "attackId": "T1110",
+      "name": "Brute Force",
+      "description": "Adversaries guess or crack credentials through repeated attempts.",
+      "url": "https://attack.mitre.org/techniques/T1110/",
+      "tactics": ["credential-access"],
+      "deprecated": false
+    },
+    {
+      "attackId": "T1003",
+      "name": "OS Credential Dumping",
+      "description": "Adversaries extract account credentials from the operating system.",
+      "url": "https://attack.mitre.org/techniques/T1003/",
+      "tactics": ["credential-access"],
+      "deprecated": false
+    },
+    {
+      "attackId": "T1083",
+      "name": "File and Directory Discovery",
+      "description": "Adversaries enumerate files and directories to orient themselves.",
+      "url": "https://attack.mitre.org/techniques/T1083/",
+      "tactics": ["discovery"],
+      "deprecated": false
+    },
+    {
+      "attackId": "T1057",
+      "name": "Process Discovery",
+      "description": "Adversaries list running processes to understand the environment.",
+      "url": "https://attack.mitre.org/techniques/T1057/",
+      "tactics": ["discovery"],
+      "deprecated": false
+    },
+    {
+      "attackId": "T1021",
+      "name": "Remote Services",
+      "description": "Adversaries use valid accounts over remote services to move laterally.",
+      "url": "https://attack.mitre.org/techniques/T1021/",
+      "tactics": ["lateral-movement"],
+      "deprecated": false
+    },
+    {
+      "attackId": "T1021.001",
+      "name": "Remote Desktop Protocol",
+      "description": "Adversaries use RDP to log into and control remote hosts.",
+      "url": "https://attack.mitre.org/techniques/T1021/001/",
+      "tactics": ["lateral-movement"],
+      "deprecated": false
+    },
+    {
+      "attackId": "T1005",
+      "name": "Data from Local System",
+      "description": "Adversaries collect data from the local host before exfiltration.",
+      "url": "https://attack.mitre.org/techniques/T1005/",
+      "tactics": ["collection"],
+      "deprecated": false
+    },
+    {
+      "attackId": "T1071",
+      "name": "Application Layer Protocol",
+      "description": "Adversaries tunnel command and control over standard application protocols.",
+      "url": "https://attack.mitre.org/techniques/T1071/",
+      "tactics": ["command-and-control"],
+      "deprecated": false
+    },
+    {
+      "attackId": "T1071.001",
+      "name": "Web Protocols",
+      "description": "Adversaries use HTTP/S traffic to blend command and control with web browsing.",
+      "url": "https://attack.mitre.org/techniques/T1071/001/",
+      "tactics": ["command-and-control"],
+      "deprecated": false
+    },
+    {
+      "attackId": "T1041",
+      "name": "Exfiltration Over C2 Channel",
+      "description": "Adversaries steal data over the existing command and control channel.",
+      "url": "https://attack.mitre.org/techniques/T1041/",
+      "tactics": ["exfiltration"],
+      "deprecated": false
+    },
+    {
+      "attackId": "T1486",
+      "name": "Data Encrypted for Impact",
+      "description": "Adversaries encrypt data to disrupt availability, as in ransomware.",
+      "url": "https://attack.mitre.org/techniques/T1486/",
+      "tactics": ["impact"],
+      "deprecated": false
+    },
+    {
+      "attackId": "T1490",
+      "name": "Inhibit System Recovery",
+      "description": "Adversaries delete or disable recovery features to hinder restoration.",
+      "url": "https://attack.mitre.org/techniques/T1490/",
+      "tactics": ["impact"],
+      "deprecated": false
+    },
+    {
+      "attackId": "T1064",
+      "name": "Scripting",
+      "description": "Deprecated technique, merged into Command and Scripting Interpreter (T1059).",
+      "url": "https://attack.mitre.org/techniques/T1064/",
+      "tactics": ["defense-evasion", "execution"],
+      "deprecated": true
+    }
+  ]
+}
