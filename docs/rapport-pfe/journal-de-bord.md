@@ -1519,7 +1519,7 @@ soupçonnait), puis par issue.
 
 ---
 
-## 2026-07-24 — Jalon MITRE M1 — référentiel ATT&CK, backend (ADR-010)
+## 2026-07-24 — Jalon MITRE M1 — référentiel ATT&CK, backend (PR #59, ADR-010)
 
 **Contexte.** Les alertes portaient déjà des techniques ATT&CK
 (`Alert.mitreTechniques`, en JSONB depuis V3) mais **aveugles** : aucun
