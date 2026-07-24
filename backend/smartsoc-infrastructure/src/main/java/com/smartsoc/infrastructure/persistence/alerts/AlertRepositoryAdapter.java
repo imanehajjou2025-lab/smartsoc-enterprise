@@ -16,8 +16,6 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Component;
 
-import java.sql.Date;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.LinkedHashMap;
@@ -116,7 +114,7 @@ public class AlertRepositoryAdapter implements AlertRepository {
         Map<LocalDate, Long> countsPerDay = new LinkedHashMap<>();
         for (Object[] row : springDataRepository.countPerDaySince(
                 from.atStartOfDay().toInstant(ZoneOffset.UTC))) {
-            countsPerDay.put(((Date) row[0]).toLocalDate(), (Long) row[1]);
+            countsPerDay.put(LocalDate.parse((String) row[0]), (Long) row[1]);
         }
         // Jours vides inclus : une courbe d'activité montre aussi les silences.
         List<AlertStatistics.DailyCount> timeline = from.datesUntil(today.plusDays(1))
