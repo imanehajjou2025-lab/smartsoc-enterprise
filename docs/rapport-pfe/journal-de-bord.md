@@ -1481,5 +1481,43 @@ tests / 9 fichiers**, build de production — tous verts.
 
 ---
 
+## 2026-07-23 — Durcissement fiabilité : Quality Gate SonarCloud de develop (PR #57)
+
+**Contexte.** Après le merge de CTI-3, le Quality Gate de `develop` est
+passé au ROUGE — non sur la maintenabilité (A) ni la duplication (0,2 %),
+mais sur **`new_reliability_rating = 3`**, six bugs de deux familles.
+
+**`java:S2259` ×4 — NPE potentiels dans `IndicatorType`.** Les quatre
+normaliseurs (IPv6, domaine, hash, e-mail) déréférençaient le résultat de
+`TextNormalization.lowerTrim()`, déclarée nullable. Inatteignable en
+pratique (le point d'entrée `normalize()` rejette le null en amont), mais
+la sûreté était **conventionnelle, pas structurelle** — un futur appel
+direct à une méthode privée l'aurait cassée. Ajout de
+`lowerTrimRequired()` (précondition explicite via `requireNonNull`) ;
+échec immédiat et nommé plutôt qu'un NPE au fond d'une expression
+régulière.
+
+**`java:S8688` ×2 — fuseau des références CASE/INC** (la dette différée
+après CTI-2). `Year.now()` sans fuseau suivait celui de la JVM : une
+référence ouverte le 31 décembre à 23h30 UTC portait une année différente
+selon la machine — exactement la classe du décalage des statistiques
+d'alertes corrigé en PR #46. Correction par **horloge UTC injectée**
+(nouveau bean `ClockConfig`), qui rend le comportement à la fois correct
+et **testable** — ce que `Year.now()` en dur ne permettait pas.
+
+**Tests de non-régression.** `TextNormalizationTest` (indépendance à la
+locale turque, tolérance au null vs échec rapide) ; et surtout
+`ReferenceGeneratorYearRolloverTest`, qui fige l'horloge au 31/12 23h30
+UTC **et force le fuseau JVM à Europe/Paris puis Asia/Tokyo** : la
+référence reste sur l'année UTC (`CASE-2026`, `INC-2026`), là où la
+version buggée aurait produit 2027.
+
+Aucun changement de comportement fonctionnel — uniquement la sûreté et le
+fuseau. Leçon transverse : un Quality Gate rouge après merge se lit
+d'abord par **métrique** (ici la fiabilité, pas la maintenabilité qu'on
+soupçonnait), puis par issue.
+
+---
+
 *Prochaines entrées : MITRE, hunting, SOAR, rapports, et enfin
 l'assistant IA (backend + frontend).*
