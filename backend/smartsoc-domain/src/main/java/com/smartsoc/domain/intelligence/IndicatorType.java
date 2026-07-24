@@ -125,7 +125,7 @@ public enum IndicatorType {
      * aucune résolution DNS n'est donc possible depuis le domaine.
      */
     private String normalizeIpv6(String value) {
-        String candidate = TextNormalization.lowerTrim(value);
+        String candidate = TextNormalization.lowerTrimRequired(value);
         if (!isIpv6Literal(candidate)) {
             throw invalid(value, EXPECTED_IPV6);
         }
@@ -167,7 +167,7 @@ public enum IndicatorType {
 
     private String normalizeDomain(String value) {
         // Le point final d'un FQDN absolu (« evil.com. ») ne change pas le nom.
-        String normalized = TextNormalization.lowerTrim(value);
+        String normalized = TextNormalization.lowerTrimRequired(value);
         int end = normalized.length();
         while (end > 0 && normalized.charAt(end - 1) == '.') {
             end--;
@@ -242,7 +242,7 @@ public enum IndicatorType {
      * est une erreur de saisie, pas un IOC.
      */
     private String normalizeHash(String value, int length) {
-        String normalized = TextNormalization.lowerTrim(value);
+        String normalized = TextNormalization.lowerTrimRequired(value);
         if (normalized.length() != length || !HEX.matcher(normalized).matches()) {
             throw invalid(value, "a %d-character hexadecimal %s hash".formatted(length, name()));
         }
@@ -256,7 +256,7 @@ public enum IndicatorType {
      * expéditeur de phishing coûte plus cher que ce cas théorique.
      */
     private String normalizeEmail(String value) {
-        String normalized = TextNormalization.lowerTrim(value);
+        String normalized = TextNormalization.lowerTrimRequired(value);
         int at = normalized.indexOf('@');
         // Une seule arobase, une partie locale et un domaine non vides.
         if (at <= 0 || at != normalized.lastIndexOf('@') || at == normalized.length() - 1) {
