@@ -81,8 +81,7 @@ class AssetApiIntegrationTest {
         assertThat(((Number) correlated.get("totalElements")).longValue()).isEqualTo(1);
         var items = (List<Map<String, Object>>) correlated.get("items");
         // Le hostname BRUT de la source est préservé sur l'alerte.
-        assertThat(items.get(0).get("hostname"))
-                .isEqualTo(hostname.toUpperCase() + " ");
+        assertThat(items.get(0)).containsEntry("hostname", hostname.toUpperCase() + " ");
     }
 
     @Test
@@ -117,7 +116,7 @@ class AssetApiIntegrationTest {
         // Décommission : statut + date, puis écriture rejetée en 422.
         Map<String, Object> decommissioned = exchange(HttpMethod.POST,
                 ASSETS + "/" + id + "/decommission", admin, null, Map.class).getBody();
-        assertThat(decommissioned.get("status")).isEqualTo("DECOMMISSIONED");
+        assertThat(decommissioned).containsEntry("status", "DECOMMISSIONED");
         assertThat(decommissioned.get("decommissionedAt")).isNotNull();
 
         ResponseEntity<String> rejectedUpdate = exchange(HttpMethod.PUT,
@@ -135,7 +134,7 @@ class AssetApiIntegrationTest {
         ResponseEntity<Map> accepted = exchange(HttpMethod.PUT,
                 ASSETS + "/" + id, admin, updatePayload(), Map.class);
         assertThat(accepted.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(accepted.getBody().get("displayName")).isEqualTo("Serveur mis à jour");
+        assertThat(accepted.getBody()).containsEntry("displayName", "Serveur mis à jour");
     }
 
     @Test
@@ -157,8 +156,8 @@ class AssetApiIntegrationTest {
                 java.net.URI.create(rest.getRootUri() + ASSETS + "/by-hostname/" + rawEncoded),
                 HttpMethod.GET, new HttpEntity<>(authHeaders), Map.class).getBody();
 
-        assertThat(resolved.get("id")).isEqualTo(created.get("id"));
-        assertThat(resolved.get("hostname")).isEqualTo(hostname);
+        assertThat(resolved).containsEntry("id", created.get("id"));
+        assertThat(resolved).containsEntry("hostname", hostname);
 
         // 404 = information métier : aucun actif inventorié pour ce hostname.
         ResponseEntity<String> unknown = exchange(HttpMethod.GET,

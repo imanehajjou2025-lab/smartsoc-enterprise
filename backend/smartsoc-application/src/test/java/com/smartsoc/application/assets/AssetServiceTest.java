@@ -14,9 +14,9 @@ import com.smartsoc.domain.common.DuplicateResourceException;
 import com.smartsoc.domain.common.PageQuery;
 import com.smartsoc.domain.common.PageResult;
 import com.smartsoc.domain.common.ResourceNotFoundException;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -47,12 +47,8 @@ class AssetServiceTest {
     @Mock
     private AlertRepository alertRepository;
 
+    @InjectMocks
     private AssetService service;
-
-    @BeforeEach
-    void setUp() {
-        service = new AssetService(assetRepository, alertRepository);
-    }
 
     private static Asset asset(String hostname) {
         return Asset.register(Asset.RegistrationData.builder()
@@ -79,9 +75,10 @@ class AssetServiceTest {
         Asset existing = asset("srv-web-01");
         when(assetRepository.findByHostname("srv-web-01")).thenReturn(Optional.of(existing));
 
-        assertThatThrownBy(() -> service.register(new RegisterAssetCommand(
+        RegisterAssetCommand duplicate = new RegisterAssetCommand(
                 "  SRV-WEB-01 ", null, AssetType.SERVER, AssetCriticality.HIGH,
-                AssetExposure.INTERNAL, null, null, null)))
+                AssetExposure.INTERNAL, null, null, null);
+        assertThatThrownBy(() -> service.register(duplicate))
                 .isInstanceOf(DuplicateResourceException.class)
                 .hasMessageContaining("srv-web-01")
                 .extracting("code").isEqualTo("ASSET_ALREADY_EXISTS");
@@ -140,9 +137,11 @@ class AssetServiceTest {
         // Lecture seule préservée : l'historique de corrélation reste accessible.
         assertThat(correlated.totalElements()).isEqualTo(1);
         // Les mutations, elles, restent bloquées par le domaine.
-        assertThatThrownBy(() -> service.update(registered.getId(), new UpdateAssetCommand(
+        UUID registeredId = registered.getId();
+        UpdateAssetCommand update = new UpdateAssetCommand(
                 "nom", null, null, null, AssetType.SERVER,
-                AssetCriticality.LOW, AssetExposure.INTERNAL)))
+                AssetCriticality.LOW, AssetExposure.INTERNAL);
+        assertThatThrownBy(() -> service.update(registeredId, update))
                 .isInstanceOf(BusinessRuleViolationException.class)
                 .hasMessageContaining("read-only");
     }
@@ -154,7 +153,8 @@ class AssetServiceTest {
 
         assertThatThrownBy(() -> service.getAsset(unknown))
                 .isInstanceOf(ResourceNotFoundException.class);
-        assertThatThrownBy(() -> service.getCorrelatedAlerts(unknown, PageQuery.of(0, 25)))
+        PageQuery firstPage = PageQuery.of(0, 25);
+        assertThatThrownBy(() -> service.getCorrelatedAlerts(unknown, firstPage))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 

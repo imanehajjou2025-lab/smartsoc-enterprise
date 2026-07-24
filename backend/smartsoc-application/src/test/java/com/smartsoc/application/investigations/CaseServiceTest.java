@@ -14,10 +14,10 @@ import com.smartsoc.domain.investigations.CaseReferenceGenerator;
 import com.smartsoc.domain.investigations.CaseRepository;
 import com.smartsoc.domain.investigations.CaseTask;
 import com.smartsoc.domain.investigations.CaseTimelineEntry;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -28,6 +28,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -48,13 +49,8 @@ class CaseServiceTest {
     @Mock
     private AlertRepository alertRepository;
 
+    @InjectMocks
     private CaseService service;
-
-    @BeforeEach
-    void setUp() {
-        service = new CaseService(caseRepository, referenceGenerator,
-                incidentRepository, alertRepository);
-    }
 
     private Case openCase() {
         return Case.open("CASE-2026-0001", "Campagne de phishing", null, Severity.HIGH);
@@ -101,7 +97,7 @@ class CaseServiceTest {
         verify(caseRepository).linkIncident(created.getId(), incident.getId());
         ArgumentCaptor<CaseTimelineEntry> captor =
                 ArgumentCaptor.forClass(CaseTimelineEntry.class);
-        verify(caseRepository, org.mockito.Mockito.times(2)).addTimelineEntry(captor.capture());
+        verify(caseRepository, times(2)).addTimelineEntry(captor.capture());
         assertThat(captor.getAllValues()).extracting(CaseTimelineEntry::type)
                 .containsExactly(CaseEventType.CREATED, CaseEventType.INCIDENT_LINKED);
     }
@@ -119,7 +115,7 @@ class CaseServiceTest {
         assertThat(followUp.getOriginCaseId()).isEqualTo(origin.getId());
         ArgumentCaptor<CaseTimelineEntry> captor =
                 ArgumentCaptor.forClass(CaseTimelineEntry.class);
-        verify(caseRepository, org.mockito.Mockito.times(2)).addTimelineEntry(captor.capture());
+        verify(caseRepository, times(2)).addTimelineEntry(captor.capture());
         assertThat(captor.getAllValues()).extracting(CaseTimelineEntry::caseId)
                 .containsExactly(followUp.getId(), origin.getId());
         assertThat(captor.getAllValues().get(1).type())
@@ -158,8 +154,8 @@ class CaseServiceTest {
                 .isInstanceOf(BusinessRuleViolationException.class);
         assertThatThrownBy(() -> service.addTask(caseId, "titre", "a"))
                 .isInstanceOf(BusinessRuleViolationException.class);
-        assertThatThrownBy(() -> service.updateTask(caseId, any,
-                new UpdateTaskCommand(null, CaseTask.Status.DONE, null), "a"))
+        UpdateTaskCommand markDone = new UpdateTaskCommand(null, CaseTask.Status.DONE, null);
+        assertThatThrownBy(() -> service.updateTask(caseId, any, markDone, "a"))
                 .isInstanceOf(BusinessRuleViolationException.class);
 
         verify(caseRepository, never()).addTimelineEntry(any());
@@ -191,8 +187,10 @@ class CaseServiceTest {
         when(caseRepository.findTaskById(foreignTask.getId()))
                 .thenReturn(Optional.of(foreignTask));
 
-        assertThatThrownBy(() -> service.updateTask(investigation.getId(), foreignTask.getId(),
-                new UpdateTaskCommand("nouveau titre", null, null), "a"))
+        UUID investigationId = investigation.getId();
+        UUID foreignTaskId = foreignTask.getId();
+        UpdateTaskCommand rename = new UpdateTaskCommand("nouveau titre", null, null);
+        assertThatThrownBy(() -> service.updateTask(investigationId, foreignTaskId, rename, "a"))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 
@@ -211,7 +209,7 @@ class CaseServiceTest {
 
         ArgumentCaptor<CaseTimelineEntry> captor =
                 ArgumentCaptor.forClass(CaseTimelineEntry.class);
-        verify(caseRepository, org.mockito.Mockito.times(2)).addTimelineEntry(captor.capture());
+        verify(caseRepository, times(2)).addTimelineEntry(captor.capture());
         assertThat(captor.getAllValues()).extracting(CaseTimelineEntry::type)
                 .containsExactly(CaseEventType.ASSIGNED, CaseEventType.UNASSIGNED);
     }
@@ -255,7 +253,7 @@ class CaseServiceTest {
         verify(caseRepository).unlinkAlert(investigation.getId(), alert.getId());
         ArgumentCaptor<CaseTimelineEntry> captor =
                 ArgumentCaptor.forClass(CaseTimelineEntry.class);
-        verify(caseRepository, org.mockito.Mockito.times(4)).addTimelineEntry(captor.capture());
+        verify(caseRepository, times(4)).addTimelineEntry(captor.capture());
         assertThat(captor.getAllValues()).extracting(CaseTimelineEntry::type)
                 .containsExactly(CaseEventType.INCIDENT_LINKED, CaseEventType.INCIDENT_UNLINKED,
                         CaseEventType.ALERT_LINKED, CaseEventType.ALERT_UNLINKED);

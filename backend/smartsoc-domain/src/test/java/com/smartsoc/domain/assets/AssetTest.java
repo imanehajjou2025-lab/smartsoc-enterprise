@@ -64,19 +64,24 @@ class AssetTest {
 
     @Test
     void registerRejectsMissingClassification() {
-        assertThatThrownBy(() -> Asset.register(Asset.RegistrationData.builder()
+        Asset.RegistrationData noType = Asset.RegistrationData.builder()
                 .hostname("srv-x").criticality(AssetCriticality.LOW)
-                .exposure(AssetExposure.INTERNAL).build()))
+                .exposure(AssetExposure.INTERNAL).build();
+        assertThatThrownBy(() -> Asset.register(noType))
                 .isInstanceOf(BusinessRuleViolationException.class)
                 .hasMessageContaining("type");
-        assertThatThrownBy(() -> Asset.register(Asset.RegistrationData.builder()
+
+        Asset.RegistrationData noCriticality = Asset.RegistrationData.builder()
                 .hostname("srv-x").type(AssetType.SERVER)
-                .exposure(AssetExposure.INTERNAL).build()))
+                .exposure(AssetExposure.INTERNAL).build();
+        assertThatThrownBy(() -> Asset.register(noCriticality))
                 .isInstanceOf(BusinessRuleViolationException.class)
                 .hasMessageContaining("criticality");
-        assertThatThrownBy(() -> Asset.register(Asset.RegistrationData.builder()
+
+        Asset.RegistrationData noExposure = Asset.RegistrationData.builder()
                 .hostname("srv-x").type(AssetType.SERVER)
-                .criticality(AssetCriticality.LOW).build()))
+                .criticality(AssetCriticality.LOW).build();
+        assertThatThrownBy(() -> Asset.register(noExposure))
                 .isInstanceOf(BusinessRuleViolationException.class)
                 .hasMessageContaining("exposure");
     }

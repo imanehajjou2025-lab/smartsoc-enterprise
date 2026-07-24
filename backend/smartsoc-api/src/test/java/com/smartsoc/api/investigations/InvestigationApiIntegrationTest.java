@@ -52,7 +52,7 @@ class InvestigationApiIntegrationTest {
                 "priority", "HIGH"), Map.class).getBody();
         String id = (String) created.get("id");
         assertThat((String) created.get("reference")).matches("CASE-\\d{4}-\\d{4}");
-        assertThat(created.get("status")).isEqualTo("OPEN");
+        assertThat(created).containsEntry("status", "OPEN");
 
         // Travail : transition, tâche créée puis terminée, note.
         exchange(HttpMethod.PATCH, url(id, "/status"), admin,
@@ -74,8 +74,8 @@ class InvestigationApiIntegrationTest {
         // Clôture formelle.
         Map<String, Object> closed = exchange(HttpMethod.POST, url(id, "/close"), admin,
                 Map.of("conclusion", "Vrai positif : campagne bloquée"), Map.class).getBody();
-        assertThat(closed.get("status")).isEqualTo("CLOSED");
-        assertThat(closed.get("conclusion")).isEqualTo("Vrai positif : campagne bloquée");
+        assertThat(closed).containsEntry("status", "CLOSED");
+        assertThat(closed).containsEntry("conclusion", "Vrai positif : campagne bloquée");
         assertThat(closed.get("closedAt")).isNotNull();
 
         // Cas clôturé immuable : note et transition rejetées en 422.
@@ -94,7 +94,7 @@ class InvestigationApiIntegrationTest {
         assertThat(timeline).extracting(e -> e.get("type")).containsExactly(
                 "CREATED", "STATUS_CHANGED", "TASK_ADDED", "TASK_COMPLETED",
                 "NOTE_ADDED", "CLOSED");
-        assertThat(timeline).allSatisfy(e -> assertThat(e.get("author")).isEqualTo("admin"));
+        assertThat(timeline).allSatisfy(e -> assertThat(e).containsEntry("author", "admin"));
     }
 
     @Test
@@ -114,7 +114,7 @@ class InvestigationApiIntegrationTest {
         Map<String, Object> followUp = exchange(HttpMethod.POST, url(originId, "/follow-up"),
                 admin, Map.of("title", "Reprise : nouvelle vague", "priority", "HIGH"),
                 Map.class).getBody();
-        assertThat(followUp.get("originCaseId")).isEqualTo(originId);
+        assertThat(followUp).containsEntry("originCaseId", originId);
 
         // L'origine expose son suivi et la trace FOLLOW_UP_OPENED.
         Map<String, Object> originDetail = exchange(HttpMethod.GET, url(originId, ""), admin,
@@ -136,8 +136,8 @@ class InvestigationApiIntegrationTest {
         Map<String, Object> investigation = exchange(HttpMethod.POST,
                 INVESTIGATIONS + "/from-incident/" + incident.get("id"), admin,
                 null, Map.class).getBody();
-        assertThat(investigation.get("title")).isEqualTo("Brute force sur srv-web-01");
-        assertThat(investigation.get("priority")).isEqualTo("CRITICAL");
+        assertThat(investigation).containsEntry("title", "Brute force sur srv-web-01");
+        assertThat(investigation).containsEntry("priority", "CRITICAL");
 
         Map<String, Object> detail = exchange(HttpMethod.GET,
                 url((String) investigation.get("id"), ""), admin, null, Map.class).getBody();
@@ -177,7 +177,7 @@ class InvestigationApiIntegrationTest {
         // Assignation / désassignation.
         Map<String, Object> assigned = exchange(HttpMethod.PUT, url(caseId, "/assignee"),
                 admin, Map.of("username", "Analyst01"), Map.class).getBody();
-        assertThat(assigned.get("assigneeUsername")).isEqualTo("analyst01");
+        assertThat(assigned).containsEntry("assigneeUsername", "analyst01");
         Map<String, Object> unassigned = exchange(HttpMethod.DELETE, url(caseId, "/assignee"),
                 admin, null, Map.class).getBody();
         assertThat(unassigned.get("assigneeUsername")).isNull();
@@ -212,9 +212,9 @@ class InvestigationApiIntegrationTest {
                 url(caseId, "/tasks/" + task.get("id")), admin,
                 Map.of("title", "Vérifier les IOC MISP", "assignee", "Analyst01"),
                 Map.class).getBody();
-        assertThat(edited.get("title")).isEqualTo("Vérifier les IOC MISP");
-        assertThat(edited.get("assigneeUsername")).isEqualTo("analyst01");
-        assertThat(edited.get("status")).isEqualTo("TODO");
+        assertThat(edited).containsEntry("title", "Vérifier les IOC MISP");
+        assertThat(edited).containsEntry("assigneeUsername", "analyst01");
+        assertThat(edited).containsEntry("status", "TODO");
     }
 
     @Test
