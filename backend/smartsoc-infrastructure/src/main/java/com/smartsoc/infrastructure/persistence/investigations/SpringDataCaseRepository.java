@@ -17,8 +17,11 @@ public interface SpringDataCaseRepository
 
     List<CaseJpaEntity> findByOriginCaseIdOrderByOpenedAt(UUID originCaseId);
 
-    // Liaisons : gérées en SQL natif (tables d'association sans entité).
-    // ON CONFLICT DO NOTHING rend chaque liaison idempotente.
+    /**
+     * Liaisons en SQL natif (tables d'association sans entité). La clause
+     * {@code on conflict do nothing} de chaque requête rend le rejeu de la
+     * liaison idempotent.
+     */
     @Modifying
     @Query(value = """
             insert into case_incidents (case_id, incident_id)

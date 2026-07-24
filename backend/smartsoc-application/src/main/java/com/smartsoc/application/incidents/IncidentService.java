@@ -43,7 +43,7 @@ public class IncidentService {
                 referenceGenerator.nextReference(),
                 command.title(), command.description(), command.severity());
         Incident saved = incidentRepository.save(incident);
-        record(saved.getId(), IncidentEventType.CREATED,
+        recordEvent(saved.getId(), IncidentEventType.CREATED,
                 "Incident %s ouvert".formatted(saved.getReference()), author);
         log.info("Incident {} created by {}", saved.getReference(), author);
         return saved;
@@ -59,12 +59,12 @@ public class IncidentService {
                 referenceGenerator.nextReference(),
                 alert.getTitle(), alert.getDescription(), alert.getSeverity());
         Incident saved = incidentRepository.save(incident);
-        record(saved.getId(), IncidentEventType.CREATED,
+        recordEvent(saved.getId(), IncidentEventType.CREATED,
                 "Incident %s ouvert depuis l'alerte %s".formatted(saved.getReference(), alert.getSource()),
                 author);
 
         incidentRepository.linkAlert(saved.getId(), alertId);
-        record(saved.getId(), IncidentEventType.ALERT_LINKED,
+        recordEvent(saved.getId(), IncidentEventType.ALERT_LINKED,
                 "Alerte liée : %s / %s".formatted(alert.getSource(), alert.getExternalId()), author);
         return saved;
     }
@@ -100,7 +100,7 @@ public class IncidentService {
         IncidentStatus previous = incident.getStatus();
         incident.transitionTo(newStatus);
         Incident saved = incidentRepository.save(incident);
-        record(id, IncidentEventType.STATUS_CHANGED,
+        recordEvent(id, IncidentEventType.STATUS_CHANGED,
                 "Statut : %s → %s".formatted(previous, newStatus), author);
         return saved;
     }
@@ -110,7 +110,7 @@ public class IncidentService {
         Incident incident = requireIncident(id);
         incident.assignTo(assignee);
         Incident saved = incidentRepository.save(incident);
-        record(id, IncidentEventType.ASSIGNED,
+        recordEvent(id, IncidentEventType.ASSIGNED,
                 "Assigné à %s".formatted(saved.getAssigneeUsername()), author);
         return saved;
     }
@@ -120,14 +120,14 @@ public class IncidentService {
         Incident incident = requireIncident(id);
         incident.unassign();
         Incident saved = incidentRepository.save(incident);
-        record(id, IncidentEventType.UNASSIGNED, "Désassigné", author);
+        recordEvent(id, IncidentEventType.UNASSIGNED, "Désassigné", author);
         return saved;
     }
 
     @Transactional
     public void addNote(UUID id, String message, String author) {
         requireIncident(id);
-        record(id, IncidentEventType.NOTE, message, author);
+        recordEvent(id, IncidentEventType.NOTE, message, author);
     }
 
     @Transactional
@@ -136,7 +136,7 @@ public class IncidentService {
         Alert alert = alertRepository.findById(alertId)
                 .orElseThrow(() -> new ResourceNotFoundException("Alert", alertId));
         incidentRepository.linkAlert(id, alertId);
-        record(id, IncidentEventType.ALERT_LINKED,
+        recordEvent(id, IncidentEventType.ALERT_LINKED,
                 "Alerte liée : %s / %s".formatted(alert.getSource(), alert.getExternalId()), author);
     }
 
@@ -144,10 +144,10 @@ public class IncidentService {
     public void unlinkAlert(UUID id, UUID alertId, String author) {
         requireIncident(id);
         incidentRepository.unlinkAlert(id, alertId);
-        record(id, IncidentEventType.ALERT_UNLINKED, "Alerte déliée : %s".formatted(alertId), author);
+        recordEvent(id, IncidentEventType.ALERT_UNLINKED, "Alerte déliée : %s".formatted(alertId), author);
     }
 
-    private void record(UUID incidentId, IncidentEventType type, String message, String author) {
+    private void recordEvent(UUID incidentId, IncidentEventType type, String message, String author) {
         incidentRepository.addTimelineEntry(
                 IncidentTimelineEntry.of(incidentId, type, message, author));
     }

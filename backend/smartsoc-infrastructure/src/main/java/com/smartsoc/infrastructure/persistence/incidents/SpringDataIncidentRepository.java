@@ -15,8 +15,11 @@ public interface SpringDataIncidentRepository
 
     Optional<IncidentJpaEntity> findByReference(String reference);
 
-    // Liaison d'alertes : gérée en SQL natif (table d'association sans entité).
-    // ON CONFLICT DO NOTHING rend la liaison idempotente.
+    /**
+     * Liaison d'une alerte, en SQL natif (table d'association sans entité).
+     * La clause {@code on conflict do nothing} de la requête rend le rejeu
+     * de la liaison idempotent.
+     */
     @Modifying
     @Query(value = """
             insert into incident_alerts (incident_id, alert_id)

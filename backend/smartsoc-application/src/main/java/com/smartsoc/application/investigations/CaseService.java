@@ -54,7 +54,7 @@ public class CaseService {
         Case investigation = Case.open(referenceGenerator.nextReference(),
                 command.title(), command.description(), command.priority());
         Case saved = caseRepository.save(investigation);
-        record(saved.getId(), CaseEventType.CREATED,
+        recordEvent(saved.getId(), CaseEventType.CREATED,
                 "Cas %s ouvert".formatted(saved.getReference()), author);
         log.info("Case {} created by {}", saved.getReference(), author);
         return saved;
@@ -69,12 +69,12 @@ public class CaseService {
         Case investigation = Case.open(referenceGenerator.nextReference(),
                 incident.getTitle(), incident.getDescription(), incident.getSeverity());
         Case saved = caseRepository.save(investigation);
-        record(saved.getId(), CaseEventType.CREATED,
+        recordEvent(saved.getId(), CaseEventType.CREATED,
                 "Cas %s ouvert depuis l'incident %s"
                         .formatted(saved.getReference(), incident.getReference()), author);
 
         caseRepository.linkIncident(saved.getId(), incidentId);
-        record(saved.getId(), CaseEventType.INCIDENT_LINKED,
+        recordEvent(saved.getId(), CaseEventType.INCIDENT_LINKED,
                 "Incident lié : %s".formatted(incident.getReference()), author);
         return saved;
     }
@@ -90,10 +90,10 @@ public class CaseService {
         Case followUp = Case.openFollowUp(origin, referenceGenerator.nextReference(),
                 command.title(), command.description(), command.priority());
         Case saved = caseRepository.save(followUp);
-        record(saved.getId(), CaseEventType.CREATED,
+        recordEvent(saved.getId(), CaseEventType.CREATED,
                 "Cas %s ouvert en suivi du cas %s"
                         .formatted(saved.getReference(), origin.getReference()), author);
-        record(originCaseId, CaseEventType.FOLLOW_UP_OPENED,
+        recordEvent(originCaseId, CaseEventType.FOLLOW_UP_OPENED,
                 "Cas de suivi ouvert : %s".formatted(saved.getReference()), author);
         return saved;
     }
@@ -150,7 +150,7 @@ public class CaseService {
         CaseStatus previous = investigation.getStatus();
         investigation.transitionTo(newStatus);
         Case saved = caseRepository.save(investigation);
-        record(id, CaseEventType.STATUS_CHANGED,
+        recordEvent(id, CaseEventType.STATUS_CHANGED,
                 "Statut : %s → %s".formatted(previous, newStatus), author);
         return saved;
     }
@@ -160,7 +160,7 @@ public class CaseService {
         Case investigation = requireCase(id);
         investigation.close(conclusion);
         Case saved = caseRepository.save(investigation);
-        record(id, CaseEventType.CLOSED,
+        recordEvent(id, CaseEventType.CLOSED,
                 "Cas clôturé : %s".formatted(saved.getConclusion()), author);
         log.info("Case {} closed by {}", saved.getReference(), author);
         return saved;
@@ -171,7 +171,7 @@ public class CaseService {
         Case investigation = requireCase(id);
         investigation.assignTo(assignee);
         Case saved = caseRepository.save(investigation);
-        record(id, CaseEventType.ASSIGNED,
+        recordEvent(id, CaseEventType.ASSIGNED,
                 "Assigné à %s".formatted(saved.getAssigneeUsername()), author);
         return saved;
     }
@@ -181,14 +181,14 @@ public class CaseService {
         Case investigation = requireCase(id);
         investigation.unassign();
         Case saved = caseRepository.save(investigation);
-        record(id, CaseEventType.UNASSIGNED, "Désassigné", author);
+        recordEvent(id, CaseEventType.UNASSIGNED, "Désassigné", author);
         return saved;
     }
 
     @Transactional
     public void addNote(UUID id, String message, String author) {
         requireOpenCase(id);
-        record(id, CaseEventType.NOTE_ADDED, message, author);
+        recordEvent(id, CaseEventType.NOTE_ADDED, message, author);
     }
 
     @Transactional
@@ -197,7 +197,7 @@ public class CaseService {
         Incident incident = incidentRepository.findById(incidentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Incident", incidentId));
         caseRepository.linkIncident(id, incidentId);
-        record(id, CaseEventType.INCIDENT_LINKED,
+        recordEvent(id, CaseEventType.INCIDENT_LINKED,
                 "Incident lié : %s".formatted(incident.getReference()), author);
     }
 
@@ -205,7 +205,7 @@ public class CaseService {
     public void unlinkIncident(UUID id, UUID incidentId, String author) {
         requireOpenCase(id);
         caseRepository.unlinkIncident(id, incidentId);
-        record(id, CaseEventType.INCIDENT_UNLINKED,
+        recordEvent(id, CaseEventType.INCIDENT_UNLINKED,
                 "Incident délié : %s".formatted(incidentId), author);
     }
 
@@ -215,7 +215,7 @@ public class CaseService {
         Alert alert = alertRepository.findById(alertId)
                 .orElseThrow(() -> new ResourceNotFoundException("Alert", alertId));
         caseRepository.linkAlert(id, alertId);
-        record(id, CaseEventType.ALERT_LINKED,
+        recordEvent(id, CaseEventType.ALERT_LINKED,
                 "Alerte liée : %s / %s".formatted(alert.getSource(), alert.getExternalId()), author);
     }
 
@@ -223,7 +223,7 @@ public class CaseService {
     public void unlinkAlert(UUID id, UUID alertId, String author) {
         requireOpenCase(id);
         caseRepository.unlinkAlert(id, alertId);
-        record(id, CaseEventType.ALERT_UNLINKED,
+        recordEvent(id, CaseEventType.ALERT_UNLINKED,
                 "Alerte déliée : %s".formatted(alertId), author);
     }
 
@@ -231,7 +231,7 @@ public class CaseService {
     public CaseTask addTask(UUID id, String title, String author) {
         requireOpenCase(id);
         CaseTask saved = caseRepository.saveTask(CaseTask.create(id, title));
-        record(id, CaseEventType.TASK_ADDED, "Tâche ajoutée : %s".formatted(saved.getTitle()), author);
+        recordEvent(id, CaseEventType.TASK_ADDED, "Tâche ajoutée : %s".formatted(saved.getTitle()), author);
         return saved;
     }
 
@@ -258,13 +258,13 @@ public class CaseService {
             completed = command.status() == CaseTask.Status.DONE;
         }
         CaseTask saved = caseRepository.saveTask(task);
-        record(id, completed ? CaseEventType.TASK_COMPLETED : CaseEventType.TASK_UPDATED,
+        recordEvent(id, completed ? CaseEventType.TASK_COMPLETED : CaseEventType.TASK_UPDATED,
                 "Tâche %s : %s".formatted(completed ? "terminée" : "mise à jour",
                         saved.getTitle()), author);
         return saved;
     }
 
-    private void record(UUID caseId, CaseEventType type, String message, String author) {
+    private void recordEvent(UUID caseId, CaseEventType type, String message, String author) {
         caseRepository.addTimelineEntry(CaseTimelineEntry.of(caseId, type, message, author));
     }
 

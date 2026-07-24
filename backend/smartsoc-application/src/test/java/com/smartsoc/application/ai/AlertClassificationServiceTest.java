@@ -10,6 +10,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
@@ -43,13 +44,13 @@ class AlertClassificationServiceTest {
     @Mock
     private ApplicationEventPublisher eventPublisher;
 
+    @InjectMocks
     private AlertClassificationService service;
 
     private Alert alert;
 
     @BeforeEach
     void setUp() {
-        service = new AlertClassificationService(alertRepository, classifier, eventPublisher);
         alert = Alert.ingest(Alert.IngestionData.builder()
                 .source("wazuh")
                 .externalId("evt-1")
@@ -82,7 +83,8 @@ class AlertClassificationServiceTest {
         when(alertRepository.findById(alert.getId())).thenReturn(Optional.of(alert));
         when(classifier.classify(alert)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.classifyNow(alert.getId()))
+        UUID alertId = alert.getId();
+        assertThatThrownBy(() -> service.classifyNow(alertId))
                 .isInstanceOf(AiServiceUnavailableException.class);
 
         assertThat(alert.getAiScore()).isNull();

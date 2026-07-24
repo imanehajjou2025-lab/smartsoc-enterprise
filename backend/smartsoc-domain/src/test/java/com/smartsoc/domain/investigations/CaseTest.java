@@ -79,7 +79,7 @@ class CaseTest {
                 .hasMessageContaining("immutable");
         assertThatThrownBy(() -> investigation.assignTo("analyst01"))
                 .isInstanceOf(BusinessRuleViolationException.class);
-        assertThatThrownBy(() -> investigation.unassign())
+        assertThatThrownBy(investigation::unassign)
                 .isInstanceOf(BusinessRuleViolationException.class);
         assertThatThrownBy(() -> investigation.updateDescription("maj"))
                 .isInstanceOf(BusinessRuleViolationException.class);
@@ -145,7 +145,8 @@ class CaseTest {
 
         assertThatThrownBy(() -> CaseTask.create(null, "titre"))
                 .isInstanceOf(BusinessRuleViolationException.class);
-        assertThatThrownBy(() -> CaseTask.create(investigation.getId(), " "))
+        UUID investigationId = investigation.getId();
+        assertThatThrownBy(() -> CaseTask.create(investigationId, " "))
                 .isInstanceOf(BusinessRuleViolationException.class);
     }
 

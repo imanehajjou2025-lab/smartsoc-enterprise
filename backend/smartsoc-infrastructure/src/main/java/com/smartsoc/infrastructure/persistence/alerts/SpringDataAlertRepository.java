@@ -26,8 +26,14 @@ public interface SpringDataAlertRepository
     @Query("select a.source, count(a) from AlertJpaEntity a group by a.source order by count(a) desc")
     List<Object[]> countGroupedBySource();
 
+    // Le jour est rendu en TEXTE ISO (YYYY-MM-DD) plutôt qu'en `date` SQL :
+    // la logique de fuseau (date_trunc AT TIME ZONE 'UTC', corrigée en PR #46)
+    // est inchangée, mais l'adaptateur reçoit une String qu'il parse en
+    // LocalDate — pas de java.sql.Date au passage. L'ordre lexicographique
+    // d'un ISO 8601 est l'ordre chronologique.
     @Query(value = """
-            select cast(date_trunc('day', detected_at AT TIME ZONE 'UTC') as date) as day, count(*)
+            select to_char(date_trunc('day', detected_at AT TIME ZONE 'UTC'), 'YYYY-MM-DD') as day,
+                   count(*)
             from alerts where detected_at >= :from
             group by day order by day
             """, nativeQuery = true)
