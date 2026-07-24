@@ -1274,7 +1274,7 @@ check — tous au vert.
 
 ---
 
-## 2026-07-20 — Jalon CTI C2 — observables d'alerte et enrichissement (PR en cours)
+## 2026-07-20 — Jalon CTI C2 — observables d'alerte et enrichissement (PR #55)
 
 **Réalisé.** Le chaînon qui donne sa valeur au référentiel : les alertes
 déclarent désormais leurs **observables** (IP, domaine, URL, hash), et la
@@ -1396,7 +1396,7 @@ désormais les champs stables, en excluant explicitement `aiScore` et
 
 ---
 
-## 2026-07-21 — Jalon CTI C3 — module Threat Intelligence, frontend (PR en cours)
+## 2026-07-21 — Jalon CTI C3 — module Threat Intelligence, frontend (PR #56)
 
 **Réalisé.** La console expose enfin le référentiel CTI construit en
 CTI-1/CTI-2 : liste filtrée des IOC, tiroir de détail avec révocation et
