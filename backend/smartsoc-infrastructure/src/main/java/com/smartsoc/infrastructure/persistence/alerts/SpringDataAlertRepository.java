@@ -76,4 +76,23 @@ public interface SpringDataAlertRepository
     Page<AlertJpaEntity> findByObservable(@Param("type") String type,
                                           @Param("value") String value,
                                           Pageable pageable);
+
+    // Correlation technique -> alertes (retro-hunt MITRE). Le containment @>
+    // sur mitre_techniques est indexable par le GIN ix_alerts_mitre_techniques
+    // (V10). Le parametre est un tableau JSONB d'un element (["T1059"]) cast
+    // en jsonb ; l'attackId est deja normalise canonique par le domaine. La
+    // countQuery reprend le MEME predicat -> le total de la page est le
+    // compteur de correlation, il ne peut pas diverger de la liste.
+    @Query(value = """
+            select * from alerts
+            where mitre_techniques @> cast(:technique as jsonb)
+            order by detected_at desc
+            """,
+            countQuery = """
+            select count(*) from alerts
+            where mitre_techniques @> cast(:technique as jsonb)
+            """,
+            nativeQuery = true)
+    Page<AlertJpaEntity> findByMitreTechnique(@Param("technique") String techniqueAsJsonArray,
+                                              Pageable pageable);
 }

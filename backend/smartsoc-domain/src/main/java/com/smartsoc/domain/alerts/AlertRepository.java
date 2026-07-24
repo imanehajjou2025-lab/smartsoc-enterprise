@@ -52,4 +52,24 @@ public interface AlertRepository {
      * même ce qui permet de justifier la révocation.
      */
     PageResult<Alert> findByObservable(Observable observable, PageQuery page);
+
+    /**
+     * Corrélation technique → alertes : les alertes citant cette technique
+     * ATT&CK — le RETRO-HUNT de la matrice, jumeau de
+     * {@link #findByObservable}.
+     *
+     * <p>Le rapprochement lit le JSONB {@code mitre_techniques} des alertes
+     * par containment {@code @>} (index GIN {@code ix_alerts_mitre_techniques},
+     * V10). L'{@code attackId} est attendu DÉJÀ NORMALISÉ par
+     * {@link com.smartsoc.domain.mitre.MitreTechniqueId} : la comparaison est
+     * exacte et sensible à la casse. <b>Hypothèse assumée (ADR-010)</b> : les
+     * outils SOC émettent des identifiants ATT&CK canoniques (majuscules,
+     * {@code T####}) — un rapprochement explicite plutôt que flou, comme la
+     * limitation FQDN des actifs.
+     *
+     * <p>Le total de la page EST le compteur de corrélation (même prédicat,
+     * jamais un count séparé). Calcul à la lecture : une alerte d'hier
+     * remonte pour une technique consultée aujourd'hui, sans rattrapage.
+     */
+    PageResult<Alert> findByMitreTechnique(String normalizedAttackId, PageQuery page);
 }
