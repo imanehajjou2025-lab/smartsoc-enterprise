@@ -1274,7 +1274,7 @@ check — tous au vert.
 
 ---
 
-## 2026-07-20 — Jalon CTI C2 — observables d'alerte et enrichissement (PR en cours)
+## 2026-07-20 — Jalon CTI C2 — observables d'alerte et enrichissement (PR #55)
 
 **Réalisé.** Le chaînon qui donne sa valeur au référentiel : les alertes
 déclarent désormais leurs **observables** (IP, domaine, URL, hash), et la
@@ -1396,7 +1396,7 @@ désormais les champs stables, en excluant explicitement `aiScore` et
 
 ---
 
-## 2026-07-21 — Jalon CTI C3 — module Threat Intelligence, frontend (PR en cours)
+## 2026-07-21 — Jalon CTI C3 — module Threat Intelligence, frontend (PR #56)
 
 **Réalisé.** La console expose enfin le référentiel CTI construit en
 CTI-1/CTI-2 : liste filtrée des IOC, tiroir de détail avec révocation et
@@ -1519,5 +1519,77 @@ soupçonnait), puis par issue.
 
 ---
 
-*Prochaines entrées : MITRE, hunting, SOAR, rapports, et enfin
-l'assistant IA (backend + frontend).*
+## 2026-07-24 — Jalon MITRE M1 — référentiel ATT&CK, backend (PR #59, ADR-010)
+
+**Contexte.** Les alertes portaient déjà des techniques ATT&CK
+(`Alert.mitreTechniques`, en JSONB depuis V3) mais **aveugles** : aucun
+nom, aucune tactique, aucune dépréciation connue — juste des chaînes
+`"T1059"` pointant en aveugle vers `attack.mitre.org`. Ce jalon construit
+le **référentiel** qui leur donne enfin un sens. C'est le jumeau structurel
+de CTI : ADR-010 reprend le patron d'ADR-009 (identité immuable, upsert
+tolérant, JSONB `@>`) et note, à chaque écart, *pourquoi* MITRE diffère.
+
+**Réalisé (backend complet, 7 lots reviewables validés un à un).**
+Domaine → persistance V9 → cas d'usage → semis → API :
+- *Domaine* : `enum MitreTactic` (14 tactiques, **verrouillées par test**
+  dans l'ordre des colonnes), entité `MitreTechnique` (identité `attackId`
+  immuable + métadonnées rafraîchies + `parentId` de sous-technique),
+  `MitreTechniqueId.normalize()` (validation **caractère par caractère,
+  sans regex à rétro-suivi** — leçon S8786), port `MitreCatalogRepository`.
+- *Persistance* : **V9** `mitre_technique_catalog`, entité JPA (tactiques en
+  JSONB), mapper MapStruct, adaptateur de recherche.
+- *Application* : `MitreCatalogService` (upsert par identité, consultation)
+  + `MitreCatalogImportService` (**lot tolérant par élément, bean séparé
+  non transactionnel** — même doctrine que le flux CTI).
+- *Semis* : `ApplicationRunner` idempotent chargeant une **ressource ATT&CK
+  Enterprise embarquée versionnée** (25 techniques, 14 tactiques, 4
+  sous-techniques, 1 dépréciée) — plateforme démontrable seule.
+- *API* : `GET /api/v1/mitre/{tactics,techniques,techniques/{id}}` +
+  **`POST /import` réservé ADMIN**.
+
+**Choix structurants** (justifications complètes dans ADR-010).
+- **La dépréciation SUIT l'import**, elle ne survit pas au flux — l'écart
+  notable avec CTI. La révocation d'un IOC est une décision d'analyste qui
+  prime sur le flux ; la dépréciation d'une technique est un **fait DU
+  référentiel ATT&CK**, donc l'import fait foi. Ce qui « survit » est la
+  non-suppression : une technique dépréciée reste consultable.
+- **Tactiques en enum, JSONB pour le stockage** : les 14 tactiques
+  Enterprise sont un vocabulaire fini et stable (un enum, comme `Severity`),
+  et les tactiques d'une technique sont filtrées par containment `@>` en
+  **réutilisant le `JsonbFunctionContributor` déjà construit pour les tags
+  d'IOC** — aucune infrastructure neuve.
+- **Alimentation hybride** : semis embarqué (démoable seule, doctrine
+  « simulation par défaut ») + import **admin JWT** — écart assumé avec le
+  webhook `X-API-Key` de CTI, parce que rafraîchir un référentiel est un
+  acte de gestion rare, pas un flux SOC continu.
+- **Table `mitre_technique_catalog`**, nommée distinctement de la colonne
+  `alerts.mitre_techniques` à laquelle elle donne un sens (la corrélation,
+  reportée en **PR-2**, lira ce JSONB sans retoucher le domaine des alertes,
+  ADR-010 §6).
+
+**Points notables.**
+- La sérialisation JSONB d'un `List<MitreTactic>` (enum) par
+  Hibernate/Jackson a été **prouvée par l'aller-retour Testcontainers** — le
+  choix de garder les types forts jusqu'en base tenait, validé plutôt que
+  supposé.
+- Tests d'intégration rendus **déterministes** : semis coupé
+  (`smartsoc.mitre.seed-on-startup=false`) sur le test de persistance pour
+  un catalogue vide, actif sur le test de semis dédié.
+- **ArchUnit a validé** que les nouveaux packages `mitre` respectent les
+  frontières de couches — garde-fou machine, pas relecture humaine.
+
+**Vérification.** 28 tests MITRE (13 domaine + 6 application + 9 API sur
+PostgreSQL réel), **suite complète 226 tests verts** sur les 4 modules
+Maven. Flyway applique **V9 sur chaque base Testcontainers neuve** (aucune
+régression des 8 migrations existantes). Semis vérifié de bout en bout :
+log `Seeded MITRE ATT&CK catalog (v16.1): 25 created, 0 rejected`.
+
+**Repli de journal.** Correction, dans ce jalon (pas de PR journal seule),
+du numéro de PR des jalons **CTI C2 (→ #55)** et **CTI C3 (→ #56)**, restés
+à tort « (PR en cours) ».
+
+---
+
+*Prochaines entrées : la corrélation MITRE (enrichissement d'alerte,
+retro-hunt par technique, heatmap de couverture) puis son frontend, ensuite
+hunting, SOAR, rapports, et enfin l'assistant IA (backend + frontend).*
