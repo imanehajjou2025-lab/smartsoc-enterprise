@@ -3,6 +3,7 @@ package com.smartsoc.api.mitre;
 import com.smartsoc.TestcontainersConfiguration;
 import com.smartsoc.domain.alerts.Alert;
 import com.smartsoc.domain.alerts.AlertRepository;
+import com.smartsoc.domain.alerts.MitreCoverageCount;
 import com.smartsoc.domain.alerts.Severity;
 import com.smartsoc.domain.common.PageQuery;
 import com.smartsoc.domain.common.PageResult;
@@ -67,6 +68,21 @@ class AlertMitreCorrelationPersistenceIntegrationTest {
         // Le total EST le compteur de la liste : même prédicat, jamais un
         // count séparé qui pourrait diverger.
         assertThat(t1059.totalElements()).isEqualTo(t1059.items().size());
+    }
+
+    @Test
+    void coverageCountsAlertsPerTechnique() {
+        String run = UUID.randomUUID().toString().substring(0, 8);
+        // Identifiants factices uniques à ce test : la couverture est
+        // globale (toutes les alertes), on isole donc nos comptes.
+        alertRepository.save(alert("cov-a-" + run, List.of("T9111", "T9222")));
+        alertRepository.save(alert("cov-b-" + run, List.of("T9111")));
+
+        List<MitreCoverageCount> coverage = alertRepository.mitreCoverage();
+
+        assertThat(coverage).contains(
+                new MitreCoverageCount("T9111", 2),
+                new MitreCoverageCount("T9222", 1));
     }
 
     @Test

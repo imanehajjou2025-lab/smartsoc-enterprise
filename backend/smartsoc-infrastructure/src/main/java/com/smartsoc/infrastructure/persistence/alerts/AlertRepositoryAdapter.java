@@ -5,6 +5,7 @@ import com.smartsoc.domain.alerts.AlertQuery;
 import com.smartsoc.domain.alerts.AlertRepository;
 import com.smartsoc.domain.alerts.AlertStatistics;
 import com.smartsoc.domain.alerts.AlertStatus;
+import com.smartsoc.domain.alerts.MitreCoverageCount;
 import com.smartsoc.domain.alerts.Severity;
 import com.smartsoc.domain.common.PageQuery;
 import com.smartsoc.domain.common.PageResult;
@@ -122,6 +123,13 @@ public class AlertRepositoryAdapter implements AlertRepository {
                 result.getTotalElements(),
                 page.page(),
                 page.size());
+    }
+
+    @Override
+    public List<MitreCoverageCount> mitreCoverage() {
+        return springDataRepository.mitreCoverageCounts().stream()
+                .map(row -> new MitreCoverageCount((String) row[0], (Long) row[1]))
+                .toList();
     }
 
     @Override

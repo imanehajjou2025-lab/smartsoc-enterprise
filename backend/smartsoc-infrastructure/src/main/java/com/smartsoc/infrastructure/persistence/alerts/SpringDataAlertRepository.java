@@ -95,4 +95,16 @@ public interface SpringDataAlertRepository
             nativeQuery = true)
     Page<AlertJpaEntity> findByMitreTechnique(@Param("technique") String techniqueAsJsonArray,
                                               Pageable pageable);
+
+    // Couverture MITRE : chaque alerte est dépliée en une ligne par technique
+    // citée (jsonb_array_elements_text), puis on compte par technique. Les
+    // alertes sans technique ne contribuent pas. Lecture pure du JSONB, meme
+    // esprit que les agregations du dashboard.
+    @Query(value = """
+            select technique, count(*)
+            from alerts, jsonb_array_elements_text(mitre_techniques) as technique
+            group by technique
+            order by count(*) desc, technique
+            """, nativeQuery = true)
+    List<Object[]> mitreCoverageCounts();
 }

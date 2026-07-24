@@ -4,6 +4,7 @@ import com.smartsoc.domain.common.PageQuery;
 import com.smartsoc.domain.common.PageResult;
 import com.smartsoc.domain.intelligence.Observable;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -72,4 +73,17 @@ public interface AlertRepository {
      * remonte pour une technique consultée aujourd'hui, sans rattrapage.
      */
     PageResult<Alert> findByMitreTechnique(String normalizedAttackId, PageQuery page);
+
+    /**
+     * Couverture MITRE : pour chaque technique ATT&CK citée par au moins une
+     * alerte, le nombre d'alertes qui la citent — la donnée de la heatmap.
+     *
+     * <p>Agrégation du JSONB {@code mitre_techniques} (dépliage par
+     * {@code jsonb_array_elements_text}) : une lecture pure du champ déjà
+     * présent, aucun état pré-calculé, comme les statistiques du dashboard.
+     * Les identifiants sont rendus tels qu'ils sont stockés (canoniques par
+     * hypothèse, ADR-010) ; la mise en correspondance avec le catalogue se
+     * fait à la lecture, côté appelant.
+     */
+    List<MitreCoverageCount> mitreCoverage();
 }
