@@ -132,6 +132,35 @@ class SoarApiIntegrationTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
+    void listsExecutionsForAnIncidentAndCancelIsATerminalTransition() {
+        String admin = adminToken();
+        UUID incidentId = seedIncident();
+        String playbookId = (String) exchange(HttpMethod.POST, PLAYBOOKS, admin,
+                declarePayload("Liste et annulation " + UUID.randomUUID()), Map.class).getBody().get("id");
+
+        Map<String, Object> execution = exchange(HttpMethod.POST,
+                "/api/v1/incidents/" + incidentId + "/playbook-executions", admin,
+                Map.of("playbookId", playbookId), Map.class).getBody();
+        String executionId = (String) execution.get("id");
+
+        Map<String, Object> page = exchange(HttpMethod.GET,
+                "/api/v1/incidents/" + incidentId + "/playbook-executions", admin, null, Map.class).getBody();
+        List<Map<String, Object>> items = (List<Map<String, Object>>) page.get("items");
+        assertThat(items).extracting(e -> e.get("id")).containsExactly(executionId);
+        assertThat(items.getFirst().get("steps")).isNotNull();
+
+        Map<String, Object> cancelled = exchange(HttpMethod.POST,
+                "/api/v1/playbook-executions/" + executionId + "/cancel", admin, null, Map.class).getBody();
+        assertThat(cancelled.get("status")).isEqualTo("CANCELLED");
+        assertThat(cancelled.get("completedAt")).isNotNull();
+
+        // Une exécution terminale ne se rouvre pas.
+        assertThat(exchange(HttpMethod.POST, "/api/v1/playbook-executions/" + executionId + "/complete",
+                admin, null, String.class).getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+    }
+
+    @Test
     void startRaises404WhenTheIncidentDoesNotExist() {
         String admin = adminToken();
         String playbookId = (String) exchange(HttpMethod.POST, PLAYBOOKS, admin,
