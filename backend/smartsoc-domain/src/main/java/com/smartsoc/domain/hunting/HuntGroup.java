@@ -17,7 +17,12 @@ public record HuntGroup(HuntLogicalOperator operator, List<HuntNode> children) i
     private static final String INVALID = "INVALID_HUNT_GROUP";
 
     /**
-     * Faux positif audité (CodeQL java/internal-representation-exposure).
+     * Faux positif audité (CodeQL java/internal-representation-exposure),
+     * alerte supprimée via l'API code-scanning avec justification tracée.
+     * Pas de commentaire {@code codeql[...]} : essayé d'abord, sans effet
+     * dans ce dépôt (cause exacte non confirmée — peut-être lié à
+     * {@code build-mode: none} du workflow) ; la suppression via l'API,
+     * elle, a été vérifiée effective au rescan suivant.
      *
      * <p>La règle documente elle-même deux remèdes valides : la copie
      * défensive ({@code List.copyOf}, appliquée ici) et la vue en lecture
@@ -33,7 +38,7 @@ public record HuntGroup(HuntLogicalOperator operator, List<HuntNode> children) i
      * .childrenAreDefensivelyCopied} vérifie que {@code children().add(...)}
      * lève {@code UnsupportedOperationException}.
      */
-    public HuntGroup { // codeql[java/internal-representation-exposure]
+    public HuntGroup {
         if (operator == null) {
             throw new BusinessRuleViolationException(INVALID, "A hunt group requires a logical operator");
         }
