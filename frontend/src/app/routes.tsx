@@ -5,6 +5,7 @@ import IncidentsPage from '../features/incidents/IncidentsPage';
 import AssetsPage from '../features/assets/AssetsPage';
 import IntelligencePage from '../features/intelligence/IntelligencePage';
 import MitrePage from '../features/mitre/MitrePage';
+import HuntingPage from '../features/hunting/HuntingPage';
 import InvestigationsPage from '../features/investigations/InvestigationsPage';
 import DashboardPage from '../features/dashboard/DashboardPage';
 import LoginPage from '../features/auth/LoginPage';
@@ -36,16 +37,7 @@ export const router = createBrowserRouter([
           { path: 'assets', element: <AssetsPage /> },
           { path: 'intelligence', element: <IntelligencePage /> },
           { path: 'mitre', element: <MitrePage /> },
-          {
-            path: 'hunting',
-            element: (
-              <PageStub
-                title="Threat Hunting"
-                description="Requêtes de chasse vers OpenSearch via les connecteurs SOC."
-                milestone="jalon connecteurs"
-              />
-            ),
-          },
+          { path: 'hunting', element: <HuntingPage /> },
           {
             path: 'soar',
             element: (
