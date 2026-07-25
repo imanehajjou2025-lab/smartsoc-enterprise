@@ -1888,5 +1888,46 @@ marchait pas.
 
 ---
 
-*Prochaines entrées : SOAR, rapports, et enfin l'assistant IA
+## 2026-07-26 — Jalon SOAR — backend complet (PR #67, ADR-012)
+
+**Contexte.** `soar` est déclaré dès ADR-002 comme *« Playbooks, workflow
+engine, exécutions, versioning »*. Comme pour Hunting (ADR-011), une
+vérification des ADR déjà validées avant tout code a livré le fait
+déterminant : `SOC-ARCHITECTURE.md` documente que **Shuffle**, opéré hors
+de ce dépôt, est le vrai moteur d'automatisation — il exécute déjà les
+playbooks réels et **pousse ses résultats vers SmartSOC via le webhook
+d'ingestion existant** (`source=shuffle`, déjà observé dans les données de
+démo). Le module SOAR de la plateforme documente et **suit** des
+procédures de réponse, il ne les automatise pas — même doctrine que
+Hunting/OpenSearch : le connecteur réel (`connectors`, jamais construit)
+reste différé faute de schéma d'intégration réel.
+
+**Réalisé (backend complet, une seule PR, grandes étapes).** Domaine
+(`Playbook` — versioning léger, `order` toujours dérivé de la position de
+liste jamais de la valeur fournie ; `PlaybookExecution` — cible incident
+uniquement ; `PlaybookExecutionStep` — **réutilise exactement le patron
+`CaseTask`** des Investigations, transitions libres + `SKIPPED` en plus)
+→ persistance (**V12** `playbooks`/`playbook_executions`/
+`playbook_execution_steps`) → application (`PlaybookService`,
+`PlaybookExecutionService` — démarrage fige une copie des étapes) → API
+(`PlaybookController`, `PlaybookExecutionController`, 9 endpoints) →
+ADR-012.
+
+**Point technique notable.** `Playbook.steps` (`List<PlaybookStepTemplate>`,
+un record PLAT sans hiérarchie scellée) se sérialise nativement en JSONB
+via Jackson, **sans codec dédié** — vérifié par un test de persistance
+dédié. Contraste volontairement documenté avec l'arbre de critères de
+Hunting, qui EN nécessitait un : la différence est la présence ou non de
+polymorphisme (sealed interface) dans le type stocké.
+
+**Vérification.** 32 tests nouveaux (15 domaine + 10 application + 2
+persistance + 5 E2E sur PostgreSQL réel — dont la preuve qu'éditer un
+playbook APRÈS le démarrage d'une exécution ne change jamais son nom, sa
+version ni ses étapes déjà figées, RBAC, 404 sur incident inexistant,
+archivage sans suppression). **Suite complète : 308 tests verts**
+(118+61+13+116), zéro régression sur les 276 tests préexistants.
+
+---
+
+*Prochaines entrées : SOAR frontend, rapports, et enfin l'assistant IA
 (backend + frontend).*
