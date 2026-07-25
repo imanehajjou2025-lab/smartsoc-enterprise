@@ -1646,7 +1646,7 @@ inclus). Pas de nouvel ADR : la corrélation est l'implémentation d'ADR-010
 
 ---
 
-## 2026-07-25 — Jalon MITRE M3 — module frontend (matrice, tiroir, enrichissement)
+## 2026-07-25 — Jalon MITRE M3 — module frontend (matrice, tiroir, enrichissement) (PR #61)
 
 **Contexte.** Le backend MITRE (M1 catalogue + M2 corrélation) est complet ;
 ce jalon l'expose dans la console, en miroir strict du module
