@@ -1831,5 +1831,29 @@ froid, vérifiée à 4 reprises** au fil du parcours.
 
 ---
 
+## 2026-07-25 — Dette technique CodeQL — accesseurs défensifs (PR séparée)
+
+**Contexte.** Avant d'attaquer SOAR, vérification de la dette CodeQL
+ouverte plutôt que de l'accepter sur parole : l'API `code-scanning/alerts`
+montrait en réalité **deux** alertes `java/internal-representation-exposure`,
+pas une seule comme supposé — `HuntGroup.children()` (nouvelle, PR #62 du
+jour) et `MitreTechnique.getTactics()` (plus ancienne, ouverte depuis le
+jalon MITRE M1, jamais réellement corrigée malgré l'enveloppement déjà fait
+à la construction).
+
+**Correctif.** Même remède déjà appliqué à `Alert.getObservables()`/
+`getMitreTechniques()` (leçon du jalon MITRE) : un accesseur écrit à la
+main plutôt que généré (record ou Lombok), enveloppant la collection dans
+`Collections.unmodifiableList`/`Set(...)` **au moment de la lecture**.
+CodeQL ne fait pas confiance à une garantie d'immuabilité prise en amont à
+la construction — il veut voir l'enveloppement dans le corps de
+l'accesseur lui-même. Aucun changement de comportement : les deux
+collections étaient déjà immuables en pratique.
+
+**Vérification.** 276 tests verts (suite complète, zéro régression), dont
+les tests d'immutabilité déjà existants pour les deux classes.
+
+---
+
 *Prochaines entrées : SOAR, rapports, et enfin l'assistant IA
 (backend + frontend).*
