@@ -1646,6 +1646,65 @@ inclus). Pas de nouvel ADR : la corrélation est l'implémentation d'ADR-010
 
 ---
 
-*Prochaines entrées : le frontend MITRE (matrice/heatmap + puces d'alerte
-catalogue-conscientes), ensuite hunting, SOAR, rapports, et enfin
-l'assistant IA (backend + frontend).*
+## 2026-07-25 — Jalon MITRE M3 — module frontend (matrice, tiroir, enrichissement) (PR #61)
+
+**Contexte.** Le backend MITRE (M1 catalogue + M2 corrélation) est complet ;
+ce jalon l'expose dans la console, en miroir strict du module
+`intelligence` — axios partagé + TanStack Query, **jamais RTK Query**.
+
+**Réalisé (5 lots reviewables).**
+- `mitreApi.ts` (client typé : tactiques, techniques, couverture, retro,
+  enrichissement) + `mitreChips.tsx`.
+- `MitrePage.tsx` : la matrice ATT&CK, 14 tactiques en colonnes, techniques
+  colorées par couverture (`GET /techniques` × `GET /coverage`, jointure
+  côté client) ; remplace le `PageStub` de `/mitre`.
+- `TechniqueDetailDrawer.tsx` : métadonnées (tactiques, sous-technique,
+  dépréciation, lien attack.mitre.org) + **alertes corrélées paginées**
+  (retro-hunt), lien profond `?selected=`.
+- Enrichissement d'`AlertDetailDrawer.tsx` : les puces MITRE deviennent
+  **catalogue-conscientes** (`GET /alerts/{id}/mitre`) — connues =
+  nom + tactique, cliquables vers `/mitre?selected=` ; **inconnues restent
+  visibles**, discrètes, lien externe attack.mitre.org (jamais masquées).
+- **Restyle en tableau de bord** (demandé après relecture visuelle) : cartes
+  KPI iconées et accentuées par couleur (techniques observées, tactiques
+  touchées, alertes corrélées, % de couverture), en-têtes de colonne et
+  pastilles de case teintées par intensité d'activité, panneau « techniques
+  les plus citées », **anneau de couverture en vrai donut ECharts** (comme
+  le dashboard, `EChart` partagé), bouton « Vue ATT&CK Navigator » (lien
+  externe), barre d'outils avec filtre État.
+
+**Choix assumé : pas de groupes/logiciels/campagnes/mitigations dans le
+tableau de bord**, malgré une maquette de référence qui les affichait.
+Périmètre acté dès ADR-010 §7 (matrice cœur uniquement) : ces objets ATT&CK
+n'ont aucune donnée backend, les inventer aurait été mentir à l'écran.
+Seul ce que le catalogue + la corrélation savent réellement est affiché.
+
+**Vérification E2E réelle contre la stack Docker reconstruite** (V9+V10
+appliquées, semis 25 techniques, 4 alertes de démonstration ingérées via le
+webhook, dont une citant une technique `T9999` hors catalogue) :
+- matrice rendue avec les 25 techniques de base (sous-technique et
+  dépréciée exclues par défaut), heatmap colorée proportionnellement
+  (mesurée : `T1110`=6→intensité 0.80, `T1078`=4→0.59, `T1059`=2→0.39) ;
+- tiroir technique ouvert par **lien profond à froid**
+  (`/mitre?selected=T1059`) : métadonnées + « Alertes citant cette
+  technique (2) » exactes ;
+- tiroir d'alerte : `T1071` résolue et cliquable, `T9999` inconnue mais
+  **visible** (« Non cataloguée localement ») ; clic sur la puce connue →
+  navigation vérifiée vers `/mitre?selected=T1071` ;
+- **console propre à froid, vérifiée à plusieurs reprises** (jamais
+  supposée) ; `npm run build` et Vitest verts avant chaque lot.
+
+**Note méthodologique.** Le test `AppLayout.test.tsx` (préexistant, sans
+dépendance au module MITRE) a échoué deux fois par **timeout** (5000ms) en
+suite Vitest complète, alors que la même exécution en isolation passe en
+moins d'une seconde de transform. Diagnostic : contention machine locale
+(Docker + Testcontainers du backend récemment sollicité, plusieurs workers
+Vitest concurrents) — le temps de transform mesuré passait de ~700ms
+(isolé) à ~15s (suite complète). Confirmé comme un aléa d'environnement,
+pas une régression : la CI GitHub Actions tourne sur un runner isolé sans
+cette contention.
+
+---
+
+*Prochaines entrées : hunting, SOAR, rapports, et enfin l'assistant IA
+(backend + frontend).*

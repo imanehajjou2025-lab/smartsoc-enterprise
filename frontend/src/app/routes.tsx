@@ -4,6 +4,7 @@ import AlertsPage from '../features/alerts/AlertsPage';
 import IncidentsPage from '../features/incidents/IncidentsPage';
 import AssetsPage from '../features/assets/AssetsPage';
 import IntelligencePage from '../features/intelligence/IntelligencePage';
+import MitrePage from '../features/mitre/MitrePage';
 import InvestigationsPage from '../features/investigations/InvestigationsPage';
 import DashboardPage from '../features/dashboard/DashboardPage';
 import LoginPage from '../features/auth/LoginPage';
@@ -34,16 +35,7 @@ export const router = createBrowserRouter([
           { path: 'investigations', element: <InvestigationsPage /> },
           { path: 'assets', element: <AssetsPage /> },
           { path: 'intelligence', element: <IntelligencePage /> },
-          {
-            path: 'mitre',
-            element: (
-              <PageStub
-                title="MITRE ATT&CK"
-                description="Matrice des tactiques et techniques, couverture de détection."
-                milestone="jalon CTI"
-              />
-            ),
-          },
+          { path: 'mitre', element: <MitrePage /> },
           {
             path: 'hunting',
             element: (

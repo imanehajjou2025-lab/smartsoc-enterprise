@@ -18,6 +18,7 @@ import { severityColors } from '../../app/theme';
 import { getAssetByHostname } from '../assets/assetsApi';
 import { ExposureChip } from '../assets/assetChips';
 import { getAlertThreatIntel } from '../intelligence/intelligenceApi';
+import { getAlertMitre, type ResolvedTechnique } from '../mitre/mitreApi';
 import { escalateFromAlert } from '../incidents/incidentsApi';
 import {
   ALLOWED_TRANSITIONS,
@@ -100,6 +101,16 @@ function AlertDetailDrawer({ alert, onClose, onUpdated }: Props) {
   const { data: threatIntel } = useQuery({
     queryKey: ['alert-threat-intel', alert?.id],
     queryFn: () => getAlertThreatIntel(alert!.id),
+    enabled: Boolean(alert?.id),
+    staleTime: 60_000,
+  });
+
+  // Enrichissement MITRE, calculé à la lecture. Les techniques connues du
+  // catalogue sont résolues (nom, tactiques) et deviennent cliquables vers
+  // la matrice ; les inconnues restent affichées telles quelles.
+  const { data: mitreTechniques } = useQuery({
+    queryKey: ['alert-mitre', alert?.id],
+    queryFn: () => getAlertMitre(alert!.id),
     enabled: Boolean(alert?.id),
     staleTime: 60_000,
   });
@@ -232,18 +243,44 @@ function AlertDetailDrawer({ alert, onClose, onUpdated }: Props) {
           {alert.mitreTechniques.length > 0 && (
             <Field label="Techniques MITRE ATT&CK">
               <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
-                {alert.mitreTechniques.map((technique) => (
-                  <Chip
-                    key={technique}
-                    label={technique}
-                    size="small"
-                    component="a"
-                    clickable
-                    href={`https://attack.mitre.org/techniques/${technique.replace('.', '/')}/`}
-                    target="_blank"
-                    rel="noreferrer"
-                  />
-                ))}
+                {(
+                  mitreTechniques ??
+                  alert.mitreTechniques.map((raw): ResolvedTechnique => ({
+                    rawId: raw,
+                    known: false,
+                    technique: null,
+                  }))
+                ).map((resolved) =>
+                  resolved.known && resolved.technique ? (
+                    <Chip
+                      key={resolved.rawId}
+                      label={`${resolved.technique.attackId} · ${resolved.technique.name}`}
+                      size="small"
+                      color="primary"
+                      variant="outlined"
+                      clickable
+                      onClick={() =>
+                        navigate(
+                          `/mitre?selected=${encodeURIComponent(resolved.technique!.attackId)}`,
+                        )
+                      }
+                      title={resolved.technique.tactics.join(', ')}
+                    />
+                  ) : (
+                    <Chip
+                      key={resolved.rawId}
+                      label={resolved.rawId}
+                      size="small"
+                      variant="outlined"
+                      component="a"
+                      clickable
+                      href={`https://attack.mitre.org/techniques/${resolved.rawId.replace('.', '/')}/`}
+                      target="_blank"
+                      rel="noreferrer"
+                      title="Non cataloguée localement"
+                    />
+                  ),
+                )}
               </Stack>
             </Field>
           )}
