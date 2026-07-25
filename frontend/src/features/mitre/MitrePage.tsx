@@ -13,6 +13,7 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { problemDetail } from '../../shared/api/client';
 import { coverageColor } from './mitreChips';
 import { getCoverage, listTactics, listTechniques, type MitreTechnique } from './mitreApi';
+import TechniqueDetailDrawer from './TechniqueDetailDrawer';
 
 const MATRIX_PAGE_SIZE = 200;
 
@@ -45,7 +46,11 @@ async function fetchAllTechniques(
 function MitrePage() {
   const [search, setSearch] = useState('');
   const [includeDeprecated, setIncludeDeprecated] = useState(false);
-  const [, setSearchParams] = useSearchParams();
+  // Lien profond /mitre?selected={attackId} : le tiroir s'ouvre dès le
+  // premier rendu (clic sur une case, ou URL partagée depuis une alerte).
+  const [searchParams, setSearchParams] = useSearchParams();
+  const selected = searchParams.get('selected');
+  const closeDrawer = () => setSearchParams({}, { replace: true });
 
   const { data, isPending, isError, error } = useQuery({
     queryKey: ['mitre-matrix', { search, includeDeprecated }],
@@ -197,6 +202,8 @@ function MitrePage() {
           </Box>
         </Box>
       )}
+
+      <TechniqueDetailDrawer attackId={selected} onClose={closeDrawer} />
     </Box>
   );
 }
