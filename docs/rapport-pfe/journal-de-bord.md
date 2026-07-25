@@ -1831,7 +1831,7 @@ froid, vérifiée à 4 reprises** au fil du parcours.
 
 ---
 
-## 2026-07-25 — Dette technique CodeQL — accesseurs défensifs (PR séparée)
+## 2026-07-25 — Dette technique CodeQL — accesseurs défensifs (PR #64)
 
 **Contexte.** Avant d'attaquer SOAR, vérification de la dette CodeQL
 ouverte plutôt que de l'accepter sur parole : l'API `code-scanning/alerts`
