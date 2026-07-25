@@ -5,6 +5,7 @@ import com.smartsoc.domain.alerts.AlertQuery;
 import com.smartsoc.domain.alerts.AlertRepository;
 import com.smartsoc.domain.alerts.AlertStatistics;
 import com.smartsoc.domain.alerts.AlertStatus;
+import com.smartsoc.domain.alerts.MitreCoverageCount;
 import com.smartsoc.domain.alerts.Severity;
 import com.smartsoc.domain.common.PageQuery;
 import com.smartsoc.domain.common.PageResult;
@@ -106,6 +107,31 @@ public class AlertRepositoryAdapter implements AlertRepository {
                 page.size());
     }
 
+    /**
+     * Retro-hunt MITRE : aucun état pré-calculé n'est consulté, la
+     * correspondance est établie à la lecture — une alerte remonte pour une
+     * technique consultée après son ingestion, sans rattrapage.
+     */
+    @Override
+    public PageResult<Alert> findByMitreTechnique(String normalizedAttackId, PageQuery page) {
+        // Le tri (detected_at desc) vit dans la requête native : le Pageable
+        // ne porte que la pagination.
+        Page<AlertJpaEntity> result = springDataRepository.findByMitreTechnique(
+                jsonArrayOf(normalizedAttackId), PageRequest.of(page.page(), page.size()));
+        return new PageResult<>(
+                result.getContent().stream().map(mapper::toDomain).toList(),
+                result.getTotalElements(),
+                page.page(),
+                page.size());
+    }
+
+    @Override
+    public List<MitreCoverageCount> mitreCoverage() {
+        return springDataRepository.mitreCoverageCounts().stream()
+                .map(row -> new MitreCoverageCount((String) row[0], (Long) row[1]))
+                .toList();
+    }
+
     @Override
     public AlertStatistics statistics(int timelineDays) {
         LocalDate today = LocalDate.now(ZoneOffset.UTC);
@@ -138,5 +164,11 @@ public class AlertRepositoryAdapter implements AlertRepository {
             counts.put(keyMapper.apply(row[0]), (Long) row[1]);
         }
         return counts;
+    }
+
+    /** L'attackId devient un tableau JSONB d'un élément, forme attendue par {@code @>}. */
+    private static String jsonArrayOf(String value) {
+        String escaped = value.replace("\\", "\\\\").replace("\"", "\\\"");
+        return "[\"" + escaped + "\"]";
     }
 }

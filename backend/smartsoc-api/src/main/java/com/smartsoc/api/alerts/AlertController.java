@@ -5,6 +5,9 @@ import com.smartsoc.api.alerts.dto.AlertDtos.UpdateAlertStatusRequest;
 import com.smartsoc.api.common.dto.PageResponse;
 import com.smartsoc.api.intelligence.ThreatIntelApiMapper;
 import com.smartsoc.api.intelligence.dto.ThreatIntelDtos.ThreatIntelResponse;
+import com.smartsoc.api.mitre.MitreApiMapper;
+import com.smartsoc.api.mitre.dto.MitreDtos.ResolvedTechniqueResponse;
+import com.smartsoc.application.mitre.MitreCorrelationService;
 import com.smartsoc.application.ai.AlertClassificationService;
 import com.smartsoc.application.alerts.AlertStatsService;
 import com.smartsoc.application.alerts.AlertTriageService;
@@ -26,6 +29,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -43,6 +47,8 @@ public class AlertController {
     private final AlertEnrichmentService enrichmentService;
     private final AlertApiMapper mapper;
     private final ThreatIntelApiMapper threatIntelMapper;
+    private final MitreCorrelationService mitreCorrelationService;
+    private final MitreApiMapper mitreMapper;
 
     /** Statistiques agrégées du dashboard (timeline 7 jours). */
     @GetMapping("/stats")
@@ -81,6 +87,18 @@ public class AlertController {
     @GetMapping("/{id}/threat-intel")
     public ThreatIntelResponse threatIntel(@PathVariable UUID id) {
         return threatIntelMapper.toResponse(enrichmentService.enrich(id));
+    }
+
+    /**
+     * Enrichissement MITRE de l'alerte : ses techniques ATT&CK résolues
+     * contre le catalogue (nom, tactiques, dépréciation). Les identifiants
+     * inconnus — hors format ou absents du catalogue — restent VISIBLES,
+     * jamais masqués. Strictement en lecture ; corrélation calculée à la
+     * demande (ADR-010).
+     */
+    @GetMapping("/{id}/mitre")
+    public List<ResolvedTechniqueResponse> mitre(@PathVariable UUID id) {
+        return mitreMapper.toEnrichment(mitreCorrelationService.enrichAlert(id));
     }
 
     @PatchMapping("/{id}/status")
