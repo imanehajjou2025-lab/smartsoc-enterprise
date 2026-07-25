@@ -1853,18 +1853,38 @@ collections étaient déjà immuables en pratique.
 **Vérification.** 276 tests verts (suite complète, zéro régression), dont
 les tests d'immutabilité déjà existants pour les deux classes.
 
-**Suite (PR séparée, même jour) : le rescan post-merge ferme une alerte
-sur deux.** `MitreTechnique.getTactics()` (#26) fermée. `HuntGroup
-.children()` (#27) **reste ouverte** malgré le même correctif — CodeQL
-continue de désigner le constructeur compact comme site d'exposition même
-avec l'accesseur canonique explicitement surchargé, signe d'une limite de
-son modèle des records Java (le remède marche pour une classe Lombok
-classique, pas pour ce type précis). Faux positif audité : suppression
-`// codeql[java/internal-representation-exposure]` sur la ligne exacte
-signalée, avec justification versionnée dans le code — même doctrine que
-le faux positif CSRF Sonar (S4502) documenté au jalon Identity. Preuve à
-l'exécution que l'immuabilité tient réellement :
+**Suite (2 PR séparées, même jour) : le rescan post-merge ferme une alerte
+sur deux, et la première tentative de suppression échoue silencieusement.**
+`MitreTechnique.getTactics()` (#26) fermée. `HuntGroup.children()` (#27)
+**reste ouverte** malgré le même correctif — CodeQL continue de désigner
+le constructeur compact comme site d'exposition même avec l'accesseur
+canonique explicitement surchargé, signe d'une limite de son modèle des
+records Java (le remède marche pour une classe Lombok classique, pas pour
+ce type précis).
+
+**Première tentative (PR #65) : commentaire en ligne `// codeql[...]`,
+sans effet réel.** Rejoué au rescan suivant : l'ancienne alerte se ferme
+bien (le code a changé), mais une **nouvelle** alerte (#28) réapparaît à
+la ligne déplacée — la suppression en ligne n'a supprimé rien du tout,
+elle a juste laissé passer un commentaire décoratif inefficace. Cause
+exacte non confirmée (peut-être liée à `build-mode: none` du workflow
+CodeQL de ce dépôt) — annoncé en clair plutôt que supposé.
+
+**Correctif retenu : suppression via l'API `code-scanning` avec
+justification tracée** (`state=dismissed`, `dismissed_reason=false
+positive`, commentaire audité), le mécanisme réellement supporté et
+vérifié effectif ici — même doctrine que le faux positif CSRF Sonar
+(S4502) documenté au jalon Identity, sur un canal différent. Le
+commentaire en ligne non fonctionnel a été retiré du code (un commentaire
+qui prétend agir sans agir est pire qu'absent) et remplacé par un Javadoc
+qui documente honnêtement les deux tentatives. Preuve à l'exécution que
+l'immuabilité tient réellement, indépendamment de l'outil :
 `HuntGroupTest.childrenAreDefensivelyCopied`.
+
+**Leçon.** Une correction appliquée n'est prouvée que par le rescan
+observé, jamais par la plausibilité de la syntaxe — la première
+suppression avait l'air correcte (bonne ligne, bonne règle) et ne
+marchait pas.
 
 ---
 
