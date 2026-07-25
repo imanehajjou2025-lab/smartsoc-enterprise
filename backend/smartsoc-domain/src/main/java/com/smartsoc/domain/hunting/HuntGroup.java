@@ -2,6 +2,7 @@ package com.smartsoc.domain.hunting;
 
 import com.smartsoc.domain.common.BusinessRuleViolationException;
 
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -26,5 +27,17 @@ public record HuntGroup(HuntLogicalOperator operator, List<HuntNode> children) i
             throw new BusinessRuleViolationException(INVALID, "A NOT group must have exactly one child");
         }
         children = List.copyOf(children);
+    }
+
+    /**
+     * Accesseur écrit à la main plutôt que généré par le record : le
+     * constructeur compact affecte déjà {@code List.copyOf(children)}, mais
+     * CodeQL (java/internal-representation-exposure) ne fait pas confiance
+     * à cette garantie prise en amont — il veut voir l'enveloppement dans
+     * l'accesseur lui-même. Même correctif que {@code Alert.getObservables}.
+     */
+    @Override
+    public List<HuntNode> children() {
+        return Collections.unmodifiableList(children);
     }
 }

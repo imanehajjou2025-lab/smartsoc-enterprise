@@ -62,6 +62,20 @@ public class MitreTechnique {
     private String attackVersion;
 
     /**
+     * Tactiques, en lecture seule.
+     *
+     * <p>Accesseur écrit à la main plutôt que généré par Lombok :
+     * {@code requireTactics()} construit déjà un ensemble non modifiable à
+     * chaque affectation ({@code fromCatalog}, {@code refreshFrom}), mais
+     * CodeQL (java/internal-representation-exposure) ne fait pas confiance
+     * à cette garantie prise en amont — il veut voir l'enveloppement dans
+     * l'accesseur lui-même. Même correctif que {@code Alert.getObservables}.
+     */
+    public Set<MitreTactic> getTactics() {
+        return Collections.unmodifiableSet(tactics);
+    }
+
+    /**
      * Entrée de catalogue — une technique telle qu'un bundle ATT&CK (ou un
      * import manuel, le même acte pour le domaine) la décrit. Porte
      * l'identité ET les métadonnées ; seule la première est figée.
