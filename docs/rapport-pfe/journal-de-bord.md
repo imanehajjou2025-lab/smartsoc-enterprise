@@ -1788,5 +1788,48 @@ les frontières de couches. Zéro régression sur les 236 tests préexistants.
 
 ---
 
-*Prochaines entrées : Threat Hunting frontend, puis SOAR, rapports, et
-enfin l'assistant IA (backend + frontend).*
+## 2026-07-25 — Jalon Threat Hunting — frontend complet (PR #63)
+
+**Contexte.** Deuxième et dernière PR du module (nouveau rythme à 2 PR),
+démarrée seulement après merge + CI verte du backend (PR #62). Miroir des
+modules existants : axios partagé + TanStack Query, jamais RTK Query.
+
+**Réalisé.** `huntingApi.ts` (client typé, arbre `HuntNode` récursif
+identique au backend). `HuntingPage.tsx` : constructeur de requête piloté
+par `GET /hunts/fields` (le sélecteur d'opérateur se recalcule selon le
+champ choisi, la valeur devient un select ou un texte libre selon le type
+— sévérité/statut en liste fermée, date en `datetime-local` converti en
+instant UTC, le reste en texte), liste des chasses sauvegardées (recherche,
+exécution directe, suppression avec confirmation), table de résultats
+**réutilisant intégralement** `SeverityChip`/`StatusChip`/
+`AlertDetailDrawer` — zéro composant dupliqué, l'enrichissement MITRE et le
+score IA du tiroir d'alerte s'appliquent donc aussi aux résultats de
+chasse sans code supplémentaire. `SaveHuntDialog.tsx` (miroir de
+`DeclareIocDialog`, pas de test dédié — convention déjà établie pour les
+dialogues de création simples). Remplace le `PageStub` de `/hunting`.
+
+**Choix UX assumé.** Deux façons distinctes d'exécuter, sans état caché à
+deviner : le bouton « Exécuter » du constructeur appelle toujours
+l'exécution AD HOC sur les critères affichés à l'écran ; le bouton ▶ de la
+liste des chasses sauvegardées appelle l'endpoint dédié (marque
+`lastExecutedAt`). Charger une chasse dans le constructeur (✎ implicite au
+clic) ne l'exécute pas automatiquement — évite l'ambiguïté « est-ce que ce
+que je vois à l'écran correspond à ce qui vient de s'exécuter ? ».
+
+**Vérification.** 27 tests frontend verts (3 nouveaux sur `HuntingPage` —
+rendu, exécution ad hoc avec résultats, ajout de condition), build et lint
+(Prettier + Oxlint, **zéro avertissement** cette fois) propres. **Vérif E2E
+réelle contre la stack Docker reconstruite** (backend PR #62 embarqué, V11
+appliquée) : 3 alertes de démonstration ingérées via webhook, cycle complet
+exercé dans le vrai navigateur — requête à 2 conditions (sévérité CRITICAL
++ hôte srv-hunt-01) donnant **exactement 1 correspondance sur 3 alertes
+semées** (preuve de filtrage combiné réel, pas supposée), sauvegarde,
+exécution sauvegardée avec `lastExecutedAt` visible après invalidation du
+cache, ouverture du tiroir d'alerte réutilisé (enrichissement MITRE T1003
+et score IA visibles), suppression avec confirmation. **Console propre à
+froid, vérifiée à 4 reprises** au fil du parcours.
+
+---
+
+*Prochaines entrées : SOAR, rapports, et enfin l'assistant IA
+(backend + frontend).*
