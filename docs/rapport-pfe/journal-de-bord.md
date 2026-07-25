@@ -1853,6 +1853,19 @@ collections étaient déjà immuables en pratique.
 **Vérification.** 276 tests verts (suite complète, zéro régression), dont
 les tests d'immutabilité déjà existants pour les deux classes.
 
+**Suite (PR séparée, même jour) : le rescan post-merge ferme une alerte
+sur deux.** `MitreTechnique.getTactics()` (#26) fermée. `HuntGroup
+.children()` (#27) **reste ouverte** malgré le même correctif — CodeQL
+continue de désigner le constructeur compact comme site d'exposition même
+avec l'accesseur canonique explicitement surchargé, signe d'une limite de
+son modèle des records Java (le remède marche pour une classe Lombok
+classique, pas pour ce type précis). Faux positif audité : suppression
+`// codeql[java/internal-representation-exposure]` sur la ligne exacte
+signalée, avec justification versionnée dans le code — même doctrine que
+le faux positif CSRF Sonar (S4502) documenté au jalon Identity. Preuve à
+l'exécution que l'immuabilité tient réellement :
+`HuntGroupTest.childrenAreDefensivelyCopied`.
+
 ---
 
 *Prochaines entrées : SOAR, rapports, et enfin l'assistant IA
