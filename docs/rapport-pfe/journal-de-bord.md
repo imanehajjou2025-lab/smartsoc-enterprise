@@ -1788,7 +1788,7 @@ les frontières de couches. Zéro régression sur les 236 tests préexistants.
 
 ---
 
-## 2026-07-25 — Jalon Threat Hunting — frontend complet
+## 2026-07-25 — Jalon Threat Hunting — frontend complet (PR #63)
 
 **Contexte.** Deuxième et dernière PR du module (nouveau rythme à 2 PR),
 démarrée seulement après merge + CI verte du backend (PR #62). Miroir des
