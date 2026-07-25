@@ -1888,7 +1888,7 @@ marchait pas.
 
 ---
 
-## 2026-07-26 — Jalon SOAR — backend complet (ADR-012)
+## 2026-07-26 — Jalon SOAR — backend complet (PR #67, ADR-012)
 
 **Contexte.** `soar` est déclaré dès ADR-002 comme *« Playbooks, workflow
 engine, exécutions, versioning »*. Comme pour Hunting (ADR-011), une
