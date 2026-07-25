@@ -1706,5 +1706,87 @@ cette contention.
 
 ---
 
-*Prochaines entrées : hunting, SOAR, rapports, et enfin l'assistant IA
-(backend + frontend).*
+## 2026-07-25 — Jalon Threat Hunting — backend complet (ADR-011)
+
+**Changement de méthode de travail (décision d'Imane).** À partir de ce
+jalon, un module = **2 PR maximum** (backend puis frontend), par grandes
+étapes vérifiées, plus le découpage en 6-7 petits lots relus un par un
+comme MITRE — jugé trop coûteux en temps et en tokens pour l'objectif de
+terminer la plateforme rapidement. Les validations explicites avant
+implémentation et avant merge restent dues ; c'est la granularité
+intermédiaire qui disparaît.
+
+**Contexte.** Chasse proactive : l'analyste formule une requête structurée
+plutôt que d'attendre une alerte. **ADR-004 (déjà acceptée) avait déjà
+tranché** le rôle de fond du module — les événements bruts massifs restent
+dans OpenSearch côté outils SOC, la plateforme interroge « à la demande via
+les connecteurs » (bounded context `connectors`, jamais construit). Second
+fait antérieur : `alerts.raw_payload` avait été choisi en JSONB dès le
+jalon Alertes A1 **explicitement pour être requêtable en threat hunting**
+— ce jalon lui donne enfin son usage.
+
+**Décision de portée validée avant tout code** : adaptateur `simulation`
+(PostgreSQL, sur les alertes déjà ingérées) seul livré ; le mode `live`
+(OpenSearch) est différé — deviner le schéma d'index Wazuh réel sans
+l'infra réelle aurait produit un mapping fictif à refaire.
+
+**Quatre exigences d'évolutivité posées par Imane avant le code, toutes
+encodées dans le domaine :**
+1. **Arbre de critères extensible sans rupture d'API.** `HuntNode` (scellé)
+   = `HuntCondition` | `HuntGroup` (`AND`/`OR`/`NOT`, récursif) — la forme
+   complète existe dès la V1 ; seul `HuntQuery` restreint la RACINE à un
+   `AND` de conditions plates (`HUNT_LOGICAL_OPERATOR_UNSUPPORTED`,
+   `HUNT_NESTED_GROUPS_UNSUPPORTED`). Débloquer l'imbrication plus tard
+   change une validation, jamais le schéma JSONB ni le contrat API.
+2. **Résultats réutilisables par un futur SOAR.** `HuntExecutionResult` =
+   `HuntExecutionSummary` (métadonnées seules, consommable sans charger les
+   résultats) + `HuntStatistics` (miroir de `AlertStatistics`, scopé à la
+   chasse) + `PageResult<Alert>` (réutilisation totale, zéro DTO dupliqué).
+3. **Stats d'exécution.** `tookMillis`/`matchedCount`/`truncated` dans le
+   résumé. `truncated=false` toujours en simulation (comptage exact) — le
+   champ existe parce qu'OpenSearch, lui, tronque réellement au-delà d'un
+   seuil : la sémantique deviendra vraie sans changement de contrat.
+4. **Visibilité `PRIVATE`/`TEAM`.** Stockée dès maintenant, **non appliquée**
+   — documenté explicitement (Javadoc + commentaire de colonne) pour ne
+   jamais laisser croire qu'une chasse « privée » l'est réellement.
+
+**Réalisé (backend complet, une seule PR, grandes étapes).** Domaine
+(`HuntField` — chaque champ déclare ses opérateurs compatibles et sa
+normalisation, `MITRE_TECHNIQUE` réutilisant directement
+`MitreTechniqueId.normalize()` du module MITRE — `HuntCondition`,
+`HuntGroup`, `HuntQuery`, ports) → persistance (**V11** `hunt_queries`,
+critères sérialisés en JSON via un **codec récursif écrit à la main**
+plutôt que des annotations Jackson sur le domaine — celui-ci doit rester
+framework-free, ADR-002 — MapStruct sélectionnant le codec via `uses`) →
+application (`HuntQueryService` CRUD, `HuntExecutionService` orchestrant
+l'exécution + le repère `lastExecutedAt`) → API (`HuntController`,
+8 endpoints, RBAC lecture/exécution pour tout authentifié, écriture
+ANALYST+) → ADR-011.
+
+**Difficulté rencontrée et corrigée.** Le filtre `RAW_PAYLOAD_TEXT`
+(`ILIKE` sur `raw_payload`) échouait avec
+`FunctionArgumentException: lower() ... type STRING ... mapped to '3001'`
+— Hibernate 6 refuse de passer un attribut mappé `SqlTypes.JSON`
+directement à une fonction texte, même si PostgreSQL accepterait très bien
+`raw_payload::text` en SQL brut. **Solution :** un second motif enregistré
+dans `JsonbFunctionContributor` (déjà utilisé pour le containment `@>`
+MITRE/CTI) — `jsonb_as_text` → `cast(?1 as text)` — appliqué avant
+`lower()`. Même mécanisme, même fichier, aucune duplication.
+
+**Vérification.** 21 tests domaine (dont le rejet nommé de chaque
+restriction V1), 3 tests du codec JSON (aller-retour, y compris un arbre
+imbriqué hors-scope V1 que le codec transporte quand même fidèlement),
+10 tests application, **6 tests E2E sur PostgreSQL réel** — dont une
+**preuve de filtrage combiné réel** (sévérité + hostname + technique MITRE
++ texte du payload brut sur 3 alertes semées, une seule correspond), le
+cycle de vie complet (créer/lire/modifier/exécuter/supprimer), les 3 rejets
+V1 nommés (422), RBAC (VIEWER lit et exécute, ne peut ni créer ni
+supprimer), et le catalogue `/hunts/fields`. **Suite complète : 276 tests
+verts** (103 domaine + 51 application + 13 infrastructure + 109 api),
+`CleanArchitectureTest` vert — les nouveaux packages `hunting` respectent
+les frontières de couches. Zéro régression sur les 236 tests préexistants.
+
+---
+
+*Prochaines entrées : Threat Hunting frontend, puis SOAR, rapports, et
+enfin l'assistant IA (backend + frontend).*
