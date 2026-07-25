@@ -16,7 +16,24 @@ public record HuntGroup(HuntLogicalOperator operator, List<HuntNode> children) i
 
     private static final String INVALID = "INVALID_HUNT_GROUP";
 
-    public HuntGroup {
+    /**
+     * Faux positif audité (CodeQL java/internal-representation-exposure).
+     *
+     * <p>La règle documente elle-même deux remèdes valides : la copie
+     * défensive ({@code List.copyOf}, appliquée ici) et la vue en lecture
+     * seule ({@code Collections.unmodifiableList}, appliquée dans
+     * l'accesseur {@link #children()} ci-dessous). Les DEUX sont en place.
+     * La même paire de remèdes a fermé l'alerte jumelle sur
+     * {@code MitreTechnique.getTactics()} (classe Lombok classique) le même
+     * jour — seule la nature <b>record</b> de ce type change ici : CodeQL
+     * continue de désigner le constructeur compact comme site d'exposition
+     * même quand l'accesseur canonique est explicitement surchargé, signe
+     * d'une limite de son modèle des records Java plutôt que d'un défaut
+     * réel. Preuve à l'exécution : {@code HuntGroupTest
+     * .childrenAreDefensivelyCopied} vérifie que {@code children().add(...)}
+     * lève {@code UnsupportedOperationException}.
+     */
+    public HuntGroup { // codeql[java/internal-representation-exposure]
         if (operator == null) {
             throw new BusinessRuleViolationException(INVALID, "A hunt group requires a logical operator");
         }
