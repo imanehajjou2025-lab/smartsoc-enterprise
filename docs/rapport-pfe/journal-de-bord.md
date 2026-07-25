@@ -1706,7 +1706,7 @@ cette contention.
 
 ---
 
-## 2026-07-25 — Jalon Threat Hunting — backend complet (ADR-011)
+## 2026-07-25 — Jalon Threat Hunting — backend complet (PR #62, ADR-011)
 
 **Changement de méthode de travail (décision d'Imane).** À partir de ce
 jalon, un module = **2 PR maximum** (backend puis frontend), par grandes
