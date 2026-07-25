@@ -1590,7 +1590,7 @@ du numéro de PR des jalons **CTI C2 (→ #55)** et **CTI C3 (→ #56)**, resté
 
 ---
 
-## 2026-07-25 — Jalon MITRE M2 — corrélation alerte ↔ ATT&CK, backend
+## 2026-07-25 — Jalon MITRE M2 — corrélation alerte ↔ ATT&CK, backend (PR #60)
 
 **Contexte.** M1 a construit le référentiel ; M2 lui donne sa valeur en le
 reliant aux alertes **dans les deux sens**, en lisant le JSONB
