@@ -2,6 +2,7 @@ package com.smartsoc.infrastructure.persistence.common;
 
 import org.hibernate.boot.model.FunctionContributions;
 import org.hibernate.boot.model.FunctionContributor;
+import org.hibernate.type.BasicType;
 import org.hibernate.type.StandardBasicTypes;
 
 /**
@@ -36,13 +37,30 @@ public class JsonbFunctionContributor implements FunctionContributor {
     /** Nom exposé aux Specifications — voir IndicatorRepositoryAdapter. */
     public static final String JSONB_ARRAY_CONTAINS = "jsonb_array_contains";
 
+    /**
+     * Cast explicite d'une colonne mappée {@code SqlTypes.JSON} (ex.
+     * {@code alerts.raw_payload}) vers du texte.
+     *
+     * <p>Hibernate 6 refuse de passer directement un attribut de type JSON
+     * à une fonction texte comme {@code lower()} : la vérification des
+     * types d'argument échoue ({@code FunctionArgumentException}), même si
+     * PostgreSQL accepterait très bien {@code raw_payload::text} au niveau
+     * SQL. Un cast enregistré par MOTIF (même mécanisme que le
+     * containment ci-dessous) contourne cette vérification côté Hibernate
+     * sans rien changer au SQL émis.
+     */
+    public static final String JSONB_AS_TEXT = "jsonb_as_text";
+
     @Override
     public void contributeFunctions(FunctionContributions functionContributions) {
+        BasicType<Boolean> booleanType = functionContributions.getTypeConfiguration()
+                .getBasicTypeRegistry().resolve(StandardBasicTypes.BOOLEAN);
+        BasicType<String> stringType = functionContributions.getTypeConfiguration()
+                .getBasicTypeRegistry().resolve(StandardBasicTypes.STRING);
+
         functionContributions.getFunctionRegistry().registerPattern(
-                JSONB_ARRAY_CONTAINS,
-                "(?1 @> cast(?2 as jsonb))",
-                functionContributions.getTypeConfiguration()
-                        .getBasicTypeRegistry()
-                        .resolve(StandardBasicTypes.BOOLEAN));
+                JSONB_ARRAY_CONTAINS, "(?1 @> cast(?2 as jsonb))", booleanType);
+        functionContributions.getFunctionRegistry().registerPattern(
+                JSONB_AS_TEXT, "cast(?1 as text)", stringType);
     }
 }
