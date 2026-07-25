@@ -1590,6 +1590,62 @@ du numéro de PR des jalons **CTI C2 (→ #55)** et **CTI C3 (→ #56)**, resté
 
 ---
 
-*Prochaines entrées : la corrélation MITRE (enrichissement d'alerte,
-retro-hunt par technique, heatmap de couverture) puis son frontend, ensuite
-hunting, SOAR, rapports, et enfin l'assistant IA (backend + frontend).*
+## 2026-07-25 — Jalon MITRE M2 — corrélation alerte ↔ ATT&CK, backend
+
+**Contexte.** M1 a construit le référentiel ; M2 lui donne sa valeur en le
+reliant aux alertes **dans les deux sens**, en lisant le JSONB
+`alerts.mitre_techniques` déjà présent — **sans retoucher le domaine des
+alertes** (ADR-010 §6). Trois capacités : enrichissement alerte→technique,
+retro-hunt technique→alertes, et heatmap de couverture.
+
+**Décision de conception validée en équipe : hypothèse d'identifiant
+canonique.** Les alertes stockent leurs techniques en chaînes BRUTES
+(`Alert.ingest` fait un `List.copyOf`, jamais de normalisation) ; le
+catalogue, lui, stocke des `attackId` canoniques majuscules. Trois options
+ont été pesées (comparaison `@>` exacte indexée GIN ; normalisation à
+l'ingestion + réécriture des lignes ; index GIN fonctionnel normalisé).
+Retenue : **`@>` exact + index GIN**, en assumant que les outils SOC
+(Wazuh, Suricata, exports ATT&CK) émettent des identifiants canoniques
+`T####` — un rapprochement **explicite plutôt que flou**, exactement la
+doctrine de la limitation FQDN des actifs. Zéro changement au domaine des
+alertes, ADR-010 §6 tenu. L'enrichissement, lui, normalise côté Java :
+il reste robuste à la casse même sur une alerte non canonique.
+
+**Réalisé (4 lots reviewables, backend).**
+- **V10** : index **GIN** sur `alerts.mitre_techniques` — l'UNIQUE point de
+  contact du contexte `mitre` avec la table `alerts`.
+- **Retro** `AlertRepository.findByMitreTechnique` : requête native
+  `mitre_techniques @> cast(:t as jsonb)` + `countQuery` identique (le total
+  de la page EST le compteur), jumelle de `findByObservable` de CTI-2.
+- **Couverture** `AlertRepository.mitreCoverage` : agrégation
+  `jsonb_array_elements_text` groupée par technique — même esprit que les
+  statistiques du dashboard, lecture pure du JSONB.
+- **`MitreCorrelationService`** : enrichissement (résout les IDs bruts
+  contre le catalogue, **les inconnus — hors format ou absents — restent
+  VISIBLES**, jamais masqués, comme un observable sans correspondance),
+  retro (normalise avant la requête), couverture. Corrélation **calculée à
+  la lecture** : une technique cataloguée après coup enrichit les alertes
+  existantes, une alerte d'hier remonte pour une technique consultée
+  aujourd'hui — aucun rattrapage.
+- **API** : `GET /api/v1/alerts/{id}/mitre` (enrichissement, à côté de
+  `/threat-intel`), `GET /api/v1/mitre/techniques/{attackId}/alerts`
+  (retro), `GET /api/v1/mitre/coverage` (heatmap) — lecture pour tout
+  authentifié.
+
+**Preuve mesurée (exigence de revue).** Un test force
+`enable_seqscan = off` puis lit le plan `EXPLAIN` de
+`mitre_techniques @> '["T1059"]'::jsonb` : il montre un **Bitmap Index Scan
+sur `ix_alerts_mitre_techniques`**, et non un Seq Scan désactivé — le GIN
+sert bien le containment (même méthode que la mesure de l'index de tags CTI).
+
+**Vérification.** 10 tests MITRE-2 (retro + total + preuve EXPLAIN,
+couverture, service, E2E enrichissement/retro/couverture avec lecture
+VIEWER) ; **suite complète verte** (module api 103, ArchUnit et Flyway V10
+inclus). Pas de nouvel ADR : la corrélation est l'implémentation d'ADR-010
+§6, déjà décidée.
+
+---
+
+*Prochaines entrées : le frontend MITRE (matrice/heatmap + puces d'alerte
+catalogue-conscientes), ensuite hunting, SOAR, rapports, et enfin
+l'assistant IA (backend + frontend).*
