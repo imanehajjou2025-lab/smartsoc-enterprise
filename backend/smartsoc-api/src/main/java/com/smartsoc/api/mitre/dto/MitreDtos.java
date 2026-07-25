@@ -84,4 +84,20 @@ public final class MitreDtos {
             String code,
             String message) {
     }
+
+    /**
+     * Une technique d'une alerte, résolue contre le catalogue.
+     * {@code technique} est {@code null} quand l'identifiant est inconnu
+     * (hors format ou absent) — mais {@code rawId} le garde toujours
+     * VISIBLE, jamais masqué.
+     */
+    public record ResolvedTechniqueResponse(
+            String rawId,
+            boolean known,
+            MitreTechniqueResponse technique) {
+    }
+
+    /** Une case de la heatmap : nombre d'alertes citant cette technique. */
+    public record MitreCoverageResponse(String attackId, long alertCount) {
+    }
 }

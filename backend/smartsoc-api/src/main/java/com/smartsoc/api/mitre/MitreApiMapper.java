@@ -1,12 +1,16 @@
 package com.smartsoc.api.mitre;
 
+import com.smartsoc.api.mitre.dto.MitreDtos.MitreCoverageResponse;
 import com.smartsoc.api.mitre.dto.MitreDtos.MitreImportError;
 import com.smartsoc.api.mitre.dto.MitreDtos.MitreImportRequest;
 import com.smartsoc.api.mitre.dto.MitreDtos.MitreImportReportResponse;
 import com.smartsoc.api.mitre.dto.MitreDtos.MitreImportTechnique;
 import com.smartsoc.api.mitre.dto.MitreDtos.MitreTacticResponse;
 import com.smartsoc.api.mitre.dto.MitreDtos.MitreTechniqueResponse;
+import com.smartsoc.api.mitre.dto.MitreDtos.ResolvedTechniqueResponse;
 import com.smartsoc.application.mitre.MitreCatalogImportService.ImportReport;
+import com.smartsoc.application.mitre.MitreCorrelationService.ResolvedTechnique;
+import com.smartsoc.domain.alerts.MitreCoverageCount;
 import com.smartsoc.domain.mitre.MitreTactic;
 import com.smartsoc.domain.mitre.MitreTechnique;
 import org.springframework.stereotype.Component;
@@ -19,9 +23,10 @@ import java.util.Set;
 
 /**
  * Traductions REST du catalogue ATT&CK. Manuel plutôt que MapStruct : la
- * frontière porte deux conversions qui dépendent du domaine — la tactique
- * s'expose par son {@code shortName} ATT&CK (jamais le nom d'enum Java), et
- * l'import résout les shortNames en tactiques de façon tolérante.
+ * frontière porte des conversions qui dépendent du domaine — la tactique
+ * s'expose par son {@code shortName} ATT&CK (jamais le nom d'enum Java),
+ * l'import résout les shortNames de façon tolérante, et une technique
+ * inconnue d'une alerte reste visible.
  */
 @Component
 public class MitreApiMapper {
@@ -49,6 +54,20 @@ public class MitreApiMapper {
                 tactics,
                 technique.isDeprecated(),
                 technique.getAttackVersion());
+    }
+
+    /** Enrichissement d'alerte : chaque identifiant résolu, les inconnus restant visibles. */
+    public List<ResolvedTechniqueResponse> toEnrichment(List<ResolvedTechnique> resolved) {
+        return resolved.stream()
+                .map(r -> new ResolvedTechniqueResponse(
+                        r.rawId(), r.known(), r.known() ? toResponse(r.catalogEntry()) : null))
+                .toList();
+    }
+
+    public List<MitreCoverageResponse> toCoverage(List<MitreCoverageCount> counts) {
+        return counts.stream()
+                .map(c -> new MitreCoverageResponse(c.attackId(), c.alertCount()))
+                .toList();
     }
 
     public List<MitreTechnique.CatalogEntry> toCatalogEntries(MitreImportRequest request) {

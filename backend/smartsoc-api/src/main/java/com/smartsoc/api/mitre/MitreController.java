@@ -1,12 +1,16 @@
 package com.smartsoc.api.mitre;
 
+import com.smartsoc.api.alerts.AlertApiMapper;
+import com.smartsoc.api.alerts.dto.AlertDtos.AlertResponse;
 import com.smartsoc.api.common.dto.PageResponse;
+import com.smartsoc.api.mitre.dto.MitreDtos.MitreCoverageResponse;
 import com.smartsoc.api.mitre.dto.MitreDtos.MitreImportReportResponse;
 import com.smartsoc.api.mitre.dto.MitreDtos.MitreImportRequest;
 import com.smartsoc.api.mitre.dto.MitreDtos.MitreTacticResponse;
 import com.smartsoc.api.mitre.dto.MitreDtos.MitreTechniqueResponse;
 import com.smartsoc.application.mitre.MitreCatalogImportService;
 import com.smartsoc.application.mitre.MitreCatalogService;
+import com.smartsoc.application.mitre.MitreCorrelationService;
 import com.smartsoc.domain.common.BusinessRuleViolationException;
 import com.smartsoc.domain.common.PageQuery;
 import com.smartsoc.domain.common.PageResult;
@@ -28,9 +32,9 @@ import java.util.List;
 
 /**
  * Référentiel MITRE ATT&CK. Consultation : tout utilisateur authentifié —
- * la matrice, ses techniques, le détail d'une technique. Import d'un bundle
- * pour rafraîchir le catalogue : réservé aux administrateurs (acte de
- * gestion du référentiel, rare, contrairement aux flux CTI continus).
+ * la matrice, ses techniques, le détail d'une technique, les alertes qui
+ * citent une technique (retro-hunt) et la heatmap de couverture. Import
+ * d'un bundle pour rafraîchir le catalogue : réservé aux administrateurs.
  *
  * <p>La tactique s'exprime partout par son {@code shortName} ATT&CK
  * ({@code execution}, {@code command-and-control}), jamais par le nom
@@ -43,7 +47,9 @@ public class MitreController {
 
     private final MitreCatalogService catalogService;
     private final MitreCatalogImportService importService;
+    private final MitreCorrelationService correlationService;
     private final MitreApiMapper mapper;
+    private final AlertApiMapper alertMapper;
 
     @GetMapping("/tactics")
     public List<MitreTacticResponse> tactics() {
@@ -66,6 +72,28 @@ public class MitreController {
     @GetMapping("/techniques/{attackId}")
     public MitreTechniqueResponse technique(@PathVariable String attackId) {
         return mapper.toResponse(catalogService.getTechnique(attackId));
+    }
+
+    /**
+     * Retro-hunt : les alertes citant cette technique. Disponible même sur
+     * une technique non cataloguée (l'identifiant est l'entrée de la
+     * requête). Corrélation calculée à la lecture (ADR-010).
+     */
+    @GetMapping("/techniques/{attackId}/alerts")
+    public PageResponse<AlertResponse> techniqueAlerts(
+            @PathVariable String attackId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "25") int size) {
+
+        return PageResponse.of(
+                correlationService.alertsForTechnique(attackId, PageQuery.of(page, size)),
+                alertMapper::toResponse);
+    }
+
+    /** Heatmap de couverture : nombre d'alertes par technique. */
+    @GetMapping("/coverage")
+    public List<MitreCoverageResponse> coverage() {
+        return mapper.toCoverage(correlationService.coverage());
     }
 
     /** Rafraîchissement du catalogue par un bundle ATT&CK — réservé aux administrateurs. */
