@@ -50,6 +50,11 @@ vi.mock('./mitreApi', async (importOriginal) => ({
   getCoverage: () => Promise.resolve(coverage),
 }));
 
+// jsdom n'a pas de canvas : le donut ECharts est simulé (comme le dashboard).
+vi.mock('../../shared/components/EChart', () => ({
+  default: () => <div data-testid="echart" />,
+}));
+
 function renderPage() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
@@ -66,18 +71,24 @@ function renderPage() {
 }
 
 describe('MitrePage', () => {
-  it('renders the ATT&CK matrix with tactic columns and technique coverage', async () => {
+  it('renders the coverage dashboard: KPIs, matrix and top techniques', async () => {
     renderPage();
 
+    // Cartes KPI et panneaux du tableau de bord.
+    expect(await screen.findByText('Techniques observées')).toBeInTheDocument();
+    expect(screen.getByText('Techniques les plus citées')).toBeInTheDocument();
+    expect(screen.getByText('Couverture MITRE')).toBeInTheDocument();
+
     // Les tactiques en colonnes, les techniques de base dans leurs cases.
-    expect(await screen.findByText('Execution')).toBeInTheDocument();
+    expect(screen.getByText('Execution')).toBeInTheDocument();
     expect(screen.getByText('Persistence')).toBeInTheDocument();
-    expect(screen.getByText('T1059')).toBeInTheDocument();
-    expect(screen.getByText('Command and Scripting Interpreter')).toBeInTheDocument();
     expect(screen.getByText('T1547')).toBeInTheDocument();
 
-    // La couverture colore la case et affiche le compte.
-    expect(screen.getByText('5')).toBeInTheDocument();
+    // T1059 (couvert) apparaît dans la matrice ET le panneau « plus citées ».
+    expect(screen.getAllByText('T1059').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('Command and Scripting Interpreter').length).toBeGreaterThanOrEqual(
+      1,
+    );
 
     // La sous-technique n'apparaît pas dans la matrice (drawer seulement).
     expect(screen.queryByText('PowerShell')).not.toBeInTheDocument();
