@@ -6,6 +6,7 @@ import AssetsPage from '../features/assets/AssetsPage';
 import IntelligencePage from '../features/intelligence/IntelligencePage';
 import MitrePage from '../features/mitre/MitrePage';
 import HuntingPage from '../features/hunting/HuntingPage';
+import SoarPage from '../features/soar/SoarPage';
 import InvestigationsPage from '../features/investigations/InvestigationsPage';
 import DashboardPage from '../features/dashboard/DashboardPage';
 import LoginPage from '../features/auth/LoginPage';
@@ -38,16 +39,7 @@ export const router = createBrowserRouter([
           { path: 'intelligence', element: <IntelligencePage /> },
           { path: 'mitre', element: <MitrePage /> },
           { path: 'hunting', element: <HuntingPage /> },
-          {
-            path: 'soar',
-            element: (
-              <PageStub
-                title="Playbooks SOAR"
-                description="Builder graphique de playbooks, exécutions et historique des réponses automatisées."
-                milestone="jalon SOAR"
-              />
-            ),
-          },
+          { path: 'soar', element: <SoarPage /> },
           {
             path: 'reports',
             element: (

@@ -11,12 +11,16 @@ import TravelExploreIcon from '@mui/icons-material/TravelExplore';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutlined';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { useAppSelector } from '../../app/hooks';
 import { problemDetail } from '../../shared/api/client';
 import { SeverityChip } from '../alerts/chips';
 import { openCaseFromIncident } from '../investigations/investigationsApi';
+import { ExecutionStatusChip } from '../soar/soarChips';
+import { listExecutionsForIncident } from '../soar/soarApi';
+import StartPlaybookExecutionDialog from '../soar/StartPlaybookExecutionDialog';
 import { IncidentStatusChip, INCIDENT_STATUS_LABELS } from './incidentChips';
 import {
   ALLOWED_TRANSITIONS,
@@ -56,6 +60,13 @@ function IncidentDetailDrawer({ incidentId, onClose }: Props) {
   const canWrite = role === 'ADMIN' || role === 'SOC_MANAGER' || role === 'SOC_ANALYST';
   const [assignee, setAssignee] = useState('');
   const [note, setNote] = useState('');
+  const [startPlaybookOpen, setStartPlaybookOpen] = useState(false);
+
+  const { data: executions } = useQuery({
+    queryKey: ['playbook-executions', incidentId],
+    queryFn: () => listExecutionsForIncident(incidentId!),
+    enabled: Boolean(incidentId),
+  });
 
   const { data, isPending, isError, error } = useQuery({
     queryKey: ['incident', incidentId],
@@ -145,16 +156,25 @@ function IncidentDetailDrawer({ incidentId, onClose }: Props) {
 
             {canWrite && (
               <>
-                <Button
-                  size="small"
-                  variant="contained"
-                  startIcon={<TravelExploreIcon />}
-                  disabled={openCaseMutation.isPending}
-                  onClick={() => openCaseMutation.mutate()}
-                  sx={{ mb: 2 }}
-                >
-                  {openCaseMutation.isPending ? 'Ouverture…' : 'Ouvrir un cas'}
-                </Button>
+                <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
+                  <Button
+                    size="small"
+                    variant="contained"
+                    startIcon={<TravelExploreIcon />}
+                    disabled={openCaseMutation.isPending}
+                    onClick={() => openCaseMutation.mutate()}
+                  >
+                    {openCaseMutation.isPending ? 'Ouverture…' : 'Ouvrir un cas'}
+                  </Button>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    startIcon={<PlayCircleOutlineIcon />}
+                    onClick={() => setStartPlaybookOpen(true)}
+                  >
+                    Exécuter un playbook
+                  </Button>
+                </Stack>
 
                 <Field label="Changer le statut">
                   <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
@@ -251,6 +271,30 @@ function IncidentDetailDrawer({ incidentId, onClose }: Props) {
 
             <Divider sx={{ my: 2 }} />
             <Typography variant="subtitle2" sx={{ mb: 1 }}>
+              Réponses ({executions?.items.length ?? 0})
+            </Typography>
+            {executions && executions.items.length === 0 && (
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Aucun playbook exécuté.
+              </Typography>
+            )}
+            {executions?.items.map((execution) => (
+              <Stack
+                key={execution.id}
+                direction="row"
+                spacing={1}
+                sx={{ alignItems: 'center', mb: 0.5, cursor: 'pointer' }}
+                onClick={() => navigate(`/soar?execution=${execution.id}`)}
+              >
+                <ExecutionStatusChip status={execution.status} />
+                <Typography variant="body2" sx={{ flexGrow: 1 }} noWrap>
+                  {execution.playbookName}
+                </Typography>
+              </Stack>
+            ))}
+
+            <Divider sx={{ my: 2 }} />
+            <Typography variant="subtitle2" sx={{ mb: 1 }}>
               Timeline
             </Typography>
             {canWrite && (
@@ -283,6 +327,19 @@ function IncidentDetailDrawer({ incidentId, onClose }: Props) {
           </>
         )}
       </Box>
+
+      {incidentId && (
+        <StartPlaybookExecutionDialog
+          open={startPlaybookOpen}
+          onClose={() => setStartPlaybookOpen(false)}
+          incidentId={incidentId}
+          onStarted={(execution) => {
+            setStartPlaybookOpen(false);
+            onClose();
+            navigate(`/soar?execution=${execution.id}`);
+          }}
+        />
+      )}
     </Drawer>
   );
 }
