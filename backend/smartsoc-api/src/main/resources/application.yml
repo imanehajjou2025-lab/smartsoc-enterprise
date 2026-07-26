@@ -66,6 +66,15 @@ management:
     health:
       probes:
         enabled: true
+  health:
+    # spring-boot-starter-mail enregistre un indicateur qui tente une
+    # connexion SMTP réelle : sans hôte configuré (mode notifications
+    # "simulation", le défaut), il reste DOWN en permanence et ferait
+    # échouer /actuator/health agrégé — donc le HEALTHCHECK Docker — alors
+    # que la plateforme fonctionne normalement (ADR-013, même esprit que
+    # le classifieur IA qui reste disponible sans service IA réel).
+    mail:
+      enabled: false
 
 springdoc:
   api-docs:

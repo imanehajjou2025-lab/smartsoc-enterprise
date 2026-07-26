@@ -7,6 +7,7 @@ import IntelligencePage from '../features/intelligence/IntelligencePage';
 import MitrePage from '../features/mitre/MitrePage';
 import HuntingPage from '../features/hunting/HuntingPage';
 import SoarPage from '../features/soar/SoarPage';
+import ReportsPage from '../features/reports/ReportsPage';
 import InvestigationsPage from '../features/investigations/InvestigationsPage';
 import DashboardPage from '../features/dashboard/DashboardPage';
 import LoginPage from '../features/auth/LoginPage';
@@ -40,16 +41,7 @@ export const router = createBrowserRouter([
           { path: 'mitre', element: <MitrePage /> },
           { path: 'hunting', element: <HuntingPage /> },
           { path: 'soar', element: <SoarPage /> },
-          {
-            path: 'reports',
-            element: (
-              <PageStub
-                title="Rapports"
-                description="Rapports périodiques et à la demande, export PDF."
-                milestone="jalon Rapports"
-              />
-            ),
-          },
+          { path: 'reports', element: <ReportsPage /> },
           {
             path: 'assistant',
             element: (
