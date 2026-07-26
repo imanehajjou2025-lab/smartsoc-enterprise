@@ -1,0 +1,47 @@
+/* Scrollbars fines, discrètes, couleurs du thème — remplace la grosse
+   barre grise par défaut (Windows/Chrome) par un style proche des
+   consoles modernes (GitHub, Notion, Linear). Auto-hide via opacité au
+   survol, comportement natif conservé (pas de faux scroll JS). */
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+*:hover {
+  scrollbar-color: #30363d transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: transparent;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+*:hover::-webkit-scrollbar-thumb {
+  background-color: #30363d;
+  background-clip: content-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: #484f58;
+  background-clip: content-box;
+}
+
+/* Accessibilité : anneau de focus visible et cohérent avec le thème,
+   uniquement au clavier (":focus-visible") pour ne pas polluer le clic
+   souris — WCAG 2.4.7. */
+:focus-visible {
+  outline: 2px solid #2f81f7;
+  outline-offset: 2px;
+}

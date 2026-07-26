@@ -16,6 +16,7 @@ import TableRow from '@mui/material/TableRow';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router-dom';
 import { problemDetail } from '../../shared/api/client';
 import AlertDetailDrawer from './AlertDetailDrawer';
 import {
@@ -42,7 +43,13 @@ function formatDate(iso: string) {
 
 /** File de triage des alertes — le cœur opérationnel de la console. */
 function AlertsPage() {
-  const [status, setStatus] = useState<AlertStatus | ''>('');
+  // Lien profond /alerts?status=NEW (notifications du header) : sert
+  // uniquement de valeur initiale, l'analyste reste libre de changer le filtre.
+  const [searchParams] = useSearchParams();
+  const initialStatus = searchParams.get('status');
+  const [status, setStatus] = useState<AlertStatus | ''>(
+    STATUSES.includes(initialStatus as AlertStatus) ? (initialStatus as AlertStatus) : '',
+  );
   const [severity, setSeverity] = useState<AlertSeverity | ''>('');
   const [page, setPage] = useState(0);
   const [size, setSize] = useState(25);

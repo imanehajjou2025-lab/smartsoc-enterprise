@@ -9,6 +9,7 @@ import '@fontsource/roboto/300.css';
 import '@fontsource/roboto/400.css';
 import '@fontsource/roboto/500.css';
 import '@fontsource/roboto/700.css';
+import './app/scrollbars.css';
 import { router } from './app/routes';
 import { store } from './app/store';
 import { theme } from './app/theme';
