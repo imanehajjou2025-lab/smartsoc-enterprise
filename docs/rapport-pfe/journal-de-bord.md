@@ -1929,5 +1929,49 @@ archivage sans suppression). **Suite complète : 308 tests verts**
 
 ---
 
-*Prochaines entrées : SOAR frontend, rapports, et enfin l'assistant IA
-(backend + frontend).*
+## 2026-07-26 — Jalon SOAR — frontend complet (PR #68)
+
+**Contexte.** Deuxième et dernière PR du module (backend fusionné en #67,
+ADR-012), démarrée seulement après merge + CI verte du backend — même
+rythme à 2 PR que Hunting et MITRE.
+
+**Réalisé.** `soarApi.ts` (client typé, `Playbook`/`PlaybookExecution`).
+`SoarPage.tsx` : catalogue (créer/modifier/archiver, recherche, filtre
+archivés), lien profond `?execution={id}` ouvrant `PlaybookExecutionDrawer`
+dès le premier rendu — même patron que le tiroir d'alerte MITRE et le
+tiroir d'exécution de chasse. `PlaybookDialog.tsx` (étapes dynamiques,
+ajout/suppression de lignes). `PlaybookExecutionDrawer.tsx` : une ligne par
+étape (Select de statut + `TextField` de note sauvegardée `onBlur`, pas de
+bouton Enregistrer séparé), boutons Terminer/Annuler **masqués une fois
+l'exécution dans un état terminal** (le composant ne les affiche pas s'il
+n'y a plus de transition possible, plutôt que de les désactiver). Sur
+`IncidentDetailDrawer.tsx` (existant, édité) : bouton « Exécuter un
+playbook » ouvrant `StartPlaybookExecutionDialog.tsx` (sélecteur de
+playbook actif, démarre puis navigue vers `/soar?execution=`), section
+« Réponses (N) » listant les exécutions liées à l'incident, cliquables
+vers le même lien profond. Remplace le `PageStub` de `/soar`.
+
+**Vérification.** 5 tests frontend verts (`SoarPage` : catalogue + filtre
+recherche ; `PlaybookExecutionDrawer` : métadonnées + étapes). Les tests de
+flux d'écriture (déclarer un playbook, terminer/annuler) ont été omis au
+niveau page — même convention déjà établie pour `IntelligencePage` et
+`HuntingPage` : le store Redux partagé des tests n'a pas d'utilisateur
+authentifié synchrone, donc `canWrite` masque ces boutons en environnement
+de test. `tsc --noEmit` et `oxlint` propres. **Vérif E2E réelle contre la
+stack Docker reconstruite** (backend PR #67 embarqué, V12 appliquée) :
+playbook « Confinement ransomware » (2 étapes) créé dans le vrai
+navigateur, déclenchement depuis l'incident réel INC-2026-0003 — snapshot
+des 2 étapes vérifié identique au playbook au moment du démarrage, statut
+d'étape et note (« Pare-feu coupé, hôte isolé du VLAN ») persistés et
+confirmés après navigation aller-retour, section Réponses de l'incident
+passée de 0 à 1 puis 2 exécutions avec le bon statut affiché. **Terminaison
+et annulation testées sur deux exécutions distinctes** (`Terminée` avec
+horodatage, `Annulée` sans horodatage de complétion figé) — boutons
+d'action disparus dans les deux cas une fois l'état terminal atteint.
+Console propre à froid vérifiée à chaque étape du parcours, aucune requête
+réseau en erreur (`GET`/`POST`/`PATCH` tous 200/201).
+
+---
+
+*Prochaines entrées : rapports, et enfin l'assistant IA (backend +
+frontend).*
