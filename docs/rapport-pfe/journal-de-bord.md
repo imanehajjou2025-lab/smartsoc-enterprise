@@ -1929,7 +1929,7 @@ archivage sans suppression). **Suite complète : 308 tests verts**
 
 ---
 
-## 2026-07-26 — Jalon SOAR — frontend complet (PR #68)
+## 2026-07-25 — Jalon SOAR — frontend complet (PR #68)
 
 **Contexte.** Deuxième et dernière PR du module (backend fusionné en #67,
 ADR-012), démarrée seulement après merge + CI verte du backend — même
@@ -1973,5 +1973,59 @@ réseau en erreur (`GET`/`POST`/`PATCH` tous 200/201).
 
 ---
 
-*Prochaines entrées : rapports, et enfin l'assistant IA (backend +
+## 2026-07-26 — Jalon Rapports — backend complet (PR #69, ADR-013)
+
+**Contexte.** `reporting` est le 8ᵉ et dernier contexte plateforme déclaré
+dès ADR-002. Distinction posée avant tout code : le Dashboard existant est
+une vue **live** (« maintenant »), un rapport est un **instantané figé**
+d'une **période passée** — objet distinct, jamais un doublon.
+
+**Décisions verrouillées (3, via AskUserQuestion).** Jeu de métriques
+complet (alerts/incidents/soar bornés à la période + Hunting/MITRE avec
+leurs limitations annoncées en clair — voir ADR-013) ; export écran + CSV
+**+ PDF** (choix élargi par Imane en cours d'échange) ; notifications par
+adaptateur e-mail en mode simulation/live, **même patron exact que
+`SMARTSOC_AI_MODE`** (ADR-008).
+
+**Réalisé.** Domaine `com.smartsoc.domain.reporting` : `Report` (immuable
+une fois généré — artefact d'audit, aucune suppression, même doctrine
+qu'Incidents/Cases), `ReportMetrics` (record plat composé de records
+plats — sérialisation JSONB native sans codec, même choix que
+`Playbook.steps`). Quatre méthodes `periodMetrics(from, to)` ajoutées aux
+repositories **existants** (`AlertRepository`, `IncidentRepository`,
+`PlaybookExecutionRepository`) et `countExecutedInPeriod` à
+`HuntQueryRepository` — `ReportGenerationService` les compose en lecture
+seule, même doctrine cross-contexte que `MitreCorrelationService`.
+**`Incident.closedAt` ajouté** (V13, nullable, rétrocompatible) : aucun
+module existant n'avait besoin de savoir QUAND un incident se clôture,
+nécessaire ici pour le temps moyen de résolution — rempli par
+`Incident.transitionTo()` à l'entrée en `CLOSED`. Export CSV/PDF derrière
+un port `ReportExporter` unique (rendu déterministe, aucun appel externe,
+donc pas de mode simulation/live comme pour les notifications) — PDF via
+**OpenPDF** (fork LGPL d'iText 4, première dépendance de génération de
+document du backend). Notifications via `ReportNotifier`
+(`SimulatedReportNotifier`/`LiveReportNotifier`, `spring-boot-starter-mail`
+en mode live). API `/api/v1/reports` (génération SOC_MANAGER+, lecture
+tout authentifié — RBAC déjà déterminé par le Javadoc existant du `Role`
+enum, pas une nouvelle décision).
+
+**Bug trouvé et corrigé pendant les tests d'intégration.** `avg(extract(epoch
+from ...) / 3600.0)` en PostgreSQL rend un `numeric` dès lors que le
+diviseur est un littéral décimal — donc un `BigDecimal` côté JDBC, pas un
+`Double` : `(Double) row[1]` levait un `ClassCastException` en E2E réel
+(jamais vu en test unitaire mocké). Corrigé par `((Number) row[1]).doubleValue()`,
+qui encaisse le type SQL réel sans en dépendre.
+
+**Vérification.** 20 tests nouveaux (5 domaine + 5 application + 1
+persistance + 3 API E2E Testcontainers, dont un test qui ingère une vraie
+alerte, ouvre-et-clôture un vrai incident et termine une vraie exécution
+SOAR dans la même fenêtre temporelle pour prouver l'agrégation
+inter-contextes réelle, pas supposée). **Suite complète : 328 tests
+verts** (128+66+13+121), zéro régression sur les 314 tests préexistants,
+ArchUnit vert (le nouveau contexte `reporting` respecte les frontières de
+couches et reste framework-free côté domaine).
+
+---
+
+*Prochaines entrées : Rapports frontend, et enfin l'assistant IA (backend +
 frontend).*

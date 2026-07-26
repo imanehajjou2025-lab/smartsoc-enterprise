@@ -29,6 +29,7 @@ public class Incident {
     private IncidentStatus status;
     private String assigneeUsername;
     private final Instant openedAt;
+    private Instant closedAt;
 
     /** Ouverture d'un incident ; la référence lisible est fournie par l'appelant. */
     public static Incident open(String reference, String title, String description,
@@ -56,6 +57,9 @@ public class Incident {
                     "Cannot transition incident from %s to %s".formatted(status, newStatus));
         }
         this.status = newStatus;
+        if (newStatus == IncidentStatus.CLOSED) {
+            this.closedAt = Instant.now();
+        }
     }
 
     public void assignTo(String username) {

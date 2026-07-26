@@ -2,6 +2,7 @@ package com.smartsoc.domain.soar;
 
 import com.smartsoc.domain.common.PageResult;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -21,4 +22,12 @@ public interface PlaybookExecutionRepository {
 
     /** Étapes de l'exécution, dans l'ordre du gabarit. */
     List<PlaybookExecutionStep> findSteps(UUID executionId);
+
+    /**
+     * Exécutions démarrées dans {@code [from, to)} — brique « soar » d'un
+     * rapport (module reporting), par statut ATTEINT à ce jour (une
+     * exécution encore {@code IN_PROGRESS} ne compte ni dans
+     * {@code completed} ni dans {@code cancelled}).
+     */
+    ExecutionPeriodMetrics periodMetrics(Instant from, Instant to);
 }

@@ -10,6 +10,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
@@ -67,5 +68,10 @@ public class HuntQueryRepositoryAdapter implements HuntQueryRepository {
                 page.getTotalElements(),
                 filter.page().page(),
                 filter.page().size());
+    }
+
+    @Override
+    public long countExecutedInPeriod(Instant from, Instant to) {
+        return springDataRepository.countByLastExecutedAtGreaterThanEqualAndLastExecutedAtLessThan(from, to);
     }
 }

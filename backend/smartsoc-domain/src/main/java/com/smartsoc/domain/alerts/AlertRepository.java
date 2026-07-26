@@ -4,6 +4,7 @@ import com.smartsoc.domain.common.PageQuery;
 import com.smartsoc.domain.common.PageResult;
 import com.smartsoc.domain.intelligence.Observable;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -86,4 +87,12 @@ public interface AlertRepository {
      * fait à la lecture, côté appelant.
      */
     List<MitreCoverageCount> mitreCoverage();
+
+    /**
+     * Volumétrie d'alertes bornée à {@code [from, to)} — brique « alerts »
+     * d'un rapport (module reporting). Contrairement à {@link #statistics},
+     * ancré sur « aujourd'hui », ici la période est arbitraire et fournie
+     * par l'appelant.
+     */
+    AlertPeriodMetrics periodMetrics(Instant from, Instant to);
 }

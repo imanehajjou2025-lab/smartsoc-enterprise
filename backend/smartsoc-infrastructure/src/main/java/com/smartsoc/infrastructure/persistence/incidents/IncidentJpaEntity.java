@@ -48,4 +48,7 @@ public class IncidentJpaEntity extends AbstractAuditableEntity {
 
     @Column(name = "opened_at", nullable = false)
     private Instant openedAt;
+
+    @Column(name = "closed_at")
+    private Instant closedAt;
 }

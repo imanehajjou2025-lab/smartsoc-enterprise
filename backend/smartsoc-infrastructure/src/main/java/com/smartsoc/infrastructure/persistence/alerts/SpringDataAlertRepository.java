@@ -23,6 +23,14 @@ public interface SpringDataAlertRepository
     @Query("select a.status, count(a) from AlertJpaEntity a group by a.status")
     List<Object[]> countGroupedByStatus();
 
+    @Query("select a.severity, count(a) from AlertJpaEntity a "
+            + "where a.detectedAt >= :from and a.detectedAt < :to group by a.severity")
+    List<Object[]> countGroupedBySeverityInPeriod(@Param("from") Instant from, @Param("to") Instant to);
+
+    @Query("select a.status, count(a) from AlertJpaEntity a "
+            + "where a.detectedAt >= :from and a.detectedAt < :to group by a.status")
+    List<Object[]> countGroupedByStatusInPeriod(@Param("from") Instant from, @Param("to") Instant to);
+
     @Query("select a.source, count(a) from AlertJpaEntity a group by a.source order by count(a) desc")
     List<Object[]> countGroupedBySource();
 
