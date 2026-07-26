@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import reducer, { bootstrapSession, login, logout, type AuthState } from './authSlice';
 import type { SessionUser } from './authApi';
 
-const admin: SessionUser = { username: 'admin', userId: 'u-1', role: 'ADMIN' };
+const admin: SessionUser = { username: 'admin', userId: 'u-1', role: 'ADMIN', fullName: 'Admin' };
 
 const initial: AuthState = {
   user: null,

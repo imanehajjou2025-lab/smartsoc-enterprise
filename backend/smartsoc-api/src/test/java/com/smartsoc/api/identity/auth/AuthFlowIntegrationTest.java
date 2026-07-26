@@ -67,7 +67,8 @@ class AuthFlowIntegrationTest {
         TokenResponse tokens = login("admin", "IntegrationTest123!").getBody();
         ResponseEntity<String> me = getWithBearer(ME, tokens.accessToken());
         assertThat(me.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(me.getBody()).contains("\"username\":\"admin\"").contains("\"role\":\"ADMIN\"");
+        assertThat(me.getBody()).contains("\"username\":\"admin\"").contains("\"role\":\"ADMIN\"")
+                .contains("\"fullName\":\"Platform Administrator\"");
     }
 
     @Test

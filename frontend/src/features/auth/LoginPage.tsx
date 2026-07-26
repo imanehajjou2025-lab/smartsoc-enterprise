@@ -3,11 +3,11 @@ import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Paper from '@mui/material/Paper';
-import ShieldIcon from '@mui/icons-material/Shield';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../app/hooks';
+import BrandLogo from '../../shared/layout/BrandLogo';
 import { login } from './authSlice';
 
 function LoginPage() {
@@ -45,17 +45,12 @@ function LoginPage() {
       }}
     >
       <Paper variant="outlined" sx={{ p: 4, width: 380 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
-          <ShieldIcon color="primary" fontSize="large" />
-          <Box>
-            <Typography variant="h6" component="h1">
-              SmartSOC Enterprise
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Console de supervision sécurité
-            </Typography>
-          </Box>
+        <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
+          <BrandLogo variant="full" height={140} />
         </Box>
+        <Typography variant="body2" color="text.secondary" align="center" sx={{ mb: 3, mt: -1 }}>
+          Console de supervision sécurité
+        </Typography>
 
         {loginError && (
           <Alert severity="error" sx={{ mb: 2 }}>

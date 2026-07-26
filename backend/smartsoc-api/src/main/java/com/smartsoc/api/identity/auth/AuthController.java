@@ -4,6 +4,8 @@ import com.smartsoc.api.identity.auth.dto.AuthDtos.LoginRequest;
 import com.smartsoc.api.identity.auth.dto.AuthDtos.MeResponse;
 import com.smartsoc.api.identity.auth.dto.AuthDtos.RefreshRequest;
 import com.smartsoc.api.identity.auth.dto.TokenResponse;
+import com.smartsoc.domain.identity.User;
+import com.smartsoc.domain.identity.UserRepository;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -22,6 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final AuthService authService;
+    private final UserRepository userRepository;
 
     @PostMapping("/login")
     public TokenResponse login(@Valid @RequestBody LoginRequest request) {
@@ -39,12 +42,21 @@ public class AuthController {
         authService.logout(request.refreshToken());
     }
 
-    /** Identity probe for the frontend: who am I, with which role. */
+    /**
+     * Identity probe for the frontend: who am I, with which role. Role and
+     * userId come from the JWT claims (no DB round-trip needed) ; fullName
+     * is looked up live so a display-name change (admin edit) is reflected
+     * immediately, unlike a claim baked into the token at login.
+     */
     @GetMapping("/me")
     public MeResponse me(@AuthenticationPrincipal Jwt jwt) {
+        String fullName = userRepository.findByUsername(jwt.getSubject())
+                .map(User::getFullName)
+                .orElse(null);
         return new MeResponse(
                 jwt.getSubject(),
                 jwt.getClaimAsString("userId"),
-                jwt.getClaimAsString("role"));
+                jwt.getClaimAsString("role"),
+                fullName);
     }
 }
