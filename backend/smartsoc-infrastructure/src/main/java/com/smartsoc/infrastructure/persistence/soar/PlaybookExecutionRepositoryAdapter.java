@@ -1,6 +1,8 @@
 package com.smartsoc.infrastructure.persistence.soar;
 
 import com.smartsoc.domain.common.PageResult;
+import com.smartsoc.domain.soar.ExecutionPeriodMetrics;
+import com.smartsoc.domain.soar.ExecutionStatus;
 import com.smartsoc.domain.soar.PlaybookExecution;
 import com.smartsoc.domain.soar.PlaybookExecutionQuery;
 import com.smartsoc.domain.soar.PlaybookExecutionRepository;
@@ -12,7 +14,10 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -66,5 +71,17 @@ public class PlaybookExecutionRepositoryAdapter implements PlaybookExecutionRepo
         return stepRepository.findByExecutionIdOrderByStepOrder(executionId).stream()
                 .map(stepMapper::toDomain)
                 .toList();
+    }
+
+    @Override
+    public ExecutionPeriodMetrics periodMetrics(Instant from, Instant to) {
+        Map<ExecutionStatus, Long> byStatus = new EnumMap<>(ExecutionStatus.class);
+        for (Object[] row : executionRepository.countGroupedByStatusInPeriod(from, to)) {
+            byStatus.put((ExecutionStatus) row[0], (Long) row[1]);
+        }
+        long started = byStatus.values().stream().mapToLong(Long::longValue).sum();
+        return new ExecutionPeriodMetrics(started,
+                byStatus.getOrDefault(ExecutionStatus.COMPLETED, 0L),
+                byStatus.getOrDefault(ExecutionStatus.CANCELLED, 0L));
     }
 }

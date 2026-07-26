@@ -39,6 +39,7 @@
         <spring-cloud.version>2025.0.0</spring-cloud.version>
         <resilience4j.version>2.3.0</resilience4j.version>
         <wiremock.version>3.13.1</wiremock.version>
+        <openpdf.version>2.0.3</openpdf.version>
 
         <!-- Couverture multi-module : Sonar lit le rapport AGREGE produit
              par smartsoc-api (report-aggregate), sinon les classes des
@@ -111,6 +112,13 @@
                 <artifactId>archunit-junit5</artifactId>
                 <version>${archunit.version}</version>
                 <scope>test</scope>
+            </dependency>
+            <!-- Export PDF des rapports (module reporting) : fork LGPL
+                 maintenu d'iText 4, pur Java, pas de dépendance native. -->
+            <dependency>
+                <groupId>com.github.librepdf</groupId>
+                <artifactId>openpdf</artifactId>
+                <version>${openpdf.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

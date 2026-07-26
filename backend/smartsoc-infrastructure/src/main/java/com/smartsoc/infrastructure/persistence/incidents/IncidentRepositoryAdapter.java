@@ -2,6 +2,7 @@ package com.smartsoc.infrastructure.persistence.incidents;
 
 import com.smartsoc.domain.common.PageResult;
 import com.smartsoc.domain.incidents.Incident;
+import com.smartsoc.domain.incidents.IncidentPeriodMetrics;
 import com.smartsoc.domain.incidents.IncidentQuery;
 import com.smartsoc.domain.incidents.IncidentRepository;
 import com.smartsoc.domain.incidents.IncidentTimelineEntry;
@@ -13,6 +14,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -92,5 +94,16 @@ public class IncidentRepositoryAdapter implements IncidentRepository {
         return timelineRepository.findByIncidentIdOrderByOccurredAt(incidentId).stream()
                 .map(mapper::toDomain)
                 .toList();
+    }
+
+    @Override
+    public IncidentPeriodMetrics periodMetrics(Instant from, Instant to) {
+        long opened = incidentRepository.countOpenedInPeriod(from, to);
+        Object[] closedRow = incidentRepository.closedPeriodStats(from, to).get(0);
+        // avg(...) rend un numeric (donc un BigDecimal cote JDBC) des lors
+        // que la division porte sur un literal decimal — Number encaisse
+        // BigDecimal comme Double sans dependre de ce detail de typage SQL.
+        Double avgResolutionHours = closedRow[1] == null ? null : ((Number) closedRow[1]).doubleValue();
+        return new IncidentPeriodMetrics(opened, (Long) closedRow[0], avgResolutionHours);
     }
 }

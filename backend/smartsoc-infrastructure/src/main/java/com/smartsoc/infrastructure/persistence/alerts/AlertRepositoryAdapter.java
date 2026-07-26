@@ -1,6 +1,7 @@
 package com.smartsoc.infrastructure.persistence.alerts;
 
 import com.smartsoc.domain.alerts.Alert;
+import com.smartsoc.domain.alerts.AlertPeriodMetrics;
 import com.smartsoc.domain.alerts.AlertQuery;
 import com.smartsoc.domain.alerts.AlertRepository;
 import com.smartsoc.domain.alerts.AlertStatistics;
@@ -17,6 +18,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.LinkedHashMap;
@@ -156,6 +158,16 @@ public class AlertRepositoryAdapter implements AlertRepository {
 
         long total = bySeverity.values().stream().mapToLong(Long::longValue).sum();
         return new AlertStatistics(total, bySeverity, byStatus, bySource, timeline);
+    }
+
+    @Override
+    public AlertPeriodMetrics periodMetrics(Instant from, Instant to) {
+        Map<Severity, Long> bySeverity = groupCounts(
+                springDataRepository.countGroupedBySeverityInPeriod(from, to), Severity.class::cast);
+        Map<AlertStatus, Long> byStatus = groupCounts(
+                springDataRepository.countGroupedByStatusInPeriod(from, to), AlertStatus.class::cast);
+        long total = bySeverity.values().stream().mapToLong(Long::longValue).sum();
+        return new AlertPeriodMetrics(total, bySeverity, byStatus);
     }
 
     private static <K> Map<K, Long> groupCounts(List<Object[]> rows, Function<Object, K> keyMapper) {

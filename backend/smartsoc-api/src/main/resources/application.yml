@@ -23,6 +23,21 @@ spring:
           time_zone: UTC
   flyway:
     enabled: true
+  # Vide par defaut : le bean JavaMailSender se cree quand meme (host="")
+  # mais ne se connecte qu'au moment d'un envoi reel — inoffensif tant que
+  # smartsoc.notifications.mode reste "simulation" (LiveReportNotifier,
+  # seul a l'utiliser, n'est alors meme pas instancie).
+  mail:
+    host: ${SMTP_HOST:}
+    port: ${SMTP_PORT:587}
+    username: ${SMTP_USERNAME:}
+    password: ${SMTP_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
   cloud:
     openfeign:
       client:
@@ -84,6 +99,11 @@ smartsoc:
     classifier:
       url: ${SMARTSOC_AI_CLASSIFIER_URL:http://localhost:8000}
       api-key: ${SMARTSOC_AI_CLASSIFIER_API_KEY:}
+  notifications:
+    # simulation (defaut) = journalise, plateforme demontrable sans SMTP ;
+    # live = e-mail reel via spring.mail.* (ADR-005). Meme doctrine que ai.mode.
+    mode: ${SMARTSOC_NOTIFICATIONS_MODE:simulation}
+    from-address: ${SMARTSOC_NOTIFICATIONS_FROM:smartsoc@localhost}
 
 resilience4j:
   circuitbreaker:
