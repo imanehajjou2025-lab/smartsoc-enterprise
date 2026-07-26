@@ -2148,6 +2148,55 @@ tiroir, **zéro scroll horizontal de page vérifié à 2560×1440, 1366×768 et
 persistance du repli de sidebar après rechargement complet, console
 propre à froid à chaque étape.
 
+**Complément (même PR, retour d'Imane sur maquette) : profil en pied de
+sidebar et mode clair/sombre.** Sur retour visuel (référence externe,
+sidebar façon « widelab ») : haut de sidebar = logo ISIX + rôle de
+l'utilisateur (« Administrateur », etc.) ; bas de sidebar = identité
+complète (`UserMenu.tsx` déplacé du header vers un bloc pied-de-page
+avatar + nom complet + rôle, repliable comme le reste de la sidebar).
+**Le nom complet n'était pas exposé par `/auth/me`** (dérivé uniquement
+des claims JWT — username/userId/role) : ajout minimal et honnête
+(`MeResponse.fullName`, résolu par un lookup `UserRepository` sur le
+username du token, **pas** un claim figé au login, pour refléter un
+changement de nom immédiatement) — champ existant sur un endpoint
+existant, zéro nouvelle route. Mode clair/sombre : `buildTheme(mode)`
+remplace le thème statique (surfaces/texte inversés, **sévérités et
+accents identiques dans les deux modes** — ce sont des couleurs de
+statut sémantique, pas des couleurs de surface), `ThemeModeProvider`
+(contexte + `localStorage`), `EChart` suit le mode (thème ECharts nommé
+'dark' vs défaut clair). L'export `theme` historique (dark statique) est
+conservé tel quel pour ne toucher **aucun** des 20+ fichiers de test
+existants qui l'utilisent.
+
+**Deux bugs réels trouvés, aucun par les vérifications habituelles.**
+(1) `tsc --noEmit` et Vitest passaient tous les deux verts alors que le
+**vrai** `npm run build` (celui que le Dockerfile exécute, `tsc -b`,
+mode projet composite) échouait : une prop MUI7 invalide
+(`Switch.inputProps` → `slotProps.input`, même famille de rupture que
+`InputLabelProps`/`primaryTypographyProps` déjà rencontrées) et un
+fixture de test (`authSlice.test.ts`) non mis à jour avec le nouveau
+champ `fullName` — Vitest transpile sans type-checker les fichiers de
+test, `tsc --noEmit` seul n'a pas la même portée que `tsc -b`. **Leçon
+retenue : toujours vérifier avec `npm run build` exact, jamais
+`tsc --noEmit` seul, avant un rebuild Docker.** (2) Accessibilité :
+`aria-label="Menu utilisateur"` fixe sur le bouton de profil masquait le
+nom affiché aux lecteurs d'écran — corrigé en
+`` `Menu utilisateur — ${displayName}` ``, sur les deux variantes
+(repliée et dépliée).
+
+**Vérification du complément.** Suite complète re-vérifiée verte (deux
+lectures bruitées par contention machine — fichiers différents à chaque
+fois, système déjà chargé par le rebuild Docker en parallèle — confirmées
+non reproductibles, troisième lecture 32/32 propre). `npm run build`
+réel (celui de Docker) propre après correction. **E2E réel contre la
+stack Docker reconstruite** : haut de sidebar affichant « ISIX » +
+« Administrateur », bas affichant **« Platform Administrator »** (le
+nouveau champ backend, valeur réelle du compte bootstrap) + rôle,
+bascule clair/sombre vérifiée par la couleur de fond calculée
+(`rgb(246,248,250)` = `#f6f8fa` exact) sur deux pages dont une avec
+graphique ECharts (`/mitre`), persistance après rechargement complet,
+console propre à froid à chaque étape.
+
 ---
 
 *Prochaine entrée : refonte du Dashboard ISIX (KPI directs des modules,

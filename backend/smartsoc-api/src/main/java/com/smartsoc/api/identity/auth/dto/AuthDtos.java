@@ -20,6 +20,7 @@ public final class AuthDtos {
     public record MeResponse(
             String username,
             String userId,
-            String role) {
+            String role,
+            String fullName) {
     }
 }

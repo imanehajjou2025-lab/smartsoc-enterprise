@@ -13,6 +13,7 @@ export interface SessionUser {
   username: string;
   userId: string;
   role: Role;
+  fullName: string | null;
 }
 
 export async function loginRequest(username: string, password: string): Promise<TokenResponse> {

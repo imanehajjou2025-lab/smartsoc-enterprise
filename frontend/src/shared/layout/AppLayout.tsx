@@ -18,7 +18,9 @@ import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import SearchIcon from '@mui/icons-material/Search';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { useAppSelector } from '../../app/hooks';
 import { useAlertsRealtime } from '../../features/alerts/useAlertsRealtime';
+import { ROLE_LABELS } from '../../features/auth/roles';
 import UserMenu from '../../features/auth/UserMenu';
 import BrandLogo from './BrandLogo';
 import GlobalSearch from './GlobalSearch';
@@ -52,6 +54,7 @@ function AppLayout() {
   const [searchOpen, setSearchOpen] = useState(false);
   const breadcrumb = useBreadcrumb(location.pathname);
   const drawerWidth = collapsed ? COLLAPSED_WIDTH : EXPANDED_WIDTH;
+  const role = useAppSelector((state) => state.auth.user?.role);
 
   // Connexion temps réel globale (alertes) : garde le badge de notifications
   // à jour quelle que soit la page affichée, pas seulement Alertes/Dashboard.
@@ -117,7 +120,6 @@ function AppLayout() {
 
           <UtcClock />
           <NotificationsBell />
-          <UserMenu />
         </Toolbar>
       </AppBar>
 
@@ -135,17 +137,40 @@ function AppLayout() {
           },
         }}
       >
-        <Toolbar
-          variant="dense"
-          sx={{ px: collapsed ? 1 : 2, justifyContent: collapsed ? 'center' : 'flex-start' }}
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1.25,
+            px: collapsed ? 1 : 2,
+            py: 1.5,
+            justifyContent: collapsed ? 'center' : 'flex-start',
+            borderBottom: 1,
+            borderColor: 'divider',
+          }}
         >
           <BrandLogo variant="mark" height={28} />
           {!collapsed && (
-            <Typography variant="subtitle2" sx={{ ml: 1.5, fontWeight: 700, letterSpacing: 0.5 }}>
-              ISIX
-            </Typography>
+            <Box sx={{ minWidth: 0 }}>
+              <Typography
+                variant="subtitle2"
+                sx={{ fontWeight: 700, letterSpacing: 0.5, lineHeight: 1.2 }}
+              >
+                ISIX
+              </Typography>
+              {role && (
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  noWrap
+                  sx={{ display: 'block' }}
+                >
+                  {ROLE_LABELS[role] ?? role}
+                </Typography>
+              )}
+            </Box>
           )}
-        </Toolbar>
+        </Box>
 
         <Box
           component="nav"
@@ -194,6 +219,10 @@ function AppLayout() {
               })}
             </List>
           ))}
+        </Box>
+
+        <Box sx={{ p: 1, borderTop: 1, borderColor: 'divider' }}>
+          <UserMenu collapsed={collapsed} />
         </Box>
 
         <Box sx={{ p: 1, borderTop: 1, borderColor: 'divider' }}>

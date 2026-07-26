@@ -1,12 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { ThemeProvider } from '@mui/material/styles';
 import { Provider } from 'react-redux';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import AppLayout from './AppLayout';
 import { navigation } from './navigation';
-import { theme } from '../../app/theme';
+import { ThemeModeProvider } from '../../app/ThemeModeProvider';
 import { store } from '../../app/store';
 
 // jsdom : ni WebSocket ni requêtes réseau réelles — même patron que DashboardPage.test.tsx.
@@ -27,9 +26,9 @@ function renderLayout() {
   return render(
     <Provider store={store}>
       <QueryClientProvider client={queryClient}>
-        <ThemeProvider theme={theme}>
+        <ThemeModeProvider>
           <RouterProvider router={router} />
-        </ThemeProvider>
+        </ThemeModeProvider>
       </QueryClientProvider>
     </Provider>,
   );
