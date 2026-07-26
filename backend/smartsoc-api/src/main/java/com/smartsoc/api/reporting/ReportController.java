@@ -72,10 +72,14 @@ public class ReportController {
         return mapper.toResponse(queryService.get(id));
     }
 
-    @GetMapping(value = "/{id}/export/csv", produces = "text/csv")
+    @GetMapping(value = "/{id}/export/csv", produces = "text/csv;charset=UTF-8")
     public ResponseEntity<byte[]> exportCsv(@PathVariable UUID id) {
         Report report = queryService.get(id);
-        return download(exporter.toCsv(report), report.getId(), "csv", MediaType.parseMediaType("text/csv"));
+        // Charset explicite : "text/csv" sans charset retombe en ISO-8859-1
+        // côté client (défaut HTTP pour text/*), ce qui corrompt tous les
+        // accents du CSV (UTF-8 réinterprété en Latin-1).
+        return download(exporter.toCsv(report), report.getId(), "csv",
+                MediaType.parseMediaType("text/csv;charset=UTF-8"));
     }
 
     @GetMapping(value = "/{id}/export/pdf", produces = MediaType.APPLICATION_PDF_VALUE)

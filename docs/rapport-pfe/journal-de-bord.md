@@ -2027,5 +2027,61 @@ couches et reste framework-free côté domaine).
 
 ---
 
-*Prochaines entrées : Rapports frontend, et enfin l'assistant IA (backend +
-frontend).*
+## 2026-07-26 — Jalon Rapports — frontend complet (PR #70)
+
+**Contexte.** Deuxième et dernière PR du module (backend fusionné en #69,
+ADR-013), démarrée seulement après merge + CI verte du backend. Demande
+explicite d'Imane : « un parfait frontend de ce module ».
+
+**Réalisé.** `reportsApi.ts` (types alignés sur `ReportDtos`, y compris
+l'export blob — première fonction de téléchargement de fichier de la
+plateforme : `responseType: 'blob'` + `URL.createObjectURL` + ancre
+temporaire). `ReportsPage.tsx` (liste, génération réservée SOC_MANAGER+,
+lien profond `?selected=`). `GenerateReportDialog.tsx` (titre + période
+`datetime-local`, pré-rempli sur les 7 derniers jours). `ReportDetailDrawer.tsx` :
+tableau de bord complet du rapport — cartes KPI (miroir du style déjà
+établi en MITRE M3), donut de sévérité et répartition par statut
+**réutilisant** `SeverityChip`/`StatusChip` d'Alertes (zéro duplication),
+panneaux Incidents/SOAR/Hunting/MITRE avec les limitations Hunting/MITRE
+**affichées en clair dans l'UI elle-même** (pas seulement dans l'ADR),
+techniques MITRE cliquables → `/mitre?selected=` (même lien profond que
+le tiroir d'alerte), boutons Export CSV/PDF.
+
+**Deux bugs réels trouvés en vérification E2E (aucun test automatisé ne
+les couvrait) :**
+
+1. **`/actuator/health` restait DOWN en permanence en mode simulation**,
+donc le `HEALTHCHECK` Docker du backend n'atteignait jamais `healthy`.
+Cause : `spring-boot-starter-mail` enregistre automatiquement un
+`MailHealthIndicator` qui tente une vraie connexion SMTP — sans hôte
+configuré (le défaut), il échoue et fait chuter le statut agrégé, alors
+que la plateforme fonctionne normalement (même esprit que le classifieur
+IA, disponible sans service IA réel). Corrigé par
+`management.health.mail.enabled=false`.
+
+2. **Export CSV corrompait tous les accents** (« Sévérité » devenait
+« SÃ©vÃ©ritÃ© ») : `produces = "text/csv"` sans charset explicite retombe
+en ISO-8859-1 côté HTTP, réinterprétant les octets UTF-8 réels. Corrigé
+par `text/csv;charset=UTF-8` sur le contrôleur. **Nouveau test dédié**
+`ReportExporterAdapterTest` (3 tests, dont un qui aurait attrapé cette
+régression — l'assertion E2E existante ne testait que l'en-tête ASCII,
+pas les valeurs accentuées).
+
+**Vérification.** 2 tests frontend verts (`ReportsPage`,
+`ReportDetailDrawer` — `EChart` mocké comme dans `DashboardPage.test.tsx`,
+jsdom n'a pas de canvas). `tsc`, `oxlint`, `npm run build` propres.
+**Vérif E2E réelle contre la stack Docker reconstruite deux fois**
+(V13 appliquée, puis la correction santé/CSV) : génération d'un rapport
+réel sur les 7 derniers jours, agrégation confirmée exacte — les
+compteurs SOAR affichés (2 démarrées, 1 terminée, 1 annulée) correspondent
+**exactement** aux exécutions réalisées dans le navigateur lors de la
+vérification E2E du jalon SOAR — export CSV relu octet par octet avec
+accents corrects, export PDF avec en-tête `%PDF` valide, lien profond
+MITRE vérifié (`T1110` → `/mitre?selected=T1110`, technique retrouvée
+avec le même compte d'alertes), console propre à froid. **MODULE RAPPORTS
+INTÉGRALEMENT TERMINÉ (backend #69 + frontend #70).**
+
+---
+
+*Prochaine entrée : l'assistant IA (backend puis frontend), dernier
+module de la plateforme.*
