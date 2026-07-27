@@ -68,6 +68,9 @@ const ACTIVITY_KIND_COLOR: Record<'alert' | 'incident' | 'report', string> = {
   report: severityColors.info,
 };
 
+/** Anneaux purement décoratifs (dégradé cyan → violet, dans l'esprit de la marque ISIX) — aucune donnée n'y est encodée. */
+const ATTACK_SURFACE_RING_COLORS = ['#39c5cf', '#2f81f7', '#6e7bfa', '#8957e5', '#a371f7'];
+
 function KpiTile({
   label,
   value,
@@ -623,33 +626,34 @@ function DashboardPage() {
               action={{ label: 'Voir les actifs', onClick: () => navigate('/assets') }}
             >
               <Stack direction="row" spacing={2} sx={{ alignItems: 'center', mb: 1.5 }}>
-                <Box sx={{ position: 'relative', width: 88, height: 88, flexShrink: 0 }}>
-                  {[0, 1, 2, 3].map((i) => (
+                <Box sx={{ position: 'relative', width: 92, height: 92, flexShrink: 0 }}>
+                  {ATTACK_SURFACE_RING_COLORS.map((c, i) => (
                     <Box
-                      key={i}
+                      key={c}
                       sx={{
                         position: 'absolute',
-                        inset: i * 11,
+                        inset: i * 9,
                         borderRadius: '50%',
-                        border: '2px solid',
-                        borderColor: alpha(severityColors.critical, 0.5 - i * 0.1),
+                        background: `conic-gradient(from ${180 + i * 18}deg, ${c}, transparent 55%)`,
+                        WebkitMask:
+                          'radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px))',
+                        mask: 'radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px))',
                       }}
                     />
                   ))}
                   <Box
                     sx={{
                       position: 'absolute',
-                      inset: 0,
+                      inset: 27,
+                      borderRadius: '50%',
                       display: 'flex',
-                      flexDirection: 'column',
                       alignItems: 'center',
                       justifyContent: 'center',
+                      background: 'radial-gradient(circle at 35% 30%, #1f3b73, #0b1626 75%)',
+                      boxShadow: '0 0 14px 2px rgba(57,197,207,0.35)',
                     }}
                   >
-                    <ShieldIcon sx={{ color: severityColors.critical, fontSize: 22 }} />
-                    <Typography variant="caption" sx={{ fontWeight: 800 }}>
-                      {derived.criticalExposed.length}
-                    </Typography>
+                    <ShieldIcon sx={{ color: '#8ecfff', fontSize: 22 }} />
                   </Box>
                 </Box>
                 <Stack spacing={0.75} sx={{ flexGrow: 1, minWidth: 0 }}>
