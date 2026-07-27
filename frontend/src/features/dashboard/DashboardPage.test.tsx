@@ -130,7 +130,7 @@ describe('DashboardPage', () => {
     await screen.findByText('Alertes totales');
 
     expect(screen.getAllByTestId('echart').length).toBeGreaterThan(0);
-    expect(screen.getByText('Temps réel')).toBeInTheDocument();
+    expect(screen.getByText('En temps réel')).toBeInTheDocument();
     expect(screen.getByText('Plateforme opérationnelle')).toBeInTheDocument();
     expect(screen.getByText('Activité — 7 derniers jours')).toBeInTheDocument();
   });

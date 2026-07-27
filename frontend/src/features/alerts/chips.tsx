@@ -1,5 +1,11 @@
 import Chip from '@mui/material/Chip';
+import { useTheme } from '@mui/material/styles';
 import { severityColors } from '../../app/theme';
+import {
+  resolveChipColor,
+  softChipSx,
+  type ChipPaletteColor,
+} from '../../shared/components/chipStyles';
 import type { AlertSeverity, AlertStatus } from './alertsApi';
 
 export const STATUS_LABELS: Record<AlertStatus, string> = {
@@ -10,22 +16,13 @@ export const STATUS_LABELS: Record<AlertStatus, string> = {
   FALSE_POSITIVE: 'Faux positif',
 };
 
-/** Sévérité : couleur issue de la palette centralisée du thème, pastille pleine (lisible dans les deux modes). */
+/** Sévérité : couleur issue de la palette centralisée du thème, badge doux (lisible dans les deux modes). */
 export function SeverityChip({ severity }: { severity: AlertSeverity }) {
   const color = severityColors[severity.toLowerCase() as keyof typeof severityColors];
-  return (
-    <Chip
-      label={severity}
-      size="small"
-      sx={{ bgcolor: color, color: '#0d1117', fontWeight: 700, minWidth: 82 }}
-    />
-  );
+  return <Chip label={severity} size="small" sx={{ ...softChipSx(color), minWidth: 82 }} />;
 }
 
-const STATUS_CHIP_COLORS: Record<
-  AlertStatus,
-  'info' | 'warning' | 'secondary' | 'success' | 'default'
-> = {
+const STATUS_CHIP_COLORS: Record<AlertStatus, ChipPaletteColor> = {
   NEW: 'info',
   ACKNOWLEDGED: 'warning',
   IN_PROGRESS: 'secondary',
@@ -34,5 +31,7 @@ const STATUS_CHIP_COLORS: Record<
 };
 
 export function StatusChip({ status }: { status: AlertStatus }) {
-  return <Chip label={STATUS_LABELS[status]} size="small" color={STATUS_CHIP_COLORS[status]} />;
+  const theme = useTheme();
+  const color = resolveChipColor(theme, STATUS_CHIP_COLORS[status]);
+  return <Chip label={STATUS_LABELS[status]} size="small" sx={softChipSx(color)} />;
 }

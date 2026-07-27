@@ -183,7 +183,7 @@ function AppLayout() {
               dense
               subheader={
                 !collapsed ? (
-                  <ListSubheader sx={{ bgcolor: 'transparent', lineHeight: '32px' }}>
+                  <ListSubheader disableSticky sx={{ bgcolor: 'transparent', lineHeight: '32px' }}>
                     {section.title}
                   </ListSubheader>
                 ) : undefined

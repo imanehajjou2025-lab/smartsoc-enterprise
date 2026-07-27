@@ -8,24 +8,33 @@ import CircularProgress from '@mui/material/CircularProgress';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
+import { alpha, keyframes, useTheme } from '@mui/material/styles';
 import BugReportIcon from '@mui/icons-material/BugReport';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
 import DnsIcon from '@mui/icons-material/Dns';
+import ErrorOutlineIcon from '@mui/icons-material/ErrorOutlineOutlined';
 import GppMaybeIcon from '@mui/icons-material/GppMaybe';
 import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
 import PublicIcon from '@mui/icons-material/Public';
 import ShieldIcon from '@mui/icons-material/Shield';
 import type { EChartsOption } from 'echarts';
 import { severityColors } from '../../app/theme';
-import { useThemeMode } from '../../app/ThemeModeProvider';
 import { problemDetail } from '../../shared/api/client';
 import EChart from '../../shared/components/EChart';
-import { SeverityChip, StatusChip } from '../alerts/chips';
+import { resolveChipColor, softChipSx } from '../../shared/components/chipStyles';
+import { SeverityChip } from '../alerts/chips';
 import { useAlertsRealtime } from '../alerts/useAlertsRealtime';
 import { IncidentStatusChip, INCIDENT_STATUS_LABELS } from '../incidents/incidentChips';
 import type { IncidentStatus } from '../incidents/incidentsApi';
 import type { Asset, AssetCriticality } from '../assets/assetsApi';
 import type { AlertStats } from './dashboardApi';
 import { useDashboardData } from './useDashboardData';
+
+const pulse = keyframes`
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.35; transform: scale(1.5); }
+`;
 
 const INCIDENT_STATUS_ORDER: IncidentStatus[] = [
   'OPEN',
@@ -80,25 +89,32 @@ function KpiTile({
       onClick={onClick}
       sx={{
         p: 2,
+        minHeight: 108,
         display: 'flex',
-        gap: 2,
+        gap: 1.75,
         alignItems: 'center',
         flex: 1,
+        borderRadius: 3,
         cursor: onClick ? 'pointer' : 'default',
-        '&:hover': onClick ? { borderColor: 'primary.main' } : undefined,
+        borderColor: alpha(color, 0.25),
+        background: (t) =>
+          `linear-gradient(135deg, ${alpha(color, t.palette.mode === 'dark' ? 0.18 : 0.12)} 0%, ${t.palette.background.paper} 70%)`,
+        transition: 'transform 150ms ease, border-color 150ms ease',
+        '&:hover': onClick ? { borderColor: color, transform: 'translateY(-2px)' } : undefined,
       }}
     >
       <Box
         sx={{
           width: 46,
           height: 46,
-          borderRadius: '12px',
+          borderRadius: '50%',
           flexShrink: 0,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           color,
-          backgroundColor: `${color}22`,
+          backgroundColor: alpha(color, 0.16),
+          boxShadow: `0 0 16px 3px ${alpha(color, 0.45)}`,
         }}
       >
         {icon}
@@ -107,7 +123,7 @@ function KpiTile({
         <Typography
           variant="caption"
           color="text.secondary"
-          sx={{ textTransform: 'uppercase', letterSpacing: 0.4 }}
+          sx={{ textTransform: 'uppercase', letterSpacing: 0.4, fontWeight: 700 }}
         >
           {label}
         </Typography>
@@ -137,7 +153,9 @@ function Panel({
         direction="row"
         sx={{ alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}
       >
-        <Typography variant="subtitle2">{title}</Typography>
+        <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+          {title}
+        </Typography>
         {action && (
           <Button size="small" onClick={action.onClick}>
             {action.label}
@@ -150,42 +168,27 @@ function Panel({
 }
 
 /**
- * Anneau de couverture MITRE, centré (pourcentage + fraction observée/
- * catalogue) — même patron exact que `MitrePage.coverageOption`, pour
- * une lecture cohérente entre les deux pages. Couleurs de texte
- * théma-conscientes (contrairement au donut de sévérité qu'il remplace,
- * qui n'avait pas sa place ici : cette carte doit refléter MITRE, pas la
- * répartition des alertes).
+ * Anneau de couverture MITRE (observées vs catalogue). Le pourcentage et
+ * le total ne sont PAS le titre ECharts (son centrage interne dépend de
+ * la largeur du texte et dérive facilement) — ils sont affichés par une
+ * superposition CSS/flexbox strictement centrée sur le conteneur, voir
+ * le rendu dans `DashboardPage`.
  */
-function mitreCoverageOption(
-  observed: number,
-  total: number,
-  pct: number,
-  textColor: string,
-  mutedColor: string,
-): EChartsOption {
+function mitreCoverageOption(observed: number, total: number): EChartsOption {
   return {
     tooltip: { trigger: 'item' },
-    title: {
-      text: `${pct}%`,
-      subtext: `${observed}/${total}`,
-      left: 'center',
-      top: 'center',
-      textAlign: 'center',
-      textStyle: { color: textColor, fontSize: 22, fontWeight: 700 },
-      subtextStyle: { color: mutedColor, fontSize: 12 },
-    },
     series: [
       {
         type: 'pie',
-        radius: ['58%', '82%'],
+        radius: ['62%', '86%'],
         label: { show: false },
+        silent: true,
         data: [
           { name: 'Observées', value: observed, itemStyle: { color: severityColors.low } },
           {
             name: 'Non observées',
             value: Math.max(0, total - observed),
-            itemStyle: { color: 'rgba(139,148,158,0.35)' },
+            itemStyle: { color: 'rgba(139,148,158,0.3)' },
           },
         ],
       },
@@ -267,9 +270,7 @@ function DashboardPage() {
   const navigate = useNavigate();
   const { data, isPending, isError, error } = useDashboardData();
   const { connected } = useAlertsRealtime();
-  const { mode } = useThemeMode();
-  const textColor = mode === 'dark' ? '#e6edf3' : '#1f2328';
-  const mutedColor = mode === 'dark' ? '#8b949e' : '#57606a';
+  const theme = useTheme();
 
   const timeline = useMemo(() => (data ? timelineOption(data.alertStats) : null), [data]);
   const sources = useMemo(() => (data ? sourcesBarOption(data.alertStats) : null), [data]);
@@ -283,6 +284,7 @@ function DashboardPage() {
 
     const assetsByCriticality = countBy(assets, (a) => a.criticality);
     const criticalExposed = assets.filter(isExposedCritical);
+    const internetFacingCount = assets.filter((a) => a.exposure === 'INTERNET_FACING').length;
 
     const fpRate =
       alertStats.total > 0
@@ -334,6 +336,7 @@ function DashboardPage() {
       incidentsOpen,
       assetsByCriticality,
       criticalExposed,
+      internetFacingCount,
       fpRate,
       coveragePct,
       observedCount: observed.length,
@@ -345,14 +348,8 @@ function DashboardPage() {
 
   const mitreDonut = useMemo(() => {
     if (!data || !derived) return null;
-    return mitreCoverageOption(
-      derived.observedCount,
-      data.techniques.length,
-      derived.coveragePct,
-      textColor,
-      mutedColor,
-    );
-  }, [data, derived, textColor, mutedColor]);
+    return mitreCoverageOption(derived.observedCount, data.techniques.length);
+  }, [data, derived]);
 
   return (
     <Box>
@@ -360,20 +357,52 @@ function DashboardPage() {
         <Typography variant="h5" component="h2">
           Dashboard
         </Typography>
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 0.75,
+            px: 1.25,
+            py: 0.4,
+            borderRadius: 999,
+            border: '1px solid',
+            borderColor: alpha(connected ? severityColors.low : theme.palette.text.disabled, 0.4),
+            bgcolor: alpha(connected ? severityColors.low : theme.palette.text.disabled, 0.1),
+          }}
+        >
+          <Box
+            sx={{
+              width: 7,
+              height: 7,
+              borderRadius: '50%',
+              bgcolor: connected ? severityColors.low : theme.palette.text.disabled,
+              boxShadow: connected ? `0 0 6px 2px ${alpha(severityColors.low, 0.7)}` : 'none',
+              animation: connected ? `${pulse} 1.6s ease-in-out infinite` : 'none',
+            }}
+          />
+          <Typography
+            variant="caption"
+            sx={{
+              fontWeight: 700,
+              color: connected ? severityColors.low : 'text.secondary',
+            }}
+          >
+            {connected ? 'En temps réel' : 'Hors ligne'}
+          </Typography>
+        </Box>
         <Chip
           size="small"
-          label={connected ? 'Temps réel' : 'Hors ligne'}
-          color={connected ? 'success' : 'default'}
-        />
-        <Chip
-          size="small"
+          icon={
+            isError ? <ErrorOutlineIcon fontSize="small" /> : <CheckCircleIcon fontSize="small" />
+          }
           label={isError ? 'Source(s) indisponible(s)' : 'Plateforme opérationnelle'}
-          color={isError ? 'error' : 'success'}
+          sx={softChipSx(resolveChipColor(theme, isError ? 'error' : 'success'))}
         />
         {data && (
           <Button
             size="small"
             variant="outlined"
+            startIcon={<DescriptionOutlinedIcon fontSize="small" />}
             component="a"
             href="/reports"
             onClick={(e) => {
@@ -491,6 +520,25 @@ function DashboardPage() {
                     sx={{ alignItems: 'center', cursor: 'pointer' }}
                     onClick={() => navigate('/alerts')}
                   >
+                    <SeverityChip severity={a.severity} />
+                    <Typography variant="body2" noWrap sx={{ flexGrow: 1, fontWeight: 600 }}>
+                      {a.title}
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      noWrap
+                      sx={{ minWidth: 64 }}
+                    >
+                      {a.source}
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{ whiteSpace: 'nowrap' }}
+                    >
+                      {timeAgo(a.detectedAt)}
+                    </Typography>
                     <Box
                       sx={{
                         width: 8,
@@ -501,18 +549,6 @@ function DashboardPage() {
                           severityColors[a.severity.toLowerCase() as keyof typeof severityColors],
                       }}
                     />
-                    <SeverityChip severity={a.severity} />
-                    <Typography variant="body2" noWrap sx={{ flexGrow: 1 }}>
-                      {a.title}
-                    </Typography>
-                    <Typography
-                      variant="caption"
-                      color="text.secondary"
-                      sx={{ whiteSpace: 'nowrap' }}
-                    >
-                      {timeAgo(a.detectedAt)}
-                    </Typography>
-                    <StatusChip status={a.status} />
                   </Stack>
                 ))}
               </Stack>
@@ -534,8 +570,26 @@ function DashboardPage() {
             >
               {mitreDonut && (
                 <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-                  <Box sx={{ width: 180 }}>
+                  <Box sx={{ position: 'relative', width: 180, height: 160 }}>
                     <EChart option={mitreDonut} height={160} />
+                    <Box
+                      sx={{
+                        position: 'absolute',
+                        inset: 0,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        pointerEvents: 'none',
+                      }}
+                    >
+                      <Typography variant="h5" sx={{ fontWeight: 800, lineHeight: 1 }}>
+                        {derived.coveragePct}%
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {derived.observedCount}/{data.techniques.length}
+                      </Typography>
+                    </Box>
                   </Box>
                 </Box>
               )}
@@ -568,27 +622,85 @@ function DashboardPage() {
               title="Surface d'attaque"
               action={{ label: 'Voir les actifs', onClick: () => navigate('/assets') }}
             >
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-                Actifs critiques exposés à Internet
-              </Typography>
+              <Stack direction="row" spacing={2} sx={{ alignItems: 'center', mb: 1.5 }}>
+                <Box sx={{ position: 'relative', width: 88, height: 88, flexShrink: 0 }}>
+                  {[0, 1, 2, 3].map((i) => (
+                    <Box
+                      key={i}
+                      sx={{
+                        position: 'absolute',
+                        inset: i * 11,
+                        borderRadius: '50%',
+                        border: '2px solid',
+                        borderColor: alpha(severityColors.critical, 0.5 - i * 0.1),
+                      }}
+                    />
+                  ))}
+                  <Box
+                    sx={{
+                      position: 'absolute',
+                      inset: 0,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <ShieldIcon sx={{ color: severityColors.critical, fontSize: 22 }} />
+                    <Typography variant="caption" sx={{ fontWeight: 800 }}>
+                      {derived.criticalExposed.length}
+                    </Typography>
+                  </Box>
+                </Box>
+                <Stack spacing={0.75} sx={{ flexGrow: 1, minWidth: 0 }}>
+                  <Stack direction="row" sx={{ justifyContent: 'space-between' }}>
+                    <Typography variant="caption" color="text.secondary">
+                      Critiques exposés Internet
+                    </Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                      {derived.criticalExposed.length}
+                    </Typography>
+                  </Stack>
+                  <Stack direction="row" sx={{ justifyContent: 'space-between' }}>
+                    <Typography variant="caption" color="text.secondary">
+                      Actifs exposés Internet
+                    </Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                      {derived.internetFacingCount}
+                    </Typography>
+                  </Stack>
+                  <Stack direction="row" sx={{ justifyContent: 'space-between' }}>
+                    <Typography variant="caption" color="text.secondary">
+                      Actifs au total
+                    </Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                      {data.assetsTotal}
+                    </Typography>
+                  </Stack>
+                </Stack>
+              </Stack>
               <Stack spacing={0.75}>
                 {derived.criticalExposed.length === 0 && (
                   <Typography variant="body2" color="text.secondary">
                     Aucun actif critique exposé.
                   </Typography>
                 )}
-                {derived.criticalExposed.slice(0, 5).map((asset) => (
+                {derived.criticalExposed.slice(0, 4).map((asset) => (
                   <Stack
                     key={asset.id}
                     direction="row"
                     spacing={1}
-                    sx={{ justifyContent: 'space-between', cursor: 'pointer' }}
+                    sx={{
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      cursor: 'pointer',
+                    }}
                     onClick={() => navigate(`/assets?selected=${asset.id}`)}
                   >
                     <Typography variant="caption" noWrap>
                       {asset.hostname}
                     </Typography>
-                    <Chip label="Internet" size="small" color="error" />
+                    <Chip label="Internet" size="small" sx={softChipSx(theme.palette.error.main)} />
                   </Stack>
                 ))}
               </Stack>
