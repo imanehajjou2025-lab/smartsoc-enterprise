@@ -374,8 +374,9 @@ function DashboardPage() {
           mb: 3,
           borderRadius: 4,
           flexWrap: 'wrap',
-          background: 'linear-gradient(135deg, #0b1220 0%, #0d1b2e 100%)',
-          boxShadow: '0 8px 30px rgba(0,0,0,0.35)',
+          border: '1px solid',
+          borderColor: alpha(theme.palette.primary.main, 0.18),
+          background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.22 : 0.1)} 0%, ${theme.palette.background.paper} 80%)`,
         }}
       >
         <Box
@@ -387,26 +388,27 @@ function DashboardPage() {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            bgcolor: 'rgba(47,129,247,0.14)',
-            border: '1px solid rgba(47,129,247,0.35)',
+            bgcolor: alpha(theme.palette.primary.main, 0.14),
+            border: '1px solid',
+            borderColor: alpha(theme.palette.primary.main, 0.35),
           }}
         >
-          <DashboardIcon sx={{ color: '#58a6ff', fontSize: 28 }} />
+          <DashboardIcon sx={{ color: theme.palette.primary.main, fontSize: 28 }} />
         </Box>
 
         <Box sx={{ minWidth: 0 }}>
-          <Typography variant="h5" component="h2" sx={{ color: '#f0f6fc', fontWeight: 800 }}>
+          <Typography variant="h5" component="h2" sx={{ fontWeight: 800 }}>
             Dashboard
           </Typography>
-          <Typography variant="body2" sx={{ color: '#8b949e' }}>
+          <Typography variant="body2" color="text.secondary">
             Bienvenue,{' '}
-            <Box component="span" sx={{ color: '#58a6ff', fontWeight: 700 }}>
+            <Box component="span" sx={{ color: theme.palette.primary.main, fontWeight: 700 }}>
               {displayName}
             </Box>
           </Typography>
         </Box>
 
-        <Box sx={{ width: '1px', alignSelf: 'stretch', bgcolor: 'rgba(255,255,255,0.1)' }} />
+        <Box sx={{ width: '1px', alignSelf: 'stretch', bgcolor: 'divider' }} />
 
         <Box
           sx={{
@@ -417,8 +419,8 @@ function DashboardPage() {
             py: 0.6,
             borderRadius: 999,
             border: '1px solid',
-            borderColor: alpha(connected ? severityColors.low : '#8b949e', 0.4),
-            bgcolor: alpha(connected ? severityColors.low : '#8b949e', 0.12),
+            borderColor: alpha(connected ? severityColors.low : theme.palette.text.secondary, 0.4),
+            bgcolor: alpha(connected ? severityColors.low : theme.palette.text.secondary, 0.12),
           }}
         >
           <Box
@@ -426,17 +428,23 @@ function DashboardPage() {
               width: 8,
               height: 8,
               borderRadius: '50%',
-              bgcolor: connected ? severityColors.low : '#8b949e',
+              bgcolor: connected ? severityColors.low : theme.palette.text.secondary,
               boxShadow: connected ? `0 0 6px 2px ${alpha(severityColors.low, 0.7)}` : 'none',
               animation: connected ? `${pulse} 1.6s ease-in-out infinite` : 'none',
             }}
           />
           <MonitorHeartIcon
-            sx={{ fontSize: 18, color: connected ? severityColors.low : '#8b949e' }}
+            sx={{
+              fontSize: 18,
+              color: connected ? severityColors.low : theme.palette.text.secondary,
+            }}
           />
           <Typography
             variant="body2"
-            sx={{ fontWeight: 700, color: connected ? severityColors.low : '#8b949e' }}
+            sx={{
+              fontWeight: 700,
+              color: connected ? severityColors.low : theme.palette.text.secondary,
+            }}
           >
             {connected ? 'En temps réel' : 'Hors ligne'}
           </Typography>
@@ -451,18 +459,21 @@ function DashboardPage() {
             py: 0.6,
             borderRadius: 999,
             border: '1px solid',
-            borderColor: alpha(isError ? severityColors.critical : '#58a6ff', 0.4),
-            bgcolor: alpha(isError ? severityColors.critical : '#58a6ff', 0.12),
+            borderColor: alpha(isError ? severityColors.critical : theme.palette.primary.main, 0.4),
+            bgcolor: alpha(isError ? severityColors.critical : theme.palette.primary.main, 0.12),
           }}
         >
           {isError ? (
             <ErrorOutlineIcon sx={{ fontSize: 18, color: severityColors.critical }} />
           ) : (
-            <GppGoodIcon sx={{ fontSize: 18, color: '#58a6ff' }} />
+            <GppGoodIcon sx={{ fontSize: 18, color: theme.palette.primary.main }} />
           )}
           <Typography
             variant="body2"
-            sx={{ fontWeight: 700, color: isError ? severityColors.critical : '#58a6ff' }}
+            sx={{
+              fontWeight: 700,
+              color: isError ? severityColors.critical : theme.palette.primary.main,
+            }}
           >
             {isError ? 'Source(s) indisponible(s)' : 'Plateforme opérationnelle'}
           </Typography>
@@ -602,7 +613,7 @@ function DashboardPage() {
                     onClick={() => navigate('/alerts')}
                   >
                     <SeverityChip severity={a.severity} />
-                    <Typography variant="body2" noWrap sx={{ flexGrow: 1, fontWeight: 600 }}>
+                    <Typography variant="body2" noWrap sx={{ flexGrow: 1 }}>
                       {a.title}
                     </Typography>
                     <Typography
