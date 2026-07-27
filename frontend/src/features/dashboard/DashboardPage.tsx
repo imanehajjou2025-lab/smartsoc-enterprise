@@ -10,19 +10,23 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { alpha, keyframes, useTheme } from '@mui/material/styles';
 import BugReportIcon from '@mui/icons-material/BugReport';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import DashboardIcon from '@mui/icons-material/Dashboard';
 import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
 import DnsIcon from '@mui/icons-material/Dns';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutlineOutlined';
+import GppGoodIcon from '@mui/icons-material/GppGood';
 import GppMaybeIcon from '@mui/icons-material/GppMaybe';
 import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
+import MonitorHeartIcon from '@mui/icons-material/MonitorHeart';
 import PublicIcon from '@mui/icons-material/Public';
 import ShieldIcon from '@mui/icons-material/Shield';
 import type { EChartsOption } from 'echarts';
+import { useAppSelector } from '../../app/hooks';
 import { severityColors } from '../../app/theme';
 import { problemDetail } from '../../shared/api/client';
 import EChart from '../../shared/components/EChart';
-import { resolveChipColor, softChipSx } from '../../shared/components/chipStyles';
+import { softChipSx } from '../../shared/components/chipStyles';
 import { SeverityChip } from '../alerts/chips';
 import { useAlertsRealtime } from '../alerts/useAlertsRealtime';
 import { IncidentStatusChip, INCIDENT_STATUS_LABELS } from '../incidents/incidentChips';
@@ -274,6 +278,7 @@ function DashboardPage() {
   const { data, isPending, isError, error } = useDashboardData();
   const { connected } = useAlertsRealtime();
   const theme = useTheme();
+  const user = useAppSelector((state) => state.auth.user);
 
   const timeline = useMemo(() => (data ? timelineOption(data.alertStats) : null), [data]);
   const sources = useMemo(() => (data ? sourcesBarOption(data.alertStats) : null), [data]);
@@ -354,69 +359,142 @@ function DashboardPage() {
     return mitreCoverageOption(derived.observedCount, data.techniques.length);
   }, [data, derived]);
 
+  const displayName = user?.fullName ?? user?.username ?? '—';
+
   return (
     <Box>
-      <Stack direction="row" spacing={1.5} sx={{ mb: 2, alignItems: 'center' }}>
-        <Typography variant="h5" component="h2">
-          Dashboard
-        </Typography>
+      <Paper
+        elevation={0}
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 2.5,
+          px: 2.5,
+          py: 2,
+          mb: 3,
+          borderRadius: 4,
+          flexWrap: 'wrap',
+          background: 'linear-gradient(135deg, #0b1220 0%, #0d1b2e 100%)',
+          boxShadow: '0 8px 30px rgba(0,0,0,0.35)',
+        }}
+      >
+        <Box
+          sx={{
+            width: 56,
+            height: 56,
+            borderRadius: 2,
+            flexShrink: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            bgcolor: 'rgba(47,129,247,0.14)',
+            border: '1px solid rgba(47,129,247,0.35)',
+          }}
+        >
+          <DashboardIcon sx={{ color: '#58a6ff', fontSize: 28 }} />
+        </Box>
+
+        <Box sx={{ minWidth: 0 }}>
+          <Typography variant="h5" component="h2" sx={{ color: '#f0f6fc', fontWeight: 800 }}>
+            Dashboard
+          </Typography>
+          <Typography variant="body2" sx={{ color: '#8b949e' }}>
+            Bienvenue,{' '}
+            <Box component="span" sx={{ color: '#58a6ff', fontWeight: 700 }}>
+              {displayName}
+            </Box>
+          </Typography>
+        </Box>
+
+        <Box sx={{ width: '1px', alignSelf: 'stretch', bgcolor: 'rgba(255,255,255,0.1)' }} />
+
         <Box
           sx={{
             display: 'flex',
             alignItems: 'center',
             gap: 0.75,
-            px: 1.25,
-            py: 0.4,
+            px: 1.5,
+            py: 0.6,
             borderRadius: 999,
             border: '1px solid',
-            borderColor: alpha(connected ? severityColors.low : theme.palette.text.disabled, 0.4),
-            bgcolor: alpha(connected ? severityColors.low : theme.palette.text.disabled, 0.1),
+            borderColor: alpha(connected ? severityColors.low : '#8b949e', 0.4),
+            bgcolor: alpha(connected ? severityColors.low : '#8b949e', 0.12),
           }}
         >
           <Box
             sx={{
-              width: 7,
-              height: 7,
+              width: 8,
+              height: 8,
               borderRadius: '50%',
-              bgcolor: connected ? severityColors.low : theme.palette.text.disabled,
+              bgcolor: connected ? severityColors.low : '#8b949e',
               boxShadow: connected ? `0 0 6px 2px ${alpha(severityColors.low, 0.7)}` : 'none',
               animation: connected ? `${pulse} 1.6s ease-in-out infinite` : 'none',
             }}
           />
+          <MonitorHeartIcon
+            sx={{ fontSize: 18, color: connected ? severityColors.low : '#8b949e' }}
+          />
           <Typography
-            variant="caption"
-            sx={{
-              fontWeight: 700,
-              color: connected ? severityColors.low : 'text.secondary',
-            }}
+            variant="body2"
+            sx={{ fontWeight: 700, color: connected ? severityColors.low : '#8b949e' }}
           >
             {connected ? 'En temps réel' : 'Hors ligne'}
           </Typography>
         </Box>
-        <Chip
-          size="small"
-          icon={
-            isError ? <ErrorOutlineIcon fontSize="small" /> : <CheckCircleIcon fontSize="small" />
-          }
-          label={isError ? 'Source(s) indisponible(s)' : 'Plateforme opérationnelle'}
-          sx={softChipSx(resolveChipColor(theme, isError ? 'error' : 'success'))}
-        />
+
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 0.75,
+            px: 1.5,
+            py: 0.6,
+            borderRadius: 999,
+            border: '1px solid',
+            borderColor: alpha(isError ? severityColors.critical : '#58a6ff', 0.4),
+            bgcolor: alpha(isError ? severityColors.critical : '#58a6ff', 0.12),
+          }}
+        >
+          {isError ? (
+            <ErrorOutlineIcon sx={{ fontSize: 18, color: severityColors.critical }} />
+          ) : (
+            <GppGoodIcon sx={{ fontSize: 18, color: '#58a6ff' }} />
+          )}
+          <Typography
+            variant="body2"
+            sx={{ fontWeight: 700, color: isError ? severityColors.critical : '#58a6ff' }}
+          >
+            {isError ? 'Source(s) indisponible(s)' : 'Plateforme opérationnelle'}
+          </Typography>
+        </Box>
+
+        <Box sx={{ flexGrow: 1 }} />
+
         {data && (
           <Button
-            size="small"
-            variant="outlined"
-            startIcon={<DescriptionOutlinedIcon fontSize="small" />}
+            variant="contained"
+            disableElevation
+            startIcon={<DescriptionOutlinedIcon />}
+            endIcon={<ChevronRightIcon />}
             component="a"
             href="/reports"
             onClick={(e) => {
               e.preventDefault();
               navigate('/reports');
             }}
+            sx={{
+              bgcolor: '#2f81f7',
+              borderRadius: 2,
+              px: 2.5,
+              fontWeight: 700,
+              boxShadow: '0 0 20px rgba(47,129,247,0.5)',
+              '&:hover': { bgcolor: '#1f6feb', boxShadow: '0 0 24px rgba(47,129,247,0.65)' },
+            }}
           >
             Générer un rapport
           </Button>
         )}
-      </Stack>
+      </Paper>
 
       {isPending && (
         <Box sx={{ display: 'flex', justifyContent: 'center', mt: 6 }}>
