@@ -7,6 +7,7 @@ import Divider from '@mui/material/Divider';
 import Drawer from '@mui/material/Drawer';
 import IconButton from '@mui/material/IconButton';
 import LinkOffIcon from '@mui/icons-material/LinkOff';
+import SmartToyOutlinedIcon from '@mui/icons-material/SmartToyOutlined';
 import TravelExploreIcon from '@mui/icons-material/TravelExplore';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
@@ -17,6 +18,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAppSelector } from '../../app/hooks';
 import { problemDetail } from '../../shared/api/client';
 import { SeverityChip } from '../alerts/chips';
+import { setAssistantContext, summarizeIncidentForAssistant } from '../assistant/assistantContext';
 import { openCaseFromIncident } from '../investigations/investigationsApi';
 import { ExecutionStatusChip } from '../soar/soarChips';
 import { listExecutionsForIncident } from '../soar/soarApi';
@@ -154,9 +156,9 @@ function IncidentDetailDrawer({ incidentId, onClose }: Props) {
               </Alert>
             )}
 
-            {canWrite && (
-              <>
-                <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
+            <Stack direction="row" spacing={1} sx={{ mb: 2, flexWrap: 'wrap' }} useFlexGap>
+              {canWrite && (
+                <>
                   <Button
                     size="small"
                     variant="contained"
@@ -174,8 +176,27 @@ function IncidentDetailDrawer({ incidentId, onClose }: Props) {
                   >
                     Exécuter un playbook
                   </Button>
-                </Stack>
+                </>
+              )}
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<SmartToyOutlinedIcon />}
+                onClick={() => {
+                  setAssistantContext({
+                    incidentId: data.incident.id,
+                    summary: summarizeIncidentForAssistant(data.incident),
+                  });
+                  onClose();
+                  navigate('/assistant');
+                }}
+              >
+                Demander à l'assistant
+              </Button>
+            </Stack>
 
+            {canWrite && (
+              <>
                 <Field label="Changer le statut">
                   <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
                     {ALLOWED_TRANSITIONS[data.incident.status].map((target) => (

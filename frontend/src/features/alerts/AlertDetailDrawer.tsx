@@ -9,6 +9,7 @@ import Typography from '@mui/material/Typography';
 import ArrowOutwardIcon from '@mui/icons-material/ArrowOutward';
 import DnsIcon from '@mui/icons-material/Dns';
 import GppMaybeIcon from '@mui/icons-material/GppMaybe';
+import SmartToyOutlinedIcon from '@mui/icons-material/SmartToyOutlined';
 import axios from 'axios';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
@@ -17,6 +18,7 @@ import { problemDetail } from '../../shared/api/client';
 import { severityColors } from '../../app/theme';
 import { getAssetByHostname } from '../assets/assetsApi';
 import { ExposureChip } from '../assets/assetChips';
+import { setAssistantContext, summarizeAlertForAssistant } from '../assistant/assistantContext';
 import { getAlertThreatIntel } from '../intelligence/intelligenceApi';
 import { getAlertMitre, type ResolvedTechnique } from '../mitre/mitreApi';
 import { escalateFromAlert } from '../incidents/incidentsApi';
@@ -149,18 +151,34 @@ function AlertDetailDrawer({ alert, onClose, onUpdated }: Props) {
             </Alert>
           )}
 
-          {canTriage && (
+          <Stack direction="row" spacing={1} sx={{ mb: 2, flexWrap: 'wrap' }} useFlexGap>
+            {canTriage && (
+              <Button
+                size="small"
+                variant="contained"
+                startIcon={<ArrowOutwardIcon />}
+                disabled={escalateMutation.isPending}
+                onClick={() => escalateMutation.mutate(alert.id)}
+              >
+                {escalateMutation.isPending ? 'Escalade…' : 'Escalader en incident'}
+              </Button>
+            )}
             <Button
               size="small"
-              variant="contained"
-              startIcon={<ArrowOutwardIcon />}
-              disabled={escalateMutation.isPending}
-              onClick={() => escalateMutation.mutate(alert.id)}
-              sx={{ mb: 2 }}
+              variant="outlined"
+              startIcon={<SmartToyOutlinedIcon />}
+              onClick={() => {
+                setAssistantContext({
+                  alertId: alert.id,
+                  summary: summarizeAlertForAssistant(alert),
+                });
+                onClose();
+                navigate('/assistant');
+              }}
             >
-              {escalateMutation.isPending ? 'Escalade…' : 'Escalader en incident'}
+              Demander à l'assistant
             </Button>
-          )}
+          </Stack>
 
           {canTriage && transitions.length > 0 && (
             <>

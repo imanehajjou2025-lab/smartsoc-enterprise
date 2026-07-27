@@ -8,6 +8,7 @@ import MitrePage from '../features/mitre/MitrePage';
 import HuntingPage from '../features/hunting/HuntingPage';
 import SoarPage from '../features/soar/SoarPage';
 import ReportsPage from '../features/reports/ReportsPage';
+import AssistantPage from '../features/assistant/AssistantPage';
 import InvestigationsPage from '../features/investigations/InvestigationsPage';
 import DashboardPage from '../features/dashboard/DashboardPage';
 import LoginPage from '../features/auth/LoginPage';
@@ -42,16 +43,7 @@ export const router = createBrowserRouter([
           { path: 'hunting', element: <HuntingPage /> },
           { path: 'soar', element: <SoarPage /> },
           { path: 'reports', element: <ReportsPage /> },
-          {
-            path: 'assistant',
-            element: (
-              <PageStub
-                title="Assistant IA"
-                description="Agent conversationnel (service IA externe, ADR-005) : analyse d'alertes, résumés d'incidents, recommandations."
-                milestone="jalon intégration IA"
-              />
-            ),
-          },
+          { path: 'assistant', element: <AssistantPage /> },
           {
             element: <RequireRole roles={['ADMIN']} />,
             children: [{ path: 'admin/users', element: <UsersPage /> }],
