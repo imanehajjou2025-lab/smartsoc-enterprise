@@ -27,6 +27,7 @@ public class SecurityConfig {
 
     private final ApiSecurityProblemSupport problemSupport;
     private final IngestApiKeyFilter ingestApiKeyFilter;
+    private final AiToolsApiKeyFilter aiToolsApiKeyFilter;
 
     @Bean
     // S4502 (CSRF disabled): false positive, same finding already dismissed
@@ -60,6 +61,7 @@ public class SecurityConfig {
                         // Cloudflare Tunnel expose ce seul service (sans Nginx).
                         .anyRequest().permitAll())
                 .addFilterBefore(ingestApiKeyFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(aiToolsApiKeyFilter, UsernamePasswordAuthenticationFilter.class)
                 .oauth2ResourceServer(oauth2 -> oauth2
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtConverter))
                         .authenticationEntryPoint(problemSupport)

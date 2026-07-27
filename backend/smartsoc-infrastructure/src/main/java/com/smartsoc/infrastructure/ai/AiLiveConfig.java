@@ -11,6 +11,6 @@ import org.springframework.context.annotation.Configuration;
  */
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnProperty(name = "smartsoc.ai.mode", havingValue = AiProperties.MODE_LIVE)
-@EnableFeignClients(clients = AiClassifierClient.class)
+@EnableFeignClients(clients = {AiClassifierClient.class, SocAssistantClient.class})
 class AiLiveConfig {
 }
