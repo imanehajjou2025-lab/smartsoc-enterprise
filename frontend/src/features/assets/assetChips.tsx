@@ -1,6 +1,8 @@
 import Chip from '@mui/material/Chip';
+import { useTheme } from '@mui/material/styles';
 import PublicIcon from '@mui/icons-material/Public';
 import { severityColors } from '../../app/theme';
+import { softChipSx } from '../../shared/components/chipStyles';
 import type { AssetCriticality, AssetExposure, AssetStatus, AssetType } from './assetsApi';
 
 export const ASSET_TYPE_LABELS: Record<AssetType, string> = {
@@ -31,14 +33,7 @@ export const EXPOSURE_LABELS: Record<AssetExposure, string> = {
  */
 export function CriticalityChip({ criticality }: { criticality: AssetCriticality }) {
   const color = severityColors[criticality.toLowerCase() as 'critical' | 'high' | 'medium' | 'low'];
-  return (
-    <Chip
-      label={criticality}
-      size="small"
-      variant="outlined"
-      sx={{ color, borderColor: color, fontWeight: 600, minWidth: 82 }}
-    />
-  );
+  return <Chip label={criticality} size="small" sx={{ ...softChipSx(color), minWidth: 82 }} />;
 }
 
 /**
@@ -62,12 +57,7 @@ export function ExposureChip({ exposure }: { exposure: AssetExposure }) {
 }
 
 export function AssetStatusChip({ status }: { status: AssetStatus }) {
-  return (
-    <Chip
-      label={ASSET_STATUS_LABELS[status]}
-      size="small"
-      color={status === 'ACTIVE' ? 'success' : 'default'}
-      variant="outlined"
-    />
-  );
+  const theme = useTheme();
+  const color = status === 'ACTIVE' ? theme.palette.success.main : theme.palette.text.secondary;
+  return <Chip label={ASSET_STATUS_LABELS[status]} size="small" sx={softChipSx(color)} />;
 }

@@ -1,4 +1,10 @@
 import Chip from '@mui/material/Chip';
+import { useTheme } from '@mui/material/styles';
+import {
+  resolveChipColor,
+  softChipSx,
+  type ChipPaletteColor,
+} from '../../shared/components/chipStyles';
 import type { CaseStatus, CaseTaskStatus } from './investigationsApi';
 
 export const CASE_STATUS_LABELS: Record<CaseStatus, string> = {
@@ -7,7 +13,7 @@ export const CASE_STATUS_LABELS: Record<CaseStatus, string> = {
   CLOSED: 'Clôturé',
 };
 
-const STATUS_COLORS: Record<CaseStatus, 'info' | 'warning' | 'default'> = {
+const STATUS_COLORS: Record<CaseStatus, ChipPaletteColor> = {
   OPEN: 'info',
   IN_PROGRESS: 'warning',
   CLOSED: 'default',
@@ -20,12 +26,7 @@ export const TASK_STATUS_LABELS: Record<CaseTaskStatus, string> = {
 };
 
 export function CaseStatusChip({ status }: { status: CaseStatus }) {
-  return (
-    <Chip
-      label={CASE_STATUS_LABELS[status]}
-      size="small"
-      color={STATUS_COLORS[status]}
-      variant="outlined"
-    />
-  );
+  const theme = useTheme();
+  const color = resolveChipColor(theme, STATUS_COLORS[status]);
+  return <Chip label={CASE_STATUS_LABELS[status]} size="small" sx={softChipSx(color)} />;
 }

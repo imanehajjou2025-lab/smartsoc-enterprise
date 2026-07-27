@@ -2199,6 +2199,58 @@ console propre à froid à chaque étape.
 
 ---
 
-*Prochaine entrée : refonte du Dashboard ISIX (KPI directs des modules,
-sans dépendance aux rapports), puis l'assistant IA (backend puis
-frontend), dernier module de la plateforme.*
+## 2026-07-27 — Refonte du Dashboard ISIX (PR #72)
+
+**Contexte.** Deuxième PR du chantier ergonomie/branding (PR A = #71,
+mergée). Consigne explicite d'Imane, corrigeant le plan initial : le
+Dashboard doit tirer ses KPI **directement des modules**, jamais du
+module Rapports — Rapports ne doit servir qu'en secours (historique/
+comparaison), le Dashboard doit rester utilisable sans aucun rapport
+généré. Contrôle de réalité déjà fait en amont (entrée PR #71) : carte
+géographique impossible, SLA/vulnérabilités/campagnes APT absents de
+tout endpoint — non construits ici non plus.
+
+**Réalisé.** `useDashboardData.ts` : compose **9 requêtes parallèles**
+directes (alerts, incidents, assets, playbooks, hunts, iocs, techniques
+MITRE, couverture MITRE) — **aucune n'appelle `/reports`** ; les rapports
+n'entrent que via `listReports` pour l'activité récente secondaire.
+Chaque compteur affiché dérive de `totalElements` (vrai total serveur,
+indépendant de la page) ; les répartitions détaillées (statut, criticité,
+top techniques) sont calculées côté client sur les `items` chargés —
+exactes tant que le volume réel reste sous le plafond de page (200, le
+max autorisé par l'API), **annoncé en commentaire, pas masqué**.
+`DashboardPage.tsx` réécrit en 4 zones : **A** — 6 tuiles KPI 100% réelles
+(alertes totales/critiques, incidents ouverts, actifs critiques exposés,
+taux de faux positifs, couverture MITRE — remplace un « score IA »/« score
+de posture » qui aurait nécessité une formule inventée, écartée
+délibérément) ; **B** — activité 7 jours + alertes récentes ; **C** — 6
+panneaux (MITRE, **Surface d'attaque** remplaçant la carte géographique
+impossible, Sources SOC, Incidents & Réponse, Posture des actifs, Threat
+Intelligence) ; **D** — activité récente fusionnant alertes/incidents/
+rapports triés par date, chaque ligne cliquable vers son module. **Chaque
+widget est un point d'entrée réel** (clic → route ou lien profond), pas
+un mur d'affichage statique. **`IncidentsPage.tsx` complété** : lien
+profond `?selected=` ajouté (même patron qu'Assets/MITRE/Rapports,
+absent jusqu'ici) — nécessaire pour que le Dashboard puisse pointer vers
+un incident précis, cohérence apportée à toute la plateforme au passage.
+
+**Vérification.** 4 tests frontend verts (mock de `useDashboardData`
+dans son ensemble plutôt que 8 modules séparés — plus simple, même
+patron que les autres tests de composition). `tsc`, `oxlint`,
+**`npm run build` réel** (leçon de la PR précédente appliquée dès le
+départ) propres. **E2E réelle contre la stack Docker reconstruite** :
+6 KPI vérifiés avec des valeurs réelles (couverture MITRE 29% —
+**identique** à la valeur affichée sur `/mitre`, même calcul, preuve de
+cohérence inter-pages), les 6 panneaux de la zone C peuplés de données
+réelles (0 actif critique exposé — honnête, l'unique actif de démo est
+MEDIUM, pas fictif), activité récente correctement fusionnée et triée
+(rapport du jour en tête, incident le plus ancien en fin), lien profond
+MITRE (`/mitre?selected=T1110`) et lien profond incident nouvellement
+ajouté (`/incidents?selected={id}`, tiroir vérifié ouvert) tous deux
+vérifiés fonctionnels, **zéro scroll horizontal à 2560×1440, 1366×768 et
+768×1024**, console propre à froid à chaque étape.
+
+---
+
+*Prochaine entrée : l'assistant IA (backend puis frontend), dernier
+module de la plateforme.*
