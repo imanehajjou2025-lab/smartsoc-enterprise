@@ -35,8 +35,7 @@ export function CriticalityChip({ criticality }: { criticality: AssetCriticality
     <Chip
       label={criticality}
       size="small"
-      variant="outlined"
-      sx={{ color, borderColor: color, fontWeight: 600, minWidth: 82 }}
+      sx={{ bgcolor: color, color: '#0d1117', fontWeight: 700, minWidth: 82 }}
     />
   );
 }
@@ -67,7 +66,6 @@ export function AssetStatusChip({ status }: { status: AssetStatus }) {
       label={ASSET_STATUS_LABELS[status]}
       size="small"
       color={status === 'ACTIVE' ? 'success' : 'default'}
-      variant="outlined"
     />
   );
 }

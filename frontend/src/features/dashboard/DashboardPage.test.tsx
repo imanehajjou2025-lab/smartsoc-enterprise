@@ -1,13 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { ThemeProvider } from '@mui/material/styles';
 import { Provider } from 'react-redux';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import DashboardPage from './DashboardPage';
 import type { DashboardOverview } from './useDashboardData';
 import { store } from '../../app/store';
-import { theme } from '../../app/theme';
+import { ThemeModeProvider } from '../../app/ThemeModeProvider';
 
 const overview: DashboardOverview = {
   alertStats: {
@@ -106,11 +105,11 @@ function renderPage() {
   return render(
     <Provider store={store}>
       <QueryClientProvider client={queryClient}>
-        <ThemeProvider theme={theme}>
+        <ThemeModeProvider>
           <MemoryRouter>
             <DashboardPage />
           </MemoryRouter>
-        </ThemeProvider>
+        </ThemeModeProvider>
       </QueryClientProvider>
     </Provider>,
   );

@@ -20,12 +20,5 @@ export const TASK_STATUS_LABELS: Record<CaseTaskStatus, string> = {
 };
 
 export function CaseStatusChip({ status }: { status: CaseStatus }) {
-  return (
-    <Chip
-      label={CASE_STATUS_LABELS[status]}
-      size="small"
-      color={STATUS_COLORS[status]}
-      variant="outlined"
-    />
-  );
+  return <Chip label={CASE_STATUS_LABELS[status]} size="small" color={STATUS_COLORS[status]} />;
 }

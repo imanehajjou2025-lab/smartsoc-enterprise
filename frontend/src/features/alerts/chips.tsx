@@ -10,15 +10,14 @@ export const STATUS_LABELS: Record<AlertStatus, string> = {
   FALSE_POSITIVE: 'Faux positif',
 };
 
-/** Sévérité : couleur issue de la palette centralisée du thème. */
+/** Sévérité : couleur issue de la palette centralisée du thème, pastille pleine (lisible dans les deux modes). */
 export function SeverityChip({ severity }: { severity: AlertSeverity }) {
   const color = severityColors[severity.toLowerCase() as keyof typeof severityColors];
   return (
     <Chip
       label={severity}
       size="small"
-      variant="outlined"
-      sx={{ color, borderColor: color, fontWeight: 600, minWidth: 82 }}
+      sx={{ bgcolor: color, color: '#0d1117', fontWeight: 700, minWidth: 82 }}
     />
   );
 }
@@ -35,12 +34,5 @@ const STATUS_CHIP_COLORS: Record<
 };
 
 export function StatusChip({ status }: { status: AlertStatus }) {
-  return (
-    <Chip
-      label={STATUS_LABELS[status]}
-      size="small"
-      color={STATUS_CHIP_COLORS[status]}
-      variant="outlined"
-    />
-  );
+  return <Chip label={STATUS_LABELS[status]} size="small" color={STATUS_CHIP_COLORS[status]} />;
 }

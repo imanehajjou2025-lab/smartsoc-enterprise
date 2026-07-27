@@ -73,7 +73,7 @@ function AppLayout() {
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', maxWidth: '100vw', overflowX: 'hidden' }}>
-      <AppBar position="fixed" sx={{ zIndex: (t) => t.zIndex.drawer + 1 }}>
+      <AppBar position="fixed" color="default" sx={{ zIndex: (t) => t.zIndex.drawer + 1 }}>
         <Toolbar variant="dense" sx={{ gap: 2 }}>
           <Stack sx={{ flexGrow: 1, minWidth: 0 }}>
             <Breadcrumbs

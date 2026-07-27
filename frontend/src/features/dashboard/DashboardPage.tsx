@@ -16,6 +16,7 @@ import PublicIcon from '@mui/icons-material/Public';
 import ShieldIcon from '@mui/icons-material/Shield';
 import type { EChartsOption } from 'echarts';
 import { severityColors } from '../../app/theme';
+import { useThemeMode } from '../../app/ThemeModeProvider';
 import { problemDetail } from '../../shared/api/client';
 import EChart from '../../shared/components/EChart';
 import { SeverityChip, StatusChip } from '../alerts/chips';
@@ -26,7 +27,6 @@ import type { Asset, AssetCriticality } from '../assets/assetsApi';
 import type { AlertStats } from './dashboardApi';
 import { useDashboardData } from './useDashboardData';
 
-const SEVERITY_ORDER = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'] as const;
 const INCIDENT_STATUS_ORDER: IncidentStatus[] = [
   'OPEN',
   'INVESTIGATING',
@@ -40,6 +40,24 @@ const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 function formatDate(iso: string) {
   return new Date(iso).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
 }
+
+/** Temps écoulé, arrondi à l'unité la plus lisible — jamais recalculé côté serveur, purement d'affichage. */
+function timeAgo(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const minutes = Math.floor(diffMs / 60_000);
+  if (minutes < 1) return "à l'instant";
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} h`;
+  const days = Math.floor(hours / 24);
+  return `${days} j`;
+}
+
+const ACTIVITY_KIND_COLOR: Record<'alert' | 'incident' | 'report', string> = {
+  alert: severityColors.critical,
+  incident: severityColors.high,
+  report: severityColors.info,
+};
 
 function KpiTile({
   label,
@@ -131,20 +149,45 @@ function Panel({
   );
 }
 
-function severityDonutOption(stats: AlertStats): EChartsOption {
+/**
+ * Anneau de couverture MITRE, centré (pourcentage + fraction observée/
+ * catalogue) — même patron exact que `MitrePage.coverageOption`, pour
+ * une lecture cohérente entre les deux pages. Couleurs de texte
+ * théma-conscientes (contrairement au donut de sévérité qu'il remplace,
+ * qui n'avait pas sa place ici : cette carte doit refléter MITRE, pas la
+ * répartition des alertes).
+ */
+function mitreCoverageOption(
+  observed: number,
+  total: number,
+  pct: number,
+  textColor: string,
+  mutedColor: string,
+): EChartsOption {
   return {
     tooltip: { trigger: 'item' },
-    legend: { bottom: 0, textStyle: { color: '#8b949e' } },
+    title: {
+      text: `${pct}%`,
+      subtext: `${observed}/${total}`,
+      left: 'center',
+      top: 'center',
+      textAlign: 'center',
+      textStyle: { color: textColor, fontSize: 22, fontWeight: 700 },
+      subtextStyle: { color: mutedColor, fontSize: 12 },
+    },
     series: [
       {
         type: 'pie',
-        radius: ['45%', '70%'],
+        radius: ['58%', '82%'],
         label: { show: false },
-        data: SEVERITY_ORDER.filter((s) => stats.bySeverity[s]).map((s) => ({
-          name: s,
-          value: stats.bySeverity[s],
-          itemStyle: { color: severityColors[s.toLowerCase() as keyof typeof severityColors] },
-        })),
+        data: [
+          { name: 'Observées', value: observed, itemStyle: { color: severityColors.low } },
+          {
+            name: 'Non observées',
+            value: Math.max(0, total - observed),
+            itemStyle: { color: 'rgba(139,148,158,0.35)' },
+          },
+        ],
       },
     ],
   };
@@ -224,8 +267,10 @@ function DashboardPage() {
   const navigate = useNavigate();
   const { data, isPending, isError, error } = useDashboardData();
   const { connected } = useAlertsRealtime();
+  const { mode } = useThemeMode();
+  const textColor = mode === 'dark' ? '#e6edf3' : '#1f2328';
+  const mutedColor = mode === 'dark' ? '#8b949e' : '#57606a';
 
-  const donut = useMemo(() => (data ? severityDonutOption(data.alertStats) : null), [data]);
   const timeline = useMemo(() => (data ? timelineOption(data.alertStats) : null), [data]);
   const sources = useMemo(() => (data ? sourcesBarOption(data.alertStats) : null), [data]);
 
@@ -298,6 +343,17 @@ function DashboardPage() {
     };
   }, [data, navigate]);
 
+  const mitreDonut = useMemo(() => {
+    if (!data || !derived) return null;
+    return mitreCoverageOption(
+      derived.observedCount,
+      data.techniques.length,
+      derived.coveragePct,
+      textColor,
+      mutedColor,
+    );
+  }, [data, derived, textColor, mutedColor]);
+
   return (
     <Box>
       <Stack direction="row" spacing={1.5} sx={{ mb: 2, alignItems: 'center' }}>
@@ -308,13 +364,11 @@ function DashboardPage() {
           size="small"
           label={connected ? 'Temps réel' : 'Hors ligne'}
           color={connected ? 'success' : 'default'}
-          variant="outlined"
         />
         <Chip
           size="small"
           label={isError ? 'Source(s) indisponible(s)' : 'Plateforme opérationnelle'}
           color={isError ? 'error' : 'success'}
-          variant="outlined"
         />
         {data && (
           <Button
@@ -437,9 +491,26 @@ function DashboardPage() {
                     sx={{ alignItems: 'center', cursor: 'pointer' }}
                     onClick={() => navigate('/alerts')}
                   >
+                    <Box
+                      sx={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: '50%',
+                        flexShrink: 0,
+                        bgcolor:
+                          severityColors[a.severity.toLowerCase() as keyof typeof severityColors],
+                      }}
+                    />
                     <SeverityChip severity={a.severity} />
                     <Typography variant="body2" noWrap sx={{ flexGrow: 1 }}>
                       {a.title}
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{ whiteSpace: 'nowrap' }}
+                    >
+                      {timeAgo(a.detectedAt)}
                     </Typography>
                     <StatusChip status={a.status} />
                   </Stack>
@@ -461,7 +532,13 @@ function DashboardPage() {
               title="MITRE ATT&CK"
               action={{ label: 'Explorer', onClick: () => navigate('/mitre') }}
             >
-              {donut && <EChart option={donut} height={140} />}
+              {mitreDonut && (
+                <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+                  <Box sx={{ width: 180 }}>
+                    <EChart option={mitreDonut} height={160} />
+                  </Box>
+                </Box>
+              )}
               <Stack spacing={0.75} sx={{ mt: 1 }}>
                 {derived.topTechniques.length === 0 && (
                   <Typography variant="caption" color="text.secondary">
@@ -511,7 +588,7 @@ function DashboardPage() {
                     <Typography variant="caption" noWrap>
                       {asset.hostname}
                     </Typography>
-                    <Chip label="Internet" size="small" color="error" variant="outlined" />
+                    <Chip label="Internet" size="small" color="error" />
                   </Stack>
                 ))}
               </Stack>
@@ -615,7 +692,7 @@ function DashboardPage() {
 
           {/* Zone D — Activité récente */}
           <Panel title="Activité récente">
-            <Stack spacing={1}>
+            <Stack spacing={0}>
               {derived.activity.length === 0 && (
                 <Typography variant="body2" color="text.secondary">
                   Aucune activité récente.
@@ -626,20 +703,48 @@ function DashboardPage() {
                   key={`${row.kind}-${index}`}
                   direction="row"
                   spacing={1.5}
-                  sx={{ alignItems: 'center', cursor: 'pointer', py: 0.5 }}
+                  sx={{ cursor: 'pointer' }}
                   onClick={row.onClick}
                 >
-                  <Chip size="small" label={row.detail} variant="outlined" sx={{ minWidth: 140 }} />
-                  <Typography variant="body2" noWrap sx={{ flexGrow: 1 }}>
-                    {row.label}
-                  </Typography>
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{ whiteSpace: 'nowrap' }}
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      width: 12,
+                    }}
                   >
-                    {formatDate(row.date)}
-                  </Typography>
+                    <Box
+                      sx={{
+                        width: 9,
+                        height: 9,
+                        borderRadius: '50%',
+                        flexShrink: 0,
+                        mt: 0.6,
+                        bgcolor: ACTIVITY_KIND_COLOR[row.kind],
+                      }}
+                    />
+                    {index < derived.activity.length - 1 && (
+                      <Box sx={{ width: '2px', flexGrow: 1, bgcolor: 'divider', mt: 0.5 }} />
+                    )}
+                  </Box>
+                  <Stack
+                    direction="row"
+                    spacing={1.5}
+                    sx={{ alignItems: 'center', flexGrow: 1, minWidth: 0, pb: 1.25 }}
+                  >
+                    <Chip size="small" label={row.detail} sx={{ minWidth: 140 }} />
+                    <Typography variant="body2" noWrap sx={{ flexGrow: 1 }}>
+                      {row.label}
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{ whiteSpace: 'nowrap' }}
+                    >
+                      {formatDate(row.date)}
+                    </Typography>
+                  </Stack>
                 </Stack>
               ))}
             </Stack>

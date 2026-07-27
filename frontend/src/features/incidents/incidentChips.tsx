@@ -21,12 +21,5 @@ const STATUS_COLORS: Record<
 };
 
 export function IncidentStatusChip({ status }: { status: IncidentStatus }) {
-  return (
-    <Chip
-      label={INCIDENT_STATUS_LABELS[status]}
-      size="small"
-      color={STATUS_COLORS[status]}
-      variant="outlined"
-    />
-  );
+  return <Chip label={INCIDENT_STATUS_LABELS[status]} size="small" color={STATUS_COLORS[status]} />;
 }
