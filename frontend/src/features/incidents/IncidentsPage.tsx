@@ -17,6 +17,7 @@ import TableRow from '@mui/material/TableRow';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router-dom';
 import { problemDetail } from '../../shared/api/client';
 import type { AlertSeverity } from '../alerts/alertsApi';
 import { SeverityChip } from '../alerts/chips';
@@ -39,7 +40,12 @@ function IncidentsPage() {
   const [page, setPage] = useState(0);
   const [size, setSize] = useState(25);
   const [createOpen, setCreateOpen] = useState(false);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Lien profond /incidents?selected={id} (ex. depuis le Dashboard), même
+  // patron que /assets et /mitre.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const selectedId = searchParams.get('selected');
+  const selectIncident = (id: string) => setSearchParams({ selected: id });
+  const closeDrawer = () => setSearchParams({}, { replace: true });
 
   const { data, isPending, isError, error } = useQuery({
     queryKey: ['incidents', { status, severity, page, size }],
@@ -136,7 +142,7 @@ function IncidentsPage() {
                   key={incident.id}
                   hover
                   sx={{ cursor: 'pointer' }}
-                  onClick={() => setSelectedId(incident.id)}
+                  onClick={() => selectIncident(incident.id)}
                 >
                   <TableCell sx={{ whiteSpace: 'nowrap' }}>{incident.reference}</TableCell>
                   <TableCell>
@@ -173,7 +179,7 @@ function IncidentsPage() {
       )}
 
       <CreateIncidentDialog open={createOpen} onClose={() => setCreateOpen(false)} />
-      <IncidentDetailDrawer incidentId={selectedId} onClose={() => setSelectedId(null)} />
+      <IncidentDetailDrawer incidentId={selectedId} onClose={closeDrawer} />
     </Box>
   );
 }
