@@ -55,7 +55,7 @@ Chaque appel sortant applique :
 
 | Règle | Classifieur | Assistant |
 | --- | --- | --- |
-| Timeout | 5 s | 30 s (génération LLM) |
+| Timeout | 5 s | 60 s (génération LLM — révisé, une réponse longue sur un modèle léger auto-hébergé en CPU peut dépasser 30 s) |
 | Circuit breaker | oui (Resilience4j) | oui (Resilience4j) |
 | Comportement dégradé | l'alerte reste sans score/verdict, traitable normalement | la console affiche « assistant indisponible » |
 

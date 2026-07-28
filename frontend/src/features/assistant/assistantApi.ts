@@ -20,11 +20,11 @@ export interface ChatResponse {
 }
 
 /**
- * > 30 s (le timeout Feign côté plateforme, ADR-008) : laisse la
+ * > 60 s (le timeout Feign côté plateforme, ADR-008 révisé) : laisse la
  * dégradation gracieuse (503 AI_UNAVAILABLE) arriver avant un abandon
  * client, plutôt que de couper la requête nous-mêmes en premier.
  */
-const CHAT_TIMEOUT_MS = 35_000;
+const CHAT_TIMEOUT_MS = 65_000;
 
 /** Sans état côté backend : l'historique complet est renvoyé à chaque appel. */
 export async function chatWithAssistant(

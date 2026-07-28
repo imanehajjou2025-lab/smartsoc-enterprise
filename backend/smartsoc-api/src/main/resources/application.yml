@@ -47,11 +47,13 @@ spring:
           ai-classifier:
             connect-timeout: 2000
             read-timeout: 5000
-          # Assistant conversationnel (ADR-008) : jusqu'à 30 s (génération
-          # LLM) — au-delà, la console affiche "assistant indisponible".
+          # Assistant conversationnel (ADR-008, révisé) : jusqu'à 60 s
+          # (génération LLM — les réponses longues sur un modèle léger type
+          # qwen2.5:1.5b en CPU peuvent dépasser 30 s) — au-delà, la console
+          # affiche "assistant indisponible".
           ai-assistant:
             connect-timeout: 3000
-            read-timeout: 30000
+            read-timeout: 60000
 
 server:
   port: ${BACKEND_PORT:8080}
