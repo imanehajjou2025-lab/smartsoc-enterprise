@@ -111,6 +111,41 @@ describe('AssistantPage', () => {
     expect(screen.getByText(/Alerte CRITICAL sur srv-web-01/)).toBeInTheDocument();
   });
 
+  it('never resends a previously failed message as conversation history', async () => {
+    const error = Object.assign(new Error('Service Unavailable'), {
+      isAxiosError: true,
+      response: {
+        status: 503,
+        data: { detail: 'The AI assistant is currently unavailable; try again shortly' },
+      },
+    });
+    mockedChat.mockRejectedValueOnce(error);
+    renderPage();
+
+    fireEvent.change(screen.getByPlaceholderText(/Écris ton message/), {
+      target: { value: 'Bonjour' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Envoyer' }));
+    await screen.findByText('The AI assistant is currently unavailable; try again shortly');
+
+    mockedChat.mockResolvedValueOnce({
+      reply: 'Réponse.',
+      model: 'simulation',
+      generatedAt: '2026-07-27T10:00:00Z',
+    });
+    fireEvent.change(screen.getByPlaceholderText(/Écris ton message/), {
+      target: { value: 'merci' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Envoyer' }));
+    await screen.findByText('Réponse.');
+
+    const secondCallMessages = mockedChat.mock.calls[1][0];
+    expect(secondCallMessages).toEqual([
+      { role: 'user', content: 'Bonjour' },
+      { role: 'user', content: 'merci' },
+    ]);
+  });
+
   it('clearing the conversation empties messages and removes the context', () => {
     sessionStorage.setItem(
       'smartsoc.assistant.messages',

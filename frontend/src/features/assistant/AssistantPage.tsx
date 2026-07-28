@@ -127,9 +127,14 @@ function AssistantPage() {
     const content = text.trim();
     if (!content || sending) return;
 
-    const outgoing: ChatMessage[] = [...messages, { role: 'user' as const, content }].map(
-      ({ role, content: c }) => ({ role, content: c }),
-    );
+    // Les messages en échec (bulle d'erreur affichée à l'écran, ex. "assistant
+    // indisponible") ne sont jamais de la vraie conversation : les renvoyer au
+    // service IA pourrait déclencher ses propres garde-fous (ex. un ';' pris
+    // pour une tentative d'injection SQL) sur du texte qu'il n'a jamais dit.
+    const outgoing: ChatMessage[] = [
+      ...messages.filter((m) => !m.failed),
+      { role: 'user' as const, content },
+    ].map(({ role, content: c }) => ({ role, content: c }));
 
     dispatch({ type: 'addUser', content });
     dispatch({ type: 'startAssistantReply' });
