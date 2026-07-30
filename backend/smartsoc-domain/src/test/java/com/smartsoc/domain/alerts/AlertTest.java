@@ -203,4 +203,35 @@ class AlertTest {
         assertThatThrownBy(() -> alert.applyAiAssessment(1.2, AiVerdict.FALSE_POSITIVE))
                 .isInstanceOf(BusinessRuleViolationException.class);
     }
+
+    @Test
+    void aiEnrichmentIsComplementaryToAiAssessmentAndNeverRequired() {
+        Alert alert = sampleAlert();
+
+        // Aucun enrichissement appliqué : jamais requis (ADR-005/ADR-008).
+        assertThat(alert.getAiZone()).isNull();
+        assertThat(alert.isAiHardOverride()).isFalse();
+        assertThat(alert.getAiJustifications()).isEmpty();
+
+        alert.applyAiAssessment(0.91, AiVerdict.TRUE_POSITIVE);
+        alert.applyAiEnrichment(AiZone.SOAR_ESCALATION, true, List.of("IOC connu malveillant."));
+
+        // Le verdict/score binaire reste intact — l'enrichissement est additif.
+        assertThat(alert.getAiScore()).isEqualTo(0.91);
+        assertThat(alert.getAiVerdict()).isEqualTo(AiVerdict.TRUE_POSITIVE);
+        assertThat(alert.getAiZone()).isEqualTo(AiZone.SOAR_ESCALATION);
+        assertThat(alert.isAiHardOverride()).isTrue();
+        assertThat(alert.getAiJustifications()).containsExactly("IOC connu malveillant.");
+    }
+
+    @Test
+    void aiJustificationsDefaultToEmptyWhenNullAndAreReadOnly() {
+        Alert alert = sampleAlert();
+
+        alert.applyAiEnrichment(AiZone.ARCHIVE, false, null);
+
+        assertThat(alert.getAiJustifications()).isEmpty();
+        assertThatThrownBy(() -> alert.getAiJustifications().add("intrusion"))
+                .isInstanceOf(UnsupportedOperationException.class);
+    }
 }

@@ -2,6 +2,7 @@ package com.smartsoc.infrastructure.ai;
 
 import com.smartsoc.application.ai.AlertClassification;
 import com.smartsoc.domain.alerts.AiVerdict;
+import com.smartsoc.domain.alerts.AiZone;
 import com.smartsoc.domain.alerts.Alert;
 import com.smartsoc.domain.alerts.Severity;
 import org.junit.jupiter.api.Test;
@@ -59,6 +60,19 @@ class SimulatedAlertClassifierTest {
                 .isEqualTo(AiVerdict.TRUE_POSITIVE);
         assertThat(classifier.classify(alertOf(Severity.INFO)).orElseThrow().verdict())
                 .isEqualTo(AiVerdict.FALSE_POSITIVE);
+    }
+
+    @Test
+    void zoneFollowsTheSameThresholdsAsTheRealClassifierAndNeverForcesAnOverride() {
+        for (Severity severity : Severity.values()) {
+            AlertClassification result = classifier.classify(alertOf(severity)).orElseThrow();
+            AiZone expected = result.score() >= 0.75 ? AiZone.SOAR_ESCALATION
+                    : result.score() >= 0.50 ? AiZone.ANALYST_REVIEW : AiZone.ARCHIVE;
+            assertThat(result.zone()).isEqualTo(expected);
+            // Aucune preuve réelle (IOC, historique) en simulation : jamais de dérogation forcée.
+            assertThat(result.hardOverride()).isFalse();
+            assertThat(result.justifications()).isNotEmpty();
+        }
     }
 
     private static Alert alertOf(Severity severity) {

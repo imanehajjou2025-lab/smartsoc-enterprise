@@ -101,12 +101,77 @@ class LiveAlertClassifierIntegrationTest {
         AlertResponse classified = getAlert(ingested.id(), admin);
         assertThat(classified.aiScore()).isEqualTo(0.87);
         assertThat(classified.aiVerdict().name()).isEqualTo("TRUE_POSITIVE");
+        // Réponse au format v1.0.0 (sans zone/hardOverride/justifications) :
+        // un fournisseur qui n'implémente pas encore l'enrichissement v1.1.0
+        // reste pleinement conforme, ces champs restent absents/vides.
+        assertThat(classified.aiZone()).isNull();
+        assertThat(classified.aiHardOverride()).isFalse();
+        assertThat(classified.aiJustifications()).isNullOrEmpty();
 
         AI_SERVICE.verify(postRequestedFor(urlEqualTo(CLASSIFICATIONS))
                 .withHeader("X-API-Key", equalTo("classifier-secret"))
                 .withRequestBody(matchingJsonPath("$.alertId",
                         equalTo(ingested.id().toString())))
                 .withRequestBody(matchingJsonPath("$.severity", equalTo("HIGH"))));
+    }
+
+    @Test
+    void appliesTheOptionalV1_1_0EnrichmentWhenProvided() {
+        AI_SERVICE.stubFor(post(urlEqualTo(CLASSIFICATIONS)).willReturn(aResponse()
+                .withStatus(200)
+                .withHeader("Content-Type", "application/json")
+                .withBody("""
+                        {
+                          "alertId": "00000000-0000-0000-0000-000000000000",
+                          "verdict": "TRUE_POSITIVE",
+                          "score": 0.91,
+                          "modelVersion": "socai-triage-1.0",
+                          "classifiedAt": "2026-07-30T09:00:00Z",
+                          "zone": "SOAR_ESCALATION",
+                          "hardOverride": true,
+                          "justifications": ["FINAL TRIAGE SCORE: 0.91", "IOC Reputation: Max score 1.00. (Hard Override triggered!)"]
+                        }
+                        """)));
+        String admin = adminToken();
+
+        AlertResponse ingested = ingest("evt-enriched-" + UUID.randomUUID());
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() ->
+                assertThat(getAlert(ingested.id(), admin).aiVerdict()).isNotNull());
+
+        AlertResponse classified = getAlert(ingested.id(), admin);
+        assertThat(classified.aiZone().name()).isEqualTo("SOAR_ESCALATION");
+        assertThat(classified.aiHardOverride()).isTrue();
+        assertThat(classified.aiJustifications()).contains(
+                "IOC Reputation: Max score 1.00. (Hard Override triggered!)");
+    }
+
+    @Test
+    void ignoresAnUnknownZoneWithoutFailingTheClassification() {
+        AI_SERVICE.stubFor(post(urlEqualTo(CLASSIFICATIONS)).willReturn(aResponse()
+                .withStatus(200)
+                .withHeader("Content-Type", "application/json")
+                .withBody("""
+                        {
+                          "alertId": "00000000-0000-0000-0000-000000000000",
+                          "verdict": "FALSE_POSITIVE",
+                          "score": 0.10,
+                          "modelVersion": "socai-triage-1.0",
+                          "classifiedAt": "2026-07-30T09:00:00Z",
+                          "zone": "SOME_FUTURE_ZONE_WE_DO_NOT_KNOW_YET"
+                        }
+                        """)));
+        String admin = adminToken();
+
+        AlertResponse ingested = ingest("evt-unknown-zone-" + UUID.randomUUID());
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() ->
+                assertThat(getAlert(ingested.id(), admin).aiVerdict()).isNotNull());
+
+        AlertResponse classified = getAlert(ingested.id(), admin);
+        // Le verdict/score restent exploitables même si la zone est
+        // méconnue : un enrichissement cosmétique imparfait ne fait
+        // jamais échouer la classification entière.
+        assertThat(classified.aiVerdict().name()).isEqualTo("FALSE_POSITIVE");
+        assertThat(classified.aiZone()).isNull();
     }
 
     @Test

@@ -10,7 +10,7 @@ import java.util.UUID;
 
 /**
  * Client Feign du classifieur TP/FP réel — implémentation exacte du contrat
- * docs/integration/ai-classifier-api.yaml (v1.0.0). N'est instancié qu'en
+ * docs/integration/ai-classifier-api.yaml (v1.1.0). N'est instancié qu'en
  * mode live (voir AiLiveConfig). URL et timeouts en configuration pure.
  */
 @FeignClient(name = "ai-classifier",
@@ -35,12 +35,20 @@ public interface AiClassifierClient {
             String rawPayload) {
     }
 
-    /** Miroir du schéma AlertClassificationResponse du contrat. */
+    /**
+     * Miroir du schéma AlertClassificationResponse du contrat. zone/
+     * hardOverride/justifications sont OPTIONNELS (ajoutés en v1.1.0,
+     * rétrocompatible) : un classifieur conforme à la v1.0.0 ne les
+     * fournit pas, ils restent alors {@code null}.
+     */
     record ClassificationResponse(
             UUID alertId,
             String verdict,
             double score,
             String modelVersion,
-            Instant classifiedAt) {
+            Instant classifiedAt,
+            String zone,
+            Boolean hardOverride,
+            List<String> justifications) {
     }
 }

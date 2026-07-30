@@ -2,6 +2,7 @@ package com.smartsoc.application.ai;
 
 import com.smartsoc.application.alerts.AlertIngestedEvent;
 import com.smartsoc.domain.alerts.AiVerdict;
+import com.smartsoc.domain.alerts.AiZone;
 import com.smartsoc.domain.alerts.Alert;
 import com.smartsoc.domain.alerts.AlertRepository;
 import com.smartsoc.domain.alerts.Severity;
@@ -16,6 +17,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -65,12 +67,16 @@ class AlertClassificationServiceTest {
         when(alertRepository.findById(alert.getId())).thenReturn(Optional.of(alert));
         when(alertRepository.save(alert)).thenReturn(alert);
         when(classifier.classify(alert)).thenReturn(Optional.of(new AlertClassification(
-                0.91, AiVerdict.TRUE_POSITIVE, "model-1", Instant.now())));
+                0.91, AiVerdict.TRUE_POSITIVE, "model-1", Instant.now(),
+                AiZone.SOAR_ESCALATION, true, List.of("IOC connu malveillant."))));
 
         Alert result = service.classifyNow(alert.getId());
 
         assertThat(result.getAiScore()).isEqualTo(0.91);
         assertThat(result.getAiVerdict()).isEqualTo(AiVerdict.TRUE_POSITIVE);
+        assertThat(result.getAiZone()).isEqualTo(AiZone.SOAR_ESCALATION);
+        assertThat(result.isAiHardOverride()).isTrue();
+        assertThat(result.getAiJustifications()).containsExactly("IOC connu malveillant.");
         verify(alertRepository).save(alert);
         ArgumentCaptor<AlertClassifiedEvent> event =
                 ArgumentCaptor.forClass(AlertClassifiedEvent.class);
@@ -106,7 +112,8 @@ class AlertClassificationServiceTest {
         when(alertRepository.findById(alert.getId())).thenReturn(Optional.of(alert));
         when(alertRepository.save(alert)).thenReturn(alert);
         when(classifier.classify(alert)).thenReturn(Optional.of(new AlertClassification(
-                0.15, AiVerdict.FALSE_POSITIVE, "model-1", Instant.now())));
+                0.15, AiVerdict.FALSE_POSITIVE, "model-1", Instant.now(),
+                AiZone.ARCHIVE, false, List.of())));
 
         service.onAlertIngested(new AlertIngestedEvent(alert));
 

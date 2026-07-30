@@ -1,6 +1,8 @@
 package com.smartsoc.api.alerts;
 
 import com.smartsoc.TestcontainersConfiguration;
+import com.smartsoc.domain.alerts.AiVerdict;
+import com.smartsoc.domain.alerts.AiZone;
 import com.smartsoc.domain.alerts.Alert;
 import com.smartsoc.domain.alerts.AlertQuery;
 import com.smartsoc.domain.alerts.AlertRepository;
@@ -56,6 +58,31 @@ class AlertPersistenceIntegrationTest {
         assertThat(reloaded.getStatus()).isEqualTo(AlertStatus.NEW);
         assertThat(reloaded.getMitreTechniques()).containsExactly("T1110", "T1078");
         assertThat(reloaded.getRawPayload()).contains("\"5710\"");
+    }
+
+    @Test
+    void savesAndReloadsTheOptionalAiEnrichmentAsJsonb() {
+        Alert saved = alert("evt-ai-zone-" + UUID.randomUUID(), Severity.CRITICAL);
+        saved.applyAiAssessment(0.93, AiVerdict.TRUE_POSITIVE);
+        saved.applyAiEnrichment(AiZone.SOAR_ESCALATION, true,
+                List.of("FINAL TRIAGE SCORE: 0.93", "IOC Reputation: Max score 1.00."));
+        Alert persisted = alertRepository.save(saved);
+
+        Alert reloaded = alertRepository.findById(persisted.getId()).orElseThrow();
+        assertThat(reloaded.getAiZone()).isEqualTo(AiZone.SOAR_ESCALATION);
+        assertThat(reloaded.isAiHardOverride()).isTrue();
+        assertThat(reloaded.getAiJustifications()).containsExactly(
+                "FINAL TRIAGE SCORE: 0.93", "IOC Reputation: Max score 1.00.");
+    }
+
+    @Test
+    void aiEnrichmentDefaultsToNullAndFalseWhenNeverClassified() {
+        Alert saved = alertRepository.save(alert("evt-no-ai-" + UUID.randomUUID(), Severity.LOW));
+
+        Alert reloaded = alertRepository.findById(saved.getId()).orElseThrow();
+        assertThat(reloaded.getAiZone()).isNull();
+        assertThat(reloaded.isAiHardOverride()).isFalse();
+        assertThat(reloaded.getAiJustifications()).isEmpty();
     }
 
     @Test

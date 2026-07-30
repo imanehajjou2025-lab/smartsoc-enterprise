@@ -3,6 +3,7 @@ package com.smartsoc.infrastructure.ai;
 import com.smartsoc.application.ai.AlertClassification;
 import com.smartsoc.application.ai.AlertClassifier;
 import com.smartsoc.domain.alerts.AiVerdict;
+import com.smartsoc.domain.alerts.AiZone;
 import com.smartsoc.domain.alerts.Alert;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import lombok.RequiredArgsConstructor;
@@ -10,7 +11,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * Adaptateur live du classifieur (ADR-008) : appelle le vrai service via
@@ -48,12 +51,33 @@ public class LiveAlertClassifier implements AlertClassifier {
                 response.score(),
                 AiVerdict.valueOf(response.verdict()),
                 response.modelVersion(),
-                response.classifiedAt()));
+                response.classifiedAt(),
+                parseZone(response.zone(), alert.getId()),
+                Boolean.TRUE.equals(response.hardOverride()),
+                response.justifications() == null ? List.of() : response.justifications()));
     }
 
     @SuppressWarnings("unused") // invoqué par Resilience4j (fallbackMethod)
     private Optional<AlertClassification> classifierUnavailable(Alert alert, Throwable cause) {
         log.warn("AI classifier unavailable for alert {}: {}", alert.getId(), cause.getMessage());
         return Optional.empty();
+    }
+
+    /**
+     * zone est un champ optionnel (v1.1.0) : absent ou mal formé, la
+     * classification reste exploitable (verdict/score inchangés) — un
+     * enrichissement cosmétique imparfait ne doit jamais faire échouer
+     * toute la classification.
+     */
+    private static AiZone parseZone(String raw, UUID alertId) {
+        if (raw == null) {
+            return null;
+        }
+        try {
+            return AiZone.valueOf(raw);
+        } catch (IllegalArgumentException e) {
+            log.warn("Unknown AI zone '{}' for alert {}, ignoring", raw, alertId);
+            return null;
+        }
     }
 }
