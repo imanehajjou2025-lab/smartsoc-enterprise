@@ -48,6 +48,10 @@ public class Alert {
     private final String rawPayload;
     private Double aiScore;
     private AiVerdict aiVerdict;
+    /** Enrichissement complémentaire optionnel — voir {@link #applyAiEnrichment}. */
+    private AiZone aiZone;
+    private boolean aiHardOverride;
+    private List<String> aiJustifications;
 
     /** Données d'ingestion — parameter object du point d'entrée unique. */
     @Builder
@@ -126,6 +130,15 @@ public class Alert {
     }
 
     /**
+     * Justifications explicables du classifieur, en lecture seule — même
+     * protection que {@code observables}/{@code mitreTechniques}, pour la
+     * même raison structurelle (CodeQL java/internal-representation-exposure).
+     */
+    public List<String> getAiJustifications() {
+        return readOnly(aiJustifications);
+    }
+
+    /**
      * Vue non modifiable, tolérante au null : un chemin de construction
      * inhabituel ne doit pas se transformer en NullPointerException
      * différé chez l'appelant.
@@ -155,6 +168,20 @@ public class Alert {
         }
         this.aiScore = score;
         this.aiVerdict = verdict;
+    }
+
+    /**
+     * Enrichissement COMPLÉMENTAIRE optionnel d'un classifieur qui va
+     * au-delà du verdict binaire (zone de routage recommandée, dérogation
+     * forcée par une preuve critique, justifications explicables) —
+     * additif, ne remplace jamais {@link #applyAiAssessment}. Un
+     * classifieur qui ne fournit pas cet enrichissement laisse
+     * simplement ces champs à {@code null}/vide.
+     */
+    public void applyAiEnrichment(AiZone zone, boolean hardOverride, List<String> justifications) {
+        this.aiZone = zone;
+        this.aiHardOverride = hardOverride;
+        this.aiJustifications = justifications == null ? List.of() : List.copyOf(justifications);
     }
 
     private static void requireNonBlank(String value, String field) {

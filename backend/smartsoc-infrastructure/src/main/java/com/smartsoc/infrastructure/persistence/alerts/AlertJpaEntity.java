@@ -1,6 +1,7 @@
 package com.smartsoc.infrastructure.persistence.alerts;
 
 import com.smartsoc.domain.alerts.AiVerdict;
+import com.smartsoc.domain.alerts.AiZone;
 import com.smartsoc.domain.alerts.AlertStatus;
 import com.smartsoc.domain.alerts.Severity;
 import com.smartsoc.infrastructure.persistence.common.AbstractAuditableEntity;
@@ -110,4 +111,15 @@ public class AlertJpaEntity extends AbstractAuditableEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "ai_verdict", length = 20)
     private AiVerdict aiVerdict;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "ai_zone", length = 30)
+    private AiZone aiZone;
+
+    @Column(name = "ai_hard_override", nullable = false)
+    private boolean aiHardOverride;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "ai_justifications")
+    private List<String> aiJustifications;
 }

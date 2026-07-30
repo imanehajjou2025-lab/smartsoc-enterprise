@@ -28,7 +28,13 @@ info:
     **Contraintes non fonctionnelles côté plateforme** (pour information du
     fournisseur) : timeout d'appel 5 s, circuit breaker, dégradation gracieuse
     — une alerte reste entièrement traitable sans score IA.
-  version: 1.0.0
+
+    **v1.1.0 (rétrocompatible)** : ajout de trois champs OPTIONNELS dans la
+    réponse — `zone`, `hardOverride`, `justifications` — un enrichissement
+    complémentaire au verdict TP/FP, jamais un remplacement. Un fournisseur
+    qui n'implémente que la v1.0.0 reste pleinement conforme : ces champs
+    sont simplement absents, la plateforme fonctionne à l'identique.
+  version: 1.1.0
   contact:
     name: Équipe SmartSOC — plateforme
   license:
@@ -195,6 +201,25 @@ components:
           type: string
           format: date-time
           description: Horodatage de la classification (UTC).
+        zone:
+          type: [string, 'null']
+          enum: [SOAR_ESCALATION, ANALYST_REVIEW, ARCHIVE, null]
+          description: >
+            Zone de routage recommandée (v1.1.0, optionnel) — un enrichissement
+            COMPLÉMENTAIRE au verdict, jamais un remplacement. SOAR_ESCALATION
+            = confiance élevée qu'il s'agit d'une menace réelle ; ANALYST_REVIEW
+            = confiance intermédiaire, nécessite un regard humain ; ARCHIVE =
+            confiance faible.
+        hardOverride:
+          type: [boolean, 'null']
+          description: >
+            Dérogation forcée par une preuve critique (ex. IOC connu
+            malveillant), indépendamment du score (v1.1.0, optionnel).
+        justifications:
+          type: [array, 'null']
+          items:
+            type: string
+          description: Justifications explicables du verdict (v1.1.0, optionnel).
 
     HealthResponse:
       type: object

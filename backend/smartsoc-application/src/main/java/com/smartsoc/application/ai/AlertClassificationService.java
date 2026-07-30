@@ -63,6 +63,8 @@ public class AlertClassificationService {
 
         return classifier.classify(alert).map(classification -> {
             alert.applyAiAssessment(classification.score(), classification.verdict());
+            alert.applyAiEnrichment(classification.zone(), classification.hardOverride(),
+                    classification.justifications());
             Alert saved = alertRepository.save(alert);
             log.debug("Alert {} classified by model {}", alertId, classification.modelVersion());
             eventPublisher.publishEvent(new AlertClassifiedEvent(saved));

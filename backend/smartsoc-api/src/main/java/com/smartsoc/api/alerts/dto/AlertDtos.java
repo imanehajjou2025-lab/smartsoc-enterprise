@@ -3,6 +3,7 @@ package com.smartsoc.api.alerts.dto;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.smartsoc.domain.alerts.AiVerdict;
+import com.smartsoc.domain.alerts.AiZone;
 import com.smartsoc.domain.alerts.AlertStatus;
 import com.smartsoc.domain.alerts.Severity;
 import com.smartsoc.domain.intelligence.IndicatorType;
@@ -126,6 +127,11 @@ public final class AlertDtos {
             String rawPayload,
             Double aiScore,
             AiVerdict aiVerdict,
+            /** Enrichissement complémentaire optionnel (ADR-008) — nullable/vide
+             *  tant qu'aucune classification ne l'a fourni. */
+            AiZone aiZone,
+            boolean aiHardOverride,
+            List<String> aiJustifications,
             /** Renseigné uniquement par le webhook d'ingestion : ailleurs
              *  il n'y a rien à rendre compte, donc le champ est absent
              *  du JSON plutôt que présent à null. */
@@ -135,7 +141,8 @@ public final class AlertDtos {
         public AlertResponse withObservableReport(ObservableReport report) {
             return new AlertResponse(id, source, externalId, title, description, severity,
                     status, detectedAt, receivedAt, hostname, ruleId, mitreTechniques,
-                    observables, rawPayload, aiScore, aiVerdict, report);
+                    observables, rawPayload, aiScore, aiVerdict, aiZone, aiHardOverride,
+                    aiJustifications, report);
         }
     }
 }
