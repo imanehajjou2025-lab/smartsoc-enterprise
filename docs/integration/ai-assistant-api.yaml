@@ -32,11 +32,11 @@ info:
     l'API backend (ADR-003) — jamais d'écriture directe.
 
     **Contraintes non fonctionnelles côté plateforme** : timeout d'appel
-    60 s (génération LLM — un modèle léger auto-hébergé en CPU peut
-    dépasser 30 s sur une réponse longue), circuit breaker, dégradation
-    gracieuse — la console affiche « assistant indisponible » sans bloquer
-    le reste.
-  version: 1.0.1
+    120 s (génération LLM — un modèle auto-hébergé plus lourd en CPU peut
+    prendre plusieurs dizaines de secondes sur une réponse détaillée),
+    circuit breaker, dégradation gracieuse — la console affiche
+    « assistant indisponible » sans bloquer le reste.
+  version: 1.0.2
   contact:
     name: Équipe SmartSOC — plateforme
   license:
