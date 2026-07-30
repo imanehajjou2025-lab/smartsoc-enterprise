@@ -34,6 +34,9 @@ const overview: DashboardOverview = {
       rawPayload: null,
       aiScore: null,
       aiVerdict: null,
+      aiZone: null,
+      aiHardOverride: false,
+      aiJustifications: [],
     },
   ],
   incidents: [

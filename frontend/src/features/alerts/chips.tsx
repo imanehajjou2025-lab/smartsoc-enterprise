@@ -6,7 +6,7 @@ import {
   softChipSx,
   type ChipPaletteColor,
 } from '../../shared/components/chipStyles';
-import type { AlertSeverity, AlertStatus } from './alertsApi';
+import type { AiZone, AlertSeverity, AlertStatus } from './alertsApi';
 
 export const STATUS_LABELS: Record<AlertStatus, string> = {
   NEW: 'Nouvelle',
@@ -34,4 +34,23 @@ export function StatusChip({ status }: { status: AlertStatus }) {
   const theme = useTheme();
   const color = resolveChipColor(theme, STATUS_CHIP_COLORS[status]);
   return <Chip label={STATUS_LABELS[status]} size="small" sx={softChipSx(color)} />;
+}
+
+export const AI_ZONE_LABELS: Record<AiZone, string> = {
+  SOAR_ESCALATION: 'Escalade SOAR',
+  ANALYST_REVIEW: 'Revue analyste',
+  ARCHIVE: 'Archive',
+};
+
+const AI_ZONE_CHIP_COLORS: Record<AiZone, ChipPaletteColor> = {
+  SOAR_ESCALATION: 'error',
+  ANALYST_REVIEW: 'warning',
+  ARCHIVE: 'default',
+};
+
+/** Zone de routage recommandée par le classifieur (contrat v1.1.0, complémentaire au verdict TP/FP). */
+export function AiZoneChip({ zone }: { zone: AiZone }) {
+  const theme = useTheme();
+  const color = resolveChipColor(theme, AI_ZONE_CHIP_COLORS[zone]);
+  return <Chip label={AI_ZONE_LABELS[zone]} size="small" sx={softChipSx(color)} />;
 }

@@ -27,6 +27,9 @@ const alerts: Alert[] = [
     rawPayload: '{"rule":{"id":"5712"}}',
     aiScore: null,
     aiVerdict: null,
+    aiZone: null,
+    aiHardOverride: false,
+    aiJustifications: [],
   },
   {
     id: 'a-2',
@@ -45,6 +48,9 @@ const alerts: Alert[] = [
     rawPayload: null,
     aiScore: 0.87,
     aiVerdict: 'TRUE_POSITIVE',
+    aiZone: 'SOAR_ESCALATION',
+    aiHardOverride: false,
+    aiJustifications: ['FINAL TRIAGE SCORE: 0.87 (87.0%)'],
   },
 ];
 

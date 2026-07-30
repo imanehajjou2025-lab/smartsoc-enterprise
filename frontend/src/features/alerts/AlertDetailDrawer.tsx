@@ -28,7 +28,7 @@ import {
   type Alert as SocAlert,
   type AlertStatus,
 } from './alertsApi';
-import { SeverityChip, StatusChip, STATUS_LABELS } from './chips';
+import { AiZoneChip, SeverityChip, StatusChip, STATUS_LABELS } from './chips';
 
 interface Props {
   alert: SocAlert | null;
@@ -361,6 +361,53 @@ function AlertDetailDrawer({ alert, onClose, onUpdated }: Props) {
                 : `${(alert.aiScore * 100).toFixed(1)} % · ${alert.aiVerdict}`}
             </Typography>
           </Field>
+
+          {(alert.aiZone != null || alert.aiJustifications.length > 0) && (
+            <Field label="Zone recommandée (enrichissement complémentaire)">
+              <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 1 }}>
+                {alert.aiZone != null ? (
+                  <AiZoneChip zone={alert.aiZone} />
+                ) : (
+                  <Typography variant="body2" color="text.secondary">
+                    Non évaluée
+                  </Typography>
+                )}
+                {alert.aiHardOverride && (
+                  <Chip label="Dérogation forcée" size="small" color="error" variant="outlined" />
+                )}
+              </Stack>
+              {alert.aiJustifications.length > 0 && (
+                <Box
+                  component="ul"
+                  sx={{
+                    m: 0,
+                    pl: 2.5,
+                    py: 1,
+                    pr: 1.5,
+                    bgcolor: 'background.default',
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    borderRadius: 1,
+                    maxHeight: 200,
+                    overflow: 'auto',
+                  }}
+                >
+                  {alert.aiJustifications
+                    .filter((line) => !/^=+$/.test(line.trim()))
+                    .map((line, index) => (
+                      <Typography
+                        key={index}
+                        component="li"
+                        variant="caption"
+                        sx={{ fontFamily: 'monospace', display: 'list-item' }}
+                      >
+                        {line}
+                      </Typography>
+                    ))}
+                </Box>
+              )}
+            </Field>
+          )}
 
           {rawPayloadPretty && (
             <Field label="Événement brut (évidence)">
