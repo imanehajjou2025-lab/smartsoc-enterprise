@@ -59,6 +59,9 @@ const matchedAlert: Alert = {
   rawPayload: null,
   aiScore: null,
   aiVerdict: null,
+  aiZone: null,
+  aiHardOverride: false,
+  aiJustifications: [],
 };
 
 const executionResult: HuntExecutionResult = {

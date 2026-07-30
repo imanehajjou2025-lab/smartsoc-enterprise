@@ -4,6 +4,7 @@ import type { Observable } from '../intelligence/intelligenceApi';
 export type AlertSeverity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO';
 export type AlertStatus = 'NEW' | 'ACKNOWLEDGED' | 'IN_PROGRESS' | 'RESOLVED' | 'FALSE_POSITIVE';
 export type AiVerdict = 'TRUE_POSITIVE' | 'FALSE_POSITIVE';
+export type AiZone = 'SOAR_ESCALATION' | 'ANALYST_REVIEW' | 'ARCHIVE';
 
 export interface Alert {
   id: string;
@@ -23,6 +24,10 @@ export interface Alert {
   rawPayload: string | null;
   aiScore: number | null;
   aiVerdict: AiVerdict | null;
+  /** Enrichissement complémentaire au verdict TP/FP (contrat v1.1.0), jamais un remplacement. */
+  aiZone: AiZone | null;
+  aiHardOverride: boolean;
+  aiJustifications: string[];
 }
 
 export interface PageResponse<T> {

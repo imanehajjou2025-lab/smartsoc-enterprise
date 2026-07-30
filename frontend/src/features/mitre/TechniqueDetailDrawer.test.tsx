@@ -39,6 +39,9 @@ const citingAlert: Alert = {
   rawPayload: null,
   aiScore: null,
   aiVerdict: null,
+  aiZone: null,
+  aiHardOverride: false,
+  aiJustifications: [],
 };
 
 const correlated: PageResponse<Alert> = {
