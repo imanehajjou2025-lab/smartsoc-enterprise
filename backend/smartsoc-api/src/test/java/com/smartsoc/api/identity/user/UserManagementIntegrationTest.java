@@ -132,6 +132,31 @@ class UserManagementIntegrationTest {
     }
 
     @Test
+    void userMutationsAreTracedInTheAuditLog() {
+        String adminToken = loginToken("admin", "IntegrationTest123!");
+
+        UserResponse created = exchange(HttpMethod.POST, USERS, adminToken,
+                createUserBody("analyst.trace", "analyst.trace@smartsoc.io"), UserResponse.class).getBody();
+        exchange(HttpMethod.PATCH, USERS + "/" + created.id(), adminToken,
+                Map.of("role", "SOC_MANAGER"), UserResponse.class);
+        exchange(HttpMethod.PATCH, USERS + "/" + created.id(), adminToken,
+                Map.of("enabled", false), UserResponse.class);
+        exchange(HttpMethod.PATCH, USERS + "/" + created.id(), adminToken,
+                Map.of("enabled", true), UserResponse.class);
+        exchange(HttpMethod.DELETE, USERS + "/" + created.id(), adminToken, null, Void.class);
+
+        ResponseEntity<String> auditLog = exchange(HttpMethod.GET,
+                "/api/v1/audit-logs?actorUsername=admin&size=50", adminToken, null, String.class);
+        String body = auditLog.getBody();
+        assertThat(body).contains("\"action\":\"USER_CREATED\"")
+                .contains("\"action\":\"USER_ROLE_CHANGED\"")
+                .contains("\"action\":\"USER_DISABLED\"")
+                .contains("\"action\":\"USER_ENABLED\"")
+                .contains("\"action\":\"USER_DELETED\"")
+                .contains(created.id().toString());
+    }
+
+    @Test
     void swaggerContractIsPubliclyAvailable() {
         ResponseEntity<String> apiDocs = rest.getForEntity("/api-docs", String.class);
         assertThat(apiDocs.getStatusCode()).isEqualTo(HttpStatus.OK);

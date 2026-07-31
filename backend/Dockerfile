@@ -39,6 +39,10 @@ COPY --from=frontend /fe/dist/ smartsoc-api/src/main/resources/static/
 RUN ./mvnw -B -ntp package -DskipTests
 
 FROM eclipse-temurin:21-jre-alpine
+# postgresql18-client fournit pg_dump, utilisé par la console Paramètres
+# (sauvegarde reelle de la base, cf. PgDumpBackupAdapter) -- version alignee
+# sur l'image postgres:18-alpine du docker-compose.
+RUN apk add --no-cache postgresql18-client
 RUN addgroup -S smartsoc && adduser -S smartsoc -G smartsoc
 USER smartsoc
 WORKDIR /app

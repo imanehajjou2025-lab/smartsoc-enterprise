@@ -3,13 +3,17 @@ package com.smartsoc.api.identity.user;
 import com.smartsoc.api.identity.user.dto.UserDtos.CreateUserRequest;
 import com.smartsoc.api.identity.user.dto.UserDtos.UpdateUserRequest;
 import com.smartsoc.api.identity.user.dto.UserDtos.UserResponse;
+import com.smartsoc.application.audit.ActorContext;
 import com.smartsoc.application.identity.UserManagementService;
 import com.smartsoc.application.identity.UserManagementService.CreateUserCommand;
 import com.smartsoc.application.identity.UserManagementService.UpdateUserCommand;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -35,13 +39,14 @@ public class UserController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public UserResponse create(@Valid @RequestBody CreateUserRequest request) {
+    public UserResponse create(@Valid @RequestBody CreateUserRequest request,
+                                @AuthenticationPrincipal Jwt jwt, HttpServletRequest httpRequest) {
         return mapper.toResponse(userManagementService.createUser(new CreateUserCommand(
                 request.username(),
                 request.email(),
                 request.password(),
                 request.fullName(),
-                request.role())));
+                request.role()), actorOf(jwt, httpRequest)));
     }
 
     @GetMapping
@@ -55,17 +60,23 @@ public class UserController {
     }
 
     @PatchMapping("/{id}")
-    public UserResponse update(@PathVariable UUID id,
-                               @Valid @RequestBody UpdateUserRequest request) {
+    public UserResponse update(@PathVariable UUID id, @Valid @RequestBody UpdateUserRequest request,
+                                @AuthenticationPrincipal Jwt jwt, HttpServletRequest httpRequest) {
         return mapper.toResponse(userManagementService.updateUser(id, new UpdateUserCommand(
                 request.fullName(),
                 request.role(),
-                request.enabled())));
+                request.enabled()), actorOf(jwt, httpRequest)));
     }
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void delete(@PathVariable UUID id) {
-        userManagementService.deleteUser(id);
+    public void delete(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt,
+                        HttpServletRequest httpRequest) {
+        userManagementService.deleteUser(id, actorOf(jwt, httpRequest));
+    }
+
+    private static ActorContext actorOf(Jwt jwt, HttpServletRequest httpRequest) {
+        return new ActorContext(jwt.getSubject(),
+                UUID.fromString(jwt.getClaimAsString("userId")), httpRequest.getRemoteAddr());
     }
 }
