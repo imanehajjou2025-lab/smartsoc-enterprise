@@ -141,6 +141,8 @@ class UserManagementIntegrationTest {
                 Map.of("role", "SOC_MANAGER"), UserResponse.class);
         exchange(HttpMethod.PATCH, USERS + "/" + created.id(), adminToken,
                 Map.of("enabled", false), UserResponse.class);
+        exchange(HttpMethod.PATCH, USERS + "/" + created.id(), adminToken,
+                Map.of("enabled", true), UserResponse.class);
         exchange(HttpMethod.DELETE, USERS + "/" + created.id(), adminToken, null, Void.class);
 
         ResponseEntity<String> auditLog = exchange(HttpMethod.GET,
@@ -149,6 +151,7 @@ class UserManagementIntegrationTest {
         assertThat(body).contains("\"action\":\"USER_CREATED\"")
                 .contains("\"action\":\"USER_ROLE_CHANGED\"")
                 .contains("\"action\":\"USER_DISABLED\"")
+                .contains("\"action\":\"USER_ENABLED\"")
                 .contains("\"action\":\"USER_DELETED\"")
                 .contains(created.id().toString());
     }

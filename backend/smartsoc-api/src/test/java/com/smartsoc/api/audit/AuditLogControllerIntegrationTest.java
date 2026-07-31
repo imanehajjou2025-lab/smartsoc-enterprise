@@ -13,6 +13,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
+import java.time.Instant;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -51,6 +52,22 @@ class AuditLogControllerIntegrationTest {
         ResponseEntity<String> succeededLogins = exchange(HttpMethod.GET,
                 AUDIT_LOGS + "?action=LOGIN_SUCCEEDED", adminToken, String.class);
         assertThat(succeededLogins.getBody()).contains("\"action\":\"LOGIN_SUCCEEDED\"");
+    }
+
+    @Test
+    void entriesCanBeFilteredByATimeWindow() {
+        String adminToken = loginToken("admin", "IntegrationTest123!");
+        Instant before = Instant.now().minusSeconds(60);
+
+        ResponseEntity<String> windowed = exchange(HttpMethod.GET,
+                AUDIT_LOGS + "?from=" + before + "&to=" + Instant.now().plusSeconds(60),
+                adminToken, String.class);
+        assertThat(windowed.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(windowed.getBody()).contains("\"action\":\"LOGIN_SUCCEEDED\"");
+
+        ResponseEntity<String> outOfWindow = exchange(HttpMethod.GET,
+                AUDIT_LOGS + "?to=" + before, adminToken, String.class);
+        assertThat(outOfWindow.getBody()).contains("\"totalElements\":0");
     }
 
     @Test
