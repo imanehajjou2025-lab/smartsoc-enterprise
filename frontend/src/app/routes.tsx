@@ -12,10 +12,10 @@ import AssistantPage from '../features/assistant/AssistantPage';
 import InvestigationsPage from '../features/investigations/InvestigationsPage';
 import DashboardPage from '../features/dashboard/DashboardPage';
 import LoginPage from '../features/auth/LoginPage';
+import SettingsPage from '../features/settings/SettingsPage';
 import { RequireAuth, RequireRole } from '../features/auth/guards';
 import AppLayout from '../shared/layout/AppLayout';
 import ForbiddenPage from '../shared/components/ForbiddenPage';
-import PageStub from '../shared/components/PageStub';
 
 /**
  * Routage de la console. Chaque module pointe vers un stub qui sera
@@ -46,17 +46,10 @@ export const router = createBrowserRouter([
           { path: 'assistant', element: <AssistantPage /> },
           {
             element: <RequireRole roles={['ADMIN']} />,
-            children: [{ path: 'admin/users', element: <UsersPage /> }],
-          },
-          {
-            path: 'settings',
-            element: (
-              <PageStub
-                title="Paramètres"
-                description="Configuration de la plateforme : intégrations, notifications, préférences."
-                milestone="jalon Paramètres"
-              />
-            ),
+            children: [
+              { path: 'admin/users', element: <UsersPage /> },
+              { path: 'settings', element: <SettingsPage /> },
+            ],
           },
           { path: 'forbidden', element: <ForbiddenPage /> },
         ],

@@ -19,6 +19,12 @@ export default defineConfig({
         target: 'ws://localhost:8080',
         ws: true,
       },
+      // Santé de la plateforme (console Paramètres) : endpoint natif
+      // Spring Boot, public par conception, hors du préfixe /api/v1.
+      '/actuator': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+      },
     },
   },
   test: {
