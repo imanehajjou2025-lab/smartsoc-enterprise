@@ -1,6 +1,8 @@
 package com.smartsoc.api.common.error;
 
 import com.smartsoc.application.ai.AiServiceUnavailableException;
+import com.smartsoc.application.settings.DatabaseBackupPort.BackupExecutionException;
+import com.smartsoc.application.settings.NotificationTestPort.NotificationTestException;
 import com.smartsoc.domain.common.BusinessRuleViolationException;
 import com.smartsoc.domain.common.DomainException;
 import com.smartsoc.domain.common.DuplicateResourceException;
@@ -85,6 +87,28 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage());
         problem.setTitle("AI service unavailable");
         problem.setProperty(PROPERTY_CODE, ex.getCode());
+        problem.setProperty(PROPERTY_TIMESTAMP, Instant.now());
+        return problem;
+    }
+
+    /** L'outil pg_dump a échoué ou n'a pas répondu (console Paramètres). */
+    @ExceptionHandler(BackupExecutionException.class)
+    public ProblemDetail handleBackupExecutionFailure(BackupExecutionException ex) {
+        log.warn("Database backup failed: {}", ex.getMessage());
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage());
+        problem.setTitle("Backup failed");
+        problem.setProperty(PROPERTY_CODE, "BACKUP_EXECUTION_FAILED");
+        problem.setProperty(PROPERTY_TIMESTAMP, Instant.now());
+        return problem;
+    }
+
+    /** Le SMTP réel n'a pas pu envoyer l'e-mail de test (console Paramètres). */
+    @ExceptionHandler(NotificationTestException.class)
+    public ProblemDetail handleNotificationTestFailure(NotificationTestException ex) {
+        log.warn("Notification test failed: {}", ex.getMessage());
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage());
+        problem.setTitle("Notification test failed");
+        problem.setProperty(PROPERTY_CODE, "NOTIFICATION_TEST_FAILED");
         problem.setProperty(PROPERTY_TIMESTAMP, Instant.now());
         return problem;
     }

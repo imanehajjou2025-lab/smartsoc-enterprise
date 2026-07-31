@@ -1,15 +1,19 @@
 package com.smartsoc.api.identity.auth;
 
 import com.smartsoc.api.identity.auth.dto.TokenResponse;
+import com.smartsoc.application.audit.AuditRecorder;
+import com.smartsoc.domain.audit.AuditAction;
 import com.smartsoc.domain.common.ResourceNotFoundException;
 import com.smartsoc.domain.identity.InvalidRefreshTokenException;
 import com.smartsoc.domain.identity.RefreshToken;
 import com.smartsoc.domain.identity.RefreshTokenRepository;
 import com.smartsoc.domain.identity.User;
 import com.smartsoc.domain.identity.UserRepository;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,7 +23,10 @@ import java.time.Instant;
 /**
  * Authentication flows: login, refresh (with rotation and reuse detection)
  * and logout. Every path presenting an invalid refresh token gets the same
- * opaque 401 — no oracle for attackers.
+ * opaque 401 — no oracle for attackers. Every login attempt (success or
+ * failure) is traced in the audit log (console Paramètres) ; the trace
+ * survives even when this method's own transaction rolls back
+ * ({@link AuditRecorder} commits independently — REQUIRES_NEW).
  */
 @Slf4j
 @Service
@@ -30,14 +37,24 @@ public class AuthService {
     private final UserRepository userRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final TokenService tokenService;
+    private final AuditRecorder auditRecorder;
+    private final HttpServletRequest httpRequest;
 
     @Transactional
     public TokenResponse login(String username, String password) {
-        authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(username, password));
+        try {
+            authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(username, password));
+        } catch (AuthenticationException ex) {
+            auditRecorder.record(AuditAction.LOGIN_FAILED, username, null, "User", null,
+                    null, httpRequest.getRemoteAddr());
+            throw ex;
+        }
 
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new ResourceNotFoundException("User", username));
+        auditRecorder.record(AuditAction.LOGIN_SUCCEEDED, username, user.getId(), "User",
+                user.getId().toString(), null, httpRequest.getRemoteAddr());
 
         String rawRefreshToken = tokenService.generateRefreshTokenValue();
         refreshTokenRepository.save(RefreshToken.issueNewFamily(
