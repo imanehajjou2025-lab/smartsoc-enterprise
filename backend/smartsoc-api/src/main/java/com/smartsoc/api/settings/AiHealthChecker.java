@@ -18,7 +18,11 @@ import java.time.Duration;
 @Component
 class AiHealthChecker {
 
-    private static final Duration TIMEOUT = Duration.ofSeconds(2);
+    // L'assistant conversationnel relaie ce ping à Ollama (liste des modèles
+    // chargés) : mesuré à 2,6-4,4s en réel sur un service déjà chargé (CPU
+    // sans GPU dédié) — 2s le déclarait DOWN à tort. Marge au-delà du pire
+    // cas observé, tout en restant net pour un panneau de statut.
+    private static final Duration TIMEOUT = Duration.ofSeconds(8);
 
     private final HttpClient httpClient = HttpClient.newBuilder().connectTimeout(TIMEOUT).build();
 
