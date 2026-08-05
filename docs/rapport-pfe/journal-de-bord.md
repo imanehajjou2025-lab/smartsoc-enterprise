@@ -2252,5 +2252,223 @@ vérifiés fonctionnels, **zéro scroll horizontal à 2560×1440, 1366×768 et
 
 ---
 
-*Prochaine entrée : l'assistant IA (backend puis frontend), dernier
-module de la plateforme.*
+## 2026-07-27 — Assistant IA A1 — pont plateforme vers l'agent conversationnel (PR #73, ADR-008)
+
+**Réalisé.** Port `SocAssistant` (module application) et deux adaptateurs
+(`simulation` par défaut, `live` via client Feign implémentant exactement
+`docs/integration/ai-assistant-api.yaml`), circuit breaker et timeout 30 s
+dédiés — même patron que le classifieur TP/FP (PR #44). Endpoint
+`POST /api/v1/assistant/chat` (JWT, tout utilisateur authentifié) : le
+backend reste **sans état**, le frontend est propriétaire de l'historique
+et le renvoie intégralement à chaque appel, conformément au contrat.
+Dégradation gracieuse : 503 `AI_UNAVAILABLE` (réutilise l'exception déjà
+générique du classifieur). Nouvelle clé d'API de **lecture dédiée**
+(`AiToolsApiKeyFilter`/`AiToolsProperties`, même patron que l'ingestion) :
+permet au service IA externe d'appeler des endpoints GET existants
+(alertes, MITRE…) sans compte analyste, strictement en lecture — le filtre
+reste inactif hors GET, aucune règle de sécurité supplémentaire nécessaire.
+
+**Vérification.** 10 nouveaux tests (unitaires + intégration
+Testcontainers/WireMock), 358 tests backend verts.
+
+---
+
+## 2026-07-27 — Assistant IA A2 — module frontend (PR #75, ADR-008)
+
+**Réalisé.** Le `PageStub` de `/assistant` remplacé par un vrai module
+(même patron que les autres features : axios partagé, pas de RTK Query) :
+`assistantApi.ts` (`chatWithAssistant`, timeout client 35 s — volontairement
+> 30 s côté Feign pour laisser le 503 dégradé arriver avant un abandon
+client) ; `AssistantPage.tsx` (fil de conversation, indicateur « en train
+d'écrire », suggestions de questions au démarrage, gestion d'erreurs dédiée
+503/timeout/403/réseau). Historique **et** contexte conservés en
+`sessionStorage` (survit à un rechargement, jamais envoyé au backend qui
+reste sans état). État géré par un reducer pensé pour le streaming futur
+sans refonte des composants, même si l'appel actuel est un JSON unique.
+Bouton **« Demander à l'assistant »** dans `AlertDetailDrawer` et
+`IncidentDetailDrawer` : construit le contexte **uniquement** à partir de
+champs réels déjà chargés (titre, sévérité, hôte, techniques MITRE),
+jamais inventé.
+
+**Vérification.** 39 tests frontend verts (7 nouveaux) ; E2E réelle contre
+le backend en mode simulation : round-trip complet, contexte réel transmis
+et confirmé par le réseau, persistance `sessionStorage` à la navigation et
+au rechargement, clair/sombre, console propre.
+
+---
+
+## 2026-07-28 à 2026-07-30 — Assistant IA : trois ajustements de délai en conditions réelles (PR #76, #77, #78)
+
+**Contexte.** Une fois l'assistant branché à un vrai modèle Ollama local
+(CPU sans GPU dédié), trois problèmes réels sont apparus successivement en
+usage, chacun corrigé et vérifié avant le suivant — illustration directe
+de la doctrine du projet : les délais et hypothèses posés sur documentation
+(ADR-008) sont révisés dès qu'un fait réel les contredit.
+
+**PR #76 — délai relevé à 60 s.** Vérifié en réel contre Ollama (modèle
+léger CPU) : une réponse détaillée peut légitimement dépasser les 30 s
+documentés dans l'ADR-008, qui n'était qu'une estimation. Délai relevé
+côté Feign, contrat (`ai-assistant-api.yaml` v1.0.1) et ADR-008 ; délai
+client frontend ajusté à 65 s (doit rester strictement supérieur au délai
+serveur pour laisser la dégradation 503 arriver en premier). 6/6 tests
+d'intégration assistant revalidés.
+
+**PR #77 — bug réel trouvé en usage : une bulle d'erreur renvoyée comme
+message.** Une bulle d'erreur affichée à l'écran (« assistant
+indisponible ») était renvoyée comme si elle faisait partie de la
+conversation au message suivant. Le service IA détectait le `;` de ce
+texte d'erreur comme une tentative d'injection SQL et rejetait **toute**
+la requête (400) — y compris le nouveau message utilisateur, parfaitement
+anodin. Correctif : les messages marqués `failed` sont désormais exclus de
+l'historique envoyé au backend, ce sont des artefacts d'affichage client,
+jamais du contenu réel de conversation.
+
+**PR #78 — délai relevé à 120 s : le modèle 7b choisi en connaissance de
+cause.** Décision explicite de repasser sur un modèle plus intelligent
+(qwen2.5:7b) plutôt que le modèle léger (1.5b), au prix d'une latence
+60-90 s+ sur ce CPU. Délai Feign/contrat/ADR-008/frontend relevé en
+conséquence (60 s → 120 s), vérifié en réel (73 s pour une réponse simple,
+sous la nouvelle limite). 6/6 tests d'intégration revalidés.
+
+---
+
+## 2026-07-30 — Classifieur IA — zone, dérogation et justifications complémentaires (PR #79, #80, ADR-008)
+
+**Contexte.** Extension **rétrocompatible** du contrat classifieur TP/FP
+(`ai-classifier-api.yaml` v1.0.0 → v1.1.0) pour brancher un classifieur
+réel plus riche (moteur ML multi-outils, routage en 3 zones) sans rien
+casser du modèle existant (`aiScore`/`aiVerdict`, déjà intégré au module
+Alertes depuis PR #44).
+
+**Réalisé (backend, PR #79).** `AiZone` (nouveau domaine) :
+`SOAR_ESCALATION` / `ANALYST_REVIEW` / `ARCHIVE`. `Alert.applyAiEnrichment
+(zone, hardOverride, justifications)` : méthode **séparée** de
+`applyAiAssessment`, purement additive, jamais requise. Migration V14
+(colonnes `ai_zone`/`ai_hard_override`/`ai_justifications` — même doctrine
+que `ai_score`/`ai_verdict` : dernière classification connue, pas de table
+d'historique séparée). `LiveAlertClassifier` : les 3 nouveaux champs sont
+optionnels côté service IA réel (v1.0.0 reste pleinement conforme), une
+zone inconnue est ignorée sans faire échouer la classification.
+`SimulatedAlertClassifier` : mêmes seuils que le classifieur réel, jamais
+de dérogation forcée en simulation (aucune preuve réelle ne la
+justifierait).
+
+**Réalisé (frontend, PR #80).** `AiZoneChip` (badge doux, couleur par
+zone) ; section « Zone recommandée » dans `AlertDetailDrawer`, juste après
+le score IA existant, affichée **seulement** si une zone ou des
+justifications sont présentes (masquée proprement pour les alertes non
+classifiées ou classifiées par un fournisseur v1.0.0 sans enrichissement) ;
+dérogation forcée signalée par un badge distinct.
+
+**Vérification.** Backend : 352 tests verts. Frontend : vérifié en réel
+contre la stack Docker reconstruite + SocAI en mode live local — alerte
+classifiée affichant la vraie zone ARCHIVE et les 6 justifications réelles
+du moteur (XGBoost/FAISS/MITRE/etc.), alerte non classifiée masquant
+correctement la section, console propre.
+
+---
+
+## 2026-07-31 — Module Paramètres — console d'administration Enterprise (PR #81, #82)
+
+**Contexte.** Consigne explicite : pas une simple page de réglages, mais
+une véritable console d'administration digne d'une plateforme SOC
+professionnelle (Sentinel, Cortex XSOAR, QRadar…). Décision d'équipe issue
+d'un audit préalable réel-vs-fabriqué : périmètre restreint aux sections
+avec de **vraies** données derrière — connecteurs SOC et mode maintenance
+laissés en « à venir » honnête, aucune donnée inventée.
+
+**Réalisé (backend, PR #81).** Nouveau bounded context `domain.audit`
+(`AuditAction`, `AuditLogEntry` immuable). `AuditRecorder` :
+`@Transactional(REQUIRES_NEW)` — une entrée d'audit survit toujours à la
+transaction appelante (même correctif que la détection de réutilisation de
+refresh token, PR #14, généralisé une fois pour toutes) — et n'échoue
+jamais bruyamment. Audit branché sur `AuthService.login()`
+(LOGIN_SUCCEEDED/FAILED avec IP) et `UserManagementService` (CRUD complet).
+V15 + `GET /api/v1/audit-logs` (ADMIN, filtres). **Sauvegarde réelle** :
+`PgDumpBackupAdapter` (`pg_dump --format=custom`, mot de passe via
+`PGPASSWORD` jamais en argument), `GET /api/v1/settings/backup` télécharge
+un vrai dump et trace `BACKUP_EXPORTED` — restauration explicitement hors
+scope (action destructrice distincte). `GET /api/v1/settings/{security,
+ai,notifications,about}` : exposition en lecture seule de la configuration
+réelle (clés configurées sans jamais exposer leur valeur, ping réel des
+services IA, version/uptime réels). `POST /settings/notifications/test` :
+envoi réel d'un e-mail de diagnostic en mode live, échec remonté (contraire
+à la doctrine `ReportNotifier` — c'est le seul but du bouton).
+
+**Difficulté (gate SonarCloud).** `new_reliability_rating` en échec (S6218 :
+`BackupResult` exposait un `byte[]` sans `equals`/`hashCode`/`toString`
+adaptés) et `new_coverage` à 70,5 % (< 80 %). Corrigés sans changement de
+comportement : méthodes explicites sur `BackupResult`, et surtout des tests
+**réels** plutôt que des tests de complaisance — `AiHealthCheckerTest` via
+un `HttpServer` JDK embarqué, `LiveNotificationTestSenderTest` via un vrai
+`JavaMailSenderImpl` pointé vers un port fermé (exerce le vrai chemin
+d'échec SMTP). 381 tests backend verts au final.
+
+**Réalisé (frontend, PR #82).** Composant réutilisable `SettingsCard`,
+sous-navigation par catégorie (12 sections, deep-link `?section=`), chaque
+section branchée sur ses propres données réelles : Vue générale, RBAC,
+Sécurité, IA (+ santé réelle), SOAR, Notifications (+ test d'envoi réel),
+Journal d'audit (table filtrable/paginée), Sauvegarde (téléchargement réel,
+restauration explicitement absente avec l'explication en clair), Santé
+(`/actuator/health` via nouveau proxy Vite), À propos. Connecteurs et
+Maintenance : état « à venir » honnête. `/settings` déplacé sous
+`RequireRole(ADMIN)`.
+
+**Bug réel trouvé en vérification navigateur (jamais vu en test Vitest).**
+`SettingsRow` enveloppait sa valeur dans un `<Typography>` (rendu `<p>`),
+invalide dès qu'un `Chip` (`<div>`) y était passé — erreur console réelle
+(« cannot be a descendant of `<p>` »). Corrigé en `<Box>`.
+
+**Vérification.** E2E réelle contre le dev server + backend Docker
+reconstruit : les 12 sections parcourues avec de vraies données (dont une
+sauvegarde réellement déclenchée et téléchargée), clair/sombre, mobile
+(zéro débordement horizontal), console propre à froid. 43 tests frontend
+verts, lint et build réels propres.
+
+---
+
+## 2026-08-04 — Fiabilité du module Paramètres et de l'infrastructure IA locale (PR #83 + travaux hors dépôt)
+
+**Difficulté réelle en usage (PR #83).** Le ping de santé de l'assistant
+(relayé à Ollama) mesure en pratique 2,6 à 4,4 s sur ce CPU sans GPU
+dédié — largement au-dessus des 2 s fixées à la création
+d'`AiHealthChecker` (PR #81) sans donnée réelle disponible à l'époque.
+Conséquence concrète : `/api/v1/settings/ai` et la console Paramètres
+affichaient l'assistant « Indisponible » alors qu'il répondait
+correctement. Délai relevé à 8 s (marge au-delà du pire cas observé),
+vérifié par redémarrage réel des deux services IA.
+
+**Exploration hors dépôt : vitesse de l'assistant vs qualité du modèle.**
+Les deux services IA (classifieur TP/FP et assistant, développés
+séparément par l'équipe IA — ADR-005) ont été rendus démarrables en un
+clic (scripts `start.bat`/`start.ps1` dans chaque dépôt externe, plus un
+lanceur unique sur le Bureau qui attend la disponibilité réelle des deux
+services avant de rendre la main). Mesures réelles effectuées directement
+sur l'API Ollama de la machine (CPU Intel Iris Xe intégré, sans GPU dédié,
+12 threads) : qwen2.5:7b ≈ 3,1 tokens/s, qwen2.5:1,5b ≈ 13 tokens/s.
+Optimisations appliquées côté service assistant (`num_predict`/`num_ctx`/
+`num_thread` sur l'appel Ollama, prompt système resserré, préchauffage du
+modèle au démarrage) : temps de réponse réel mesuré via l'endpoint
+`/api/v1/chat` du contrat, passé de 60-90 s+ à 26-29 s typique avec le 7b.
+Constat rapporté explicitement plutôt que masqué : les 10-15 s visés et la
+qualité du 7b sont physiquement incompatibles sur ce matériel CPU seul.
+Décision (après mesure) de repasser sur qwen2.5:1,5b (22,9 s mesurés en
+réel sur l'endpoint contractuel) — au prix d'une qualité de réponse
+dégradée constatée sur un exemple réel (explication imprécise du
+credential stuffing), compromis assumé par l'équipe en attendant une
+éventuelle bascule vers 7b ou 3b.
+
+**Difficulté technique notable (lanceur Bureau).** Le script batch combinant
+attente Docker Desktop et attente des deux services IA échouait
+systématiquement (« … était inattendu. », code de sortie 255) : un `goto`
+à l'intérieur d'un bloc parenthésé `if ( ... )` combiné à une boucle casse
+le parseur de `cmd.exe` — un piège classique du langage batch, non détecté
+par une simple relecture, isolé par bissection (fichiers de test minimaux
+reproduisant puis excluant chaque construction) puis corrigé en réécrivant
+les deux boucles concernées avec des `if ... goto ...` en ligne simple.
+
+**Vérification.** PR #83 : 6 tests backend revalidés (`AiHealthCheckerTest`,
+`SettingsControllerIntegrationTest`) + rebuild Docker réel confirmant les
+deux services affichés « UP ». Lanceur Bureau : exécuté pour de vrai
+(code de sortie 0), a réellement lancé les deux fenêtres de service et
+détecté leur disponibilité.
