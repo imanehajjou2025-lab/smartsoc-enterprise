@@ -70,6 +70,14 @@ et re-tentable manuellement, jamais bloquant.
   classifieur en asynchrone puis applique `Alert.applyAiAssessment(score,
   verdict)` (déjà présent dans le domaine) et pousse la mise à jour en
   temps réel (STOMP). Un endpoint autorise la (re)classification manuelle.
+  Depuis le contrat classifieur v1.1.0 (rétrocompatible, PR #79), la
+  réponse peut porter un **enrichissement optionnel** — zone recommandée
+  (`SOAR_ESCALATION`/`ANALYST_REVIEW`/`ARCHIVE`), dérogation forcée et
+  justifications explicables — appliqué par `Alert.applyAiEnrichment(zone,
+  hardOverride, justifications)`, une méthode **séparée** de
+  `applyAiAssessment` et purement additive : un fournisseur v1.0.0 sans
+  enrichissement, ou une zone inconnue, ne fait jamais échouer la
+  classification.
 - **Assistant** : la plateforme expose son propre endpoint de chat,
   authentifié JWT + RBAC ; le service IA n'est **jamais** exposé
   directement au frontend ni à Internet. La plateforme reste propriétaire
