@@ -2664,8 +2664,38 @@ commits sur la branche `feature/connectors-wazuh-agents-backend`
 (PR #85) : agents (6bf19a8), santé du manager (09606bb), inventaire
 système (dbd1d71 + fixtures 3bb8e48).
 
-**Reste en phase 1.** Écran « Connecteurs » de la console Paramètres
-(actuellement « à venir ») ; phase 1.3 — vulnérabilités Wazuh, un
-module d'ampleur comparable à ce qui vient d'être livré ; revalidation
-MISP avant la phase 2, explicitement différée par Imane le temps de
-stabiliser la connectivité de cet outil.
+**Complément le même jour — section « Connecteurs » de la console
+(PR #85, même branche).** Le backend étant terminé et tournant en réel
+(scheduler en mode simulation par défaut), la console Paramètres
+affichait encore le placeholder « à venir » — dernière pièce
+manquante de la phase 1.2. `GET /api/v1/connectors` (déjà construit)
+alimente une carte par connecteur SOC : **seul Wazuh a un adaptateur
+backend aujourd'hui**, donc seule sa carte affiche de vraies données
+(statut, dernière sonde/synchronisation, capacités) — les quatre
+autres (OpenSearch, MISP, VirusTotal, Shuffle) restent des cartes
+honnêtes « phase à venir » plutôt que des `NOT_CONFIGURED` trompeurs,
+même doctrine que le reste du module Paramètres.
+
+**Constat fait en lisant le code plutôt que supposé.** `detectedVersion`
+et `capabilities` de `ConnectorDescriptor` sont conçus depuis l'ADR-014
+v1.1 mais **jamais réellement peuplés** : `WazuhAgentMapper.
+detectManagerVersion()` existe et est testé isolément, mais n'est
+appelé nulle part dans `AgentSyncService` — celui-ci réutilise
+`connector.getDescriptor()` tel quel à chaque cycle. Vérifié en
+navigateur contre le backend réel reconstruit : la carte Wazuh affiche
+bien « Non détectée » / « Aucune capacité confirmée », jamais une
+valeur inventée. Écart de câblage réel, signalé pour un futur lot
+plutôt que corrigé ici (hors périmètre de ce PR frontend).
+
+**Vérification réelle.** Backend Docker reconstruit depuis le code du
+jour (le conteneur tournant datait de la veille, sans ce PR) ; section
+testée dans le navigateur contre l'API réelle après connexion admin :
+Wazuh « Connecté », dernier cycle « Succès · 3 traités · 0 rejetés » ;
+navigation par clic entre sections vérifiée. `tsc --noEmit` propre,
+3 tests Vitest verts, lint propre, build de production réussi.
+
+**Reste en phase 1.** Phase 1.3 — vulnérabilités Wazuh, un module
+d'ampleur comparable à ce qui vient d'être livré ; revalidation MISP
+avant la phase 2, explicitement différée par Imane le temps de
+stabiliser la connectivité de cet outil. Écart signalé ci-dessus
+(câblage du `CapabilityProbe`) à traiter en tâche séparée.
