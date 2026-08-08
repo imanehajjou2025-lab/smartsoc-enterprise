@@ -21,6 +21,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -40,6 +41,9 @@ class AgentSyncServiceTest {
     private ManagerStatsPort managerStatsPort;
 
     @Mock
+    private SystemInventoryPort systemInventoryPort;
+
+    @Mock
     private SyncRunRepository syncRunRepository;
 
     @Mock
@@ -54,7 +58,7 @@ class AgentSyncServiceTest {
     @BeforeEach
     void createService() {
         service = new AgentSyncService(agentInventoryPort, reconciliationService,
-                managerStatsPort, syncRunRepository, connectorRepository);
+                managerStatsPort, systemInventoryPort, syncRunRepository, connectorRepository);
     }
 
     @Test
@@ -87,7 +91,7 @@ class AgentSyncServiceTest {
         service.synchronize();
 
         // L'agent est quand meme reconcilie : l'inventaire a reussi.
-        verify(reconciliationService).reconcileOne(any());
+        verify(reconciliationService).reconcileOne(any(), isNull());
 
         ArgumentCaptor<SocConnector> connectorCaptor = ArgumentCaptor.forClass(SocConnector.class);
         verify(connectorRepository).save(connectorCaptor.capture());
@@ -130,15 +134,15 @@ class AgentSyncServiceTest {
         // methode (void) — verifie que bad/good1/good2 sont bien les
         // MEMES instances (pas un probleme d'egalite de record).
         lenient().doThrow(new RuntimeException("hostname already taken by another asset"))
-                .when(reconciliationService).reconcileOne(bad);
+                .when(reconciliationService).reconcileOne(bad, null);
         when(managerStatsPort.checkHealth()).thenReturn(new ManagerHealth(true, List.of()));
         when(connectorRepository.findByType(ConnectorType.WAZUH))
                 .thenReturn(Optional.of(SocConnector.notConfigured(ConnectorType.WAZUH)));
 
         service.synchronize();
 
-        verify(reconciliationService).reconcileOne(good1);
-        verify(reconciliationService).reconcileOne(good2);
+        verify(reconciliationService).reconcileOne(good1, null);
+        verify(reconciliationService).reconcileOne(good2, null);
         ArgumentCaptor<SyncRun> runCaptor = ArgumentCaptor.forClass(SyncRun.class);
         verify(syncRunRepository).save(runCaptor.capture());
         assertThat(runCaptor.getValue().getItemsProcessed()).isEqualTo(2);
@@ -158,7 +162,7 @@ class AgentSyncServiceTest {
 
         service.synchronize();
 
-        verify(reconciliationService, never()).reconcileOne(any());
+        verify(reconciliationService, never()).reconcileOne(any(), any());
         ArgumentCaptor<SyncRun> runCaptor = ArgumentCaptor.forClass(SyncRun.class);
         verify(syncRunRepository).save(runCaptor.capture());
         assertThat(runCaptor.getValue().isInProgress()).isFalse();

@@ -33,11 +33,29 @@ public class AgentReconciliationService {
 
     @Transactional
     public void reconcileOne(AgentInventoryPort.AgentSnapshot snapshot) {
+        reconcileOne(snapshot, null);
+    }
+
+    /**
+     * @param systemDetails détail syscollector, {@code null} si non récupéré
+     *                       ce cycle (agent jamais scanné, ou sonde en échec —
+     *                       voir {@link AgentSyncService}). Quand présent, sa
+     *                       description d'OS est PLUS RICHE que celle de la
+     *                       liste d'agents de base et prend le dessus.
+     */
+    @Transactional
+    public void reconcileOne(AgentInventoryPort.AgentSnapshot snapshot,
+                             SystemInventoryPort.SystemDetails systemDetails) {
         Asset asset = assetRepository.findByExternalRef(SOURCE, snapshot.externalId())
                 .orElseGet(() -> registerFromAgent(snapshot));
 
+        String operatingSystem = (systemDetails != null && systemDetails.operatingSystemDetail() != null)
+                ? systemDetails.operatingSystemDetail()
+                : snapshot.operatingSystem();
+        String hardwareSummary = systemDetails == null ? null : systemDetails.hardwareSummary();
+
         asset.applySyncMetadata(snapshot.externalId(), SOURCE,
-                snapshot.operatingSystem(), snapshot.lastSeenAt());
+                operatingSystem, snapshot.lastSeenAt(), hardwareSummary);
 
         assetRepository.save(asset);
     }

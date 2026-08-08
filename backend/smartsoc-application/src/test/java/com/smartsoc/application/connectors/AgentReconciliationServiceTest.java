@@ -79,4 +79,65 @@ class AgentReconciliationServiceTest {
         // Le jugement métier déjà porté par un analyste (HIGH) n'est PAS écrasé.
         assertThat(updated.getCriticality()).isEqualTo(AssetCriticality.HIGH);
     }
+
+    @Test
+    void systemDetailsOsDescriptionTakesPrecedenceOverTheBaseSnapshot() {
+        service = new AgentReconciliationService(assetRepository);
+        var snapshot = new AgentInventoryPort.AgentSnapshot(
+                "004", "WIN10-CLIENT", "10.100.0.9", "Microsoft Windows 10 Home", Instant.now());
+        var systemDetails = new SystemInventoryPort.SystemDetails(
+                "Microsoft Windows 10 Home 22H2 (build 19045.3803)",
+                "12th Gen Intel(R) Core(TM) i5-12450H, 1 coeur, 2 Go RAM");
+        when(assetRepository.findByExternalRef("wazuh", "004")).thenReturn(Optional.empty());
+        when(assetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        service.reconcileOne(snapshot, systemDetails);
+
+        ArgumentCaptor<Asset> captor = ArgumentCaptor.forClass(Asset.class);
+        verify(assetRepository).save(captor.capture());
+        Asset created = captor.getValue();
+        // La description syscollector (plus riche) l'emporte sur celle,
+        // plus pauvre, de la liste d'agents de base.
+        assertThat(created.getOperatingSystem()).isEqualTo("Microsoft Windows 10 Home 22H2 (build 19045.3803)");
+        assertThat(created.getHardwareSummary())
+                .isEqualTo("12th Gen Intel(R) Core(TM) i5-12450H, 1 coeur, 2 Go RAM");
+    }
+
+    @Test
+    void nullSystemDetailsFallsBackToTheBaseSnapshotOsAndLeavesHardwareUnset() {
+        service = new AgentReconciliationService(assetRepository);
+        var snapshot = new AgentInventoryPort.AgentSnapshot(
+                "004", "WIN10-CLIENT", "10.100.0.9", "Microsoft Windows 10 Home", Instant.now());
+        when(assetRepository.findByExternalRef("wazuh", "004")).thenReturn(Optional.empty());
+        when(assetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        // systemDetails absent -- agent jamais scanne, ou sonde en echec ce cycle.
+        service.reconcileOne(snapshot, null);
+
+        ArgumentCaptor<Asset> captor = ArgumentCaptor.forClass(Asset.class);
+        verify(assetRepository).save(captor.capture());
+        Asset created = captor.getValue();
+        assertThat(created.getOperatingSystem()).isEqualTo("Microsoft Windows 10 Home");
+        assertThat(created.getHardwareSummary()).isNull();
+    }
+
+    @Test
+    void systemDetailsHardwareOnlyStillFallsBackToBaseOsDescription() {
+        service = new AgentReconciliationService(assetRepository);
+        var snapshot = new AgentInventoryPort.AgentSnapshot(
+                "004", "WIN10-CLIENT", "10.100.0.9", "Microsoft Windows 10 Home", Instant.now());
+        // Le endpoint /os a echoue ce cycle mais /hardware a repondu :
+        // operatingSystemDetail() est null, on retombe sur le snapshot de base.
+        var systemDetails = new SystemInventoryPort.SystemDetails(null, "Intel Core i5, 1 coeur, 2 Go RAM");
+        when(assetRepository.findByExternalRef("wazuh", "004")).thenReturn(Optional.empty());
+        when(assetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        service.reconcileOne(snapshot, systemDetails);
+
+        ArgumentCaptor<Asset> captor = ArgumentCaptor.forClass(Asset.class);
+        verify(assetRepository).save(captor.capture());
+        Asset created = captor.getValue();
+        assertThat(created.getOperatingSystem()).isEqualTo("Microsoft Windows 10 Home");
+        assertThat(created.getHardwareSummary()).isEqualTo("Intel Core i5, 1 coeur, 2 Go RAM");
+    }
 }

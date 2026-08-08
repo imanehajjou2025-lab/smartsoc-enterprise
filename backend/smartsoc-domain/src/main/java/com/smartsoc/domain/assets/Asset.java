@@ -47,6 +47,7 @@ public class Asset {
     // sans jamais les renseigner.
     private String operatingSystem;
     private Instant lastSeenAt;
+    private String hardwareSummary;
     private String externalId;
     private String externalSource;
 
@@ -129,12 +130,29 @@ public class Asset {
      */
     public void applySyncMetadata(String externalId, String externalSource,
                                   String operatingSystem, Instant lastSeenAt) {
+        applySyncMetadata(externalId, externalSource, operatingSystem, lastSeenAt, null);
+    }
+
+    /**
+     * @param hardwareSummary vient d'un appel SÉPARÉ (syscollector), qui peut
+     *                        échouer indépendamment de l'inventaire de base sans
+     *                        que ce soit une vraie perte de donnée — {@code null}
+     *                        n'efface donc JAMAIS une valeur déjà connue,
+     *                        contrairement à {@code operatingSystem}/{@code externalId}
+     *                        qui reflètent l'état COURANT rapporté par la source.
+     */
+    public void applySyncMetadata(String externalId, String externalSource,
+                                  String operatingSystem, Instant lastSeenAt,
+                                  String hardwareSummary) {
         requireActive();
         this.externalId = TextNormalization.blankToNull(externalId);
         this.externalSource = TextNormalization.blankToNull(externalSource);
         this.operatingSystem = TextNormalization.blankToNull(operatingSystem);
         if (lastSeenAt != null) {
             this.lastSeenAt = lastSeenAt;
+        }
+        if (hardwareSummary != null) {
+            this.hardwareSummary = TextNormalization.blankToNull(hardwareSummary);
         }
     }
 

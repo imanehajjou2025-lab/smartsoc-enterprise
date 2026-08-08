@@ -72,6 +72,9 @@ public class AssetJpaEntity extends AbstractAuditableEntity {
     @Column(name = "last_seen_at")
     private Instant lastSeenAt;
 
+    @Column(name = "hardware_summary", length = 255)
+    private String hardwareSummary;
+
     @Column(name = "external_id", length = 100)
     private String externalId;
 

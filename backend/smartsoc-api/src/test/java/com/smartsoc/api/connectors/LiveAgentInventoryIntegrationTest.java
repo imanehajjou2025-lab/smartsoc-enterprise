@@ -31,6 +31,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlPathMatching;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -98,6 +99,26 @@ class LiveAgentInventoryIntegrationTest {
                           "wazuh-logcollector": "running", "wazuh-syscheckd": "running"
                         }]}, "message": "ok", "error": 0}
                         """)));
+        // Syscollector sain par defaut, pour TOUT agent (motif generique) :
+        // AgentSyncService appelle desormais SystemInventoryPort par agent
+        // reconcilie a chaque cycle. Sans stub par defaut, chaque test qui
+        // synchronise un agent verrait un 404 -> echec compte par le
+        // circuit breaker PARTAGE entre les methodes de cette classe
+        // (meme contexte Spring reutilise) -- au risque d'ouvrir le
+        // circuit et de fausser un test ulterieur pourtant correctement
+        // stube. Le test dedie ci-dessous ecrase ce stub par defaut.
+        WAZUH.stubFor(get(urlPathMatching("/syscollector/.*/os")).willReturn(aResponse()
+                .withStatus(200)
+                .withHeader("Content-Type", "application/json")
+                .withBody("""
+                        {"data": {"affected_items": []}, "message": "ok", "error": 0}
+                        """)));
+        WAZUH.stubFor(get(urlPathMatching("/syscollector/.*/hardware")).willReturn(aResponse()
+                .withStatus(200)
+                .withHeader("Content-Type", "application/json")
+                .withBody("""
+                        {"data": {"affected_items": []}, "message": "ok", "error": 0}
+                        """)));
     }
 
     @Test
@@ -150,6 +171,45 @@ class LiveAgentInventoryIntegrationTest {
                 connectorRepository.findByType(ConnectorType.WAZUH);
         assertThat(connector).isPresent();
         assertThat(connector.get().getStatus()).isEqualTo(ConnectorStatus.CONNECTED);
+    }
+
+    @Test
+    void syscollectorEnrichesTheAssetWithRicherOsAndHardwareDetail() {
+        WAZUH.stubFor(get(urlPathEqualTo("/agents")).willReturn(aResponse()
+                .withStatus(200)
+                .withHeader("Content-Type", "application/json")
+                .withBody("""
+                        {"data": {"affected_items": [
+                          {"id": "004", "name": "WIN10-CLIENT", "ip": "10.100.0.9", "status": "active",
+                           "os": {"name": "Microsoft Windows 10 Home", "version": "10.0.19045.3803"}}
+                        ], "total_affected_items": 1}, "message": "ok", "error": 0}
+                        """)));
+        WAZUH.stubFor(get(urlPathEqualTo("/syscollector/004/os")).willReturn(aResponse()
+                .withStatus(200)
+                .withHeader("Content-Type", "application/json")
+                .withBody("""
+                        {"data": {"affected_items": [{
+                          "os": {"name": "Microsoft Windows 10 Home", "display_version": "22H2", "build": "19045.3803"}
+                        }]}, "message": "ok", "error": 0}
+                        """)));
+        WAZUH.stubFor(get(urlPathEqualTo("/syscollector/004/hardware")).willReturn(aResponse()
+                .withStatus(200)
+                .withHeader("Content-Type", "application/json")
+                .withBody("""
+                        {"data": {"affected_items": [{
+                          "cpu": {"name": "12th Gen Intel(R) Core(TM) i5-12450H", "cores": 1, "mhz": 2496},
+                          "ram": {"total": 2096180, "free": 974272, "usage": 53}
+                        }]}, "message": "ok", "error": 0}
+                        """)));
+
+        agentSyncService.synchronize();
+
+        Asset asset = assetRepository.findByExternalRef("wazuh", "004").orElseThrow();
+        // La description syscollector (plus riche) l'emporte sur celle,
+        // plus pauvre, de la liste d'agents de base.
+        assertThat(asset.getOperatingSystem()).isEqualTo("Microsoft Windows 10 Home 22H2 (build 19045.3803)");
+        assertThat(asset.getHardwareSummary())
+                .isEqualTo("12th Gen Intel(R) Core(TM) i5-12450H, 1 coeur, 2.0 Go RAM");
     }
 
     @Test

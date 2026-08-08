@@ -194,4 +194,36 @@ class AssetTest {
                 .isInstanceOf(BusinessRuleViolationException.class)
                 .hasMessageContaining("decommissioned");
     }
+
+    @Test
+    void hardwareSummaryIsSetWhenProvided() {
+        Asset asset = sample();
+
+        asset.applySyncMetadata("004", "wazuh", "Windows 10", Instant.now(),
+                "Intel Core i5-12450H, 1 coeur, 2 Go RAM");
+
+        assertThat(asset.getHardwareSummary()).isEqualTo("Intel Core i5-12450H, 1 coeur, 2 Go RAM");
+    }
+
+    @Test
+    void hardwareSummaryNullNeverErasesAPreviousValue() {
+        // Contrairement a operatingSystem : le syscollector peut echouer
+        // UN cycle sans que ce soit une vraie perte de donnee materielle.
+        Asset asset = sample();
+        asset.applySyncMetadata("004", "wazuh", "Windows 10", Instant.now(), "Intel Core i5-12450H");
+
+        asset.applySyncMetadata("004", "wazuh", "Windows 10", Instant.now(), null);
+
+        assertThat(asset.getHardwareSummary()).isEqualTo("Intel Core i5-12450H");
+    }
+
+    @Test
+    void hardwareSummaryBlankIsClearedExplicitly() {
+        Asset asset = sample();
+        asset.applySyncMetadata("004", "wazuh", "Windows 10", Instant.now(), "Intel Core i5-12450H");
+
+        asset.applySyncMetadata("004", "wazuh", "Windows 10", Instant.now(), "   ");
+
+        assertThat(asset.getHardwareSummary()).isNull();
+    }
 }

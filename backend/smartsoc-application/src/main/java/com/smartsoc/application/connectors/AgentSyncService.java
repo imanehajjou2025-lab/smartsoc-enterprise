@@ -33,6 +33,7 @@ public class AgentSyncService {
     private final AgentInventoryPort agentInventoryPort;
     private final AgentReconciliationService reconciliationService;
     private final ManagerStatsPort managerStatsPort;
+    private final SystemInventoryPort systemInventoryPort;
     private final SyncRunRepository syncRunRepository;
     private final SocConnectorRepository connectorRepository;
 
@@ -54,7 +55,7 @@ public class AgentSyncService {
         int rejected = 0;
         for (AgentInventoryPort.AgentSnapshot snapshot : agents) {
             try {
-                reconciliationService.reconcileOne(snapshot);
+                reconciliationService.reconcileOne(snapshot, fetchSystemDetails(snapshot));
                 processed++;
             } catch (RuntimeException e) {
                 log.warn("Rejected Wazuh agent {} ({}): {}",
@@ -68,6 +69,23 @@ public class AgentSyncService {
         recordSuccessWithHealth();
 
         log.info("Wazuh agent sync completed: {} processed, {} rejected", processed, rejected);
+    }
+
+    /**
+     * Un appel syscollector PAR AGENT, séparé de l'inventaire de base :
+     * un échec ici (agent jamais scanné, timeout ponctuel) ne doit
+     * jamais rejeter l'agent lui-même — c'est un enrichissement, pas une
+     * condition de reconciliation. Limite connue : N appels
+     * supplémentaires par cycle, acceptable à l'échelle de ce
+     * déploiement, à revoir si le nombre d'agents grossit significativement.
+     */
+    private SystemInventoryPort.SystemDetails fetchSystemDetails(AgentInventoryPort.AgentSnapshot snapshot) {
+        try {
+            return systemInventoryPort.describe(snapshot.externalId()).orElse(null);
+        } catch (SocConnectorException e) {
+            log.warn("System inventory unavailable for agent {}: {}", snapshot.externalId(), e.getMessage());
+            return null;
+        }
     }
 
     private void recordSuccessWithHealth() {
