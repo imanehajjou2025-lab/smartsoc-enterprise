@@ -143,8 +143,7 @@ réelles** et consigné dans le journal de bord.
 | --- | --- | --- | --- | --- |
 | 0 — Réseau + capacités | ✅ **terminée** — R1 levé, R2 qualifié et corrigé (3 certificats régénérés côté SOC) | [ADR-015](adr/ADR-015-soc-network-topology.md) ✅ | — | 4 outils SOC + VirusTotal joignables depuis le conteneur, TLS vérifié |
 | 1.1 — Alertes push | ✅ **terminée** | — | *(config Wazuh, hors dépôt)* | Chaîne réelle bout en bout : attaque SSH → règle 5712 → webhook → PostgreSQL → classification IA (voir journal PFE, 2026-08-08) |
-| 1.1 — Alertes push | ⬜ | — | — | — |
-| 1.2 — API Wazuh + socle | ⬜ | — | — | — |
+| 1.2 — API Wazuh + socle | 🟡 **backend terminé**, frontend restant | — | [#85](https://github.com/imanehajjou2025-lab/smartsoc-enterprise/pull/85) | Socle `connectors` + agents → actifs + santé manager (DEGRADED) + inventaire système (syscollector), 448 tests verts, WireMock bout en bout (voir journal PFE, 2026-08-08) |
 | 1.3 — Vulnérabilités | ⬜ | — | — | — |
 | 2 — MISP | ⬜ | — | — | — |
 | 3 — VirusTotal | ⬜ | — | — | — |

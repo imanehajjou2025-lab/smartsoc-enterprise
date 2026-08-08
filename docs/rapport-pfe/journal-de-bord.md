@@ -2563,3 +2563,109 @@ score 0.0656, six justifications détaillées par outil.
 source) avant correctif, jamais par supposition relancée au hasard —
 cinq itérations de diagnostic pour un seul webhook, cohérent avec la
 doctrine du projet établie sur l'IA et les certificats.
+
+---
+
+## 2026-08-08 — Phase 1.2 : premier connecteur bidirectionnel — agents, santé et inventaire système Wazuh (PR #85)
+
+**Contexte.** Après le flux push (alertes, phase 1.1), la phase 1.2
+construit le premier connecteur *pull* : la plateforme interroge
+activement l'API de gestion Wazuh (distincte du flux d'événements) pour
+peupler et enrichir le contexte `assets`. Trois VM réelles allumées côté
+SOC pour ce chantier (Ubuntu-Sensor, Windows endpoint, Win10-client),
+avec des agents `never_connected`/`disconnected` volontairement laissés
+dans Wazuh comme bruit réaliste plutôt que nettoyés avant capture.
+
+**Réalisé — socle `connectors` (domaine).** Bounded context dédié
+(ADR-014) : `SocConnector` (entité riche, statuts NOT_CONFIGURED /
+DISABLED / CONNECTED / DEGRADED / DISCONNECTED, gardes empêchant tout
+`recordSuccess`/`recordFailure` d'écraser NOT_CONFIGURED ou DISABLED),
+`ConnectorDescriptor` (version et capacités détectées), `SyncRun`
+(cycle de vie d'une synchronisation). Extension additive d'`Asset`
+(operatingSystem, lastSeenAt, externalId/externalSource pour la
+réconciliation, puis hardwareSummary) — **jamais de champ retiré ni de
+contrat cassé**, conformément à la clause « additive-only » de
+l'ADR-014.
+
+**Réalisé — connecteur agents → actifs.** `AgentInventoryPort` (ACL
+neutre côté application) ; trois adaptateurs simulation/live/disabled
+sélectionnés par `smartsoc.connectors.wazuh.mode` (le mode `disabled`
+est **obligatoire**, pas un simple raccourci : sans lui, Spring ne
+trouve aucun bean pour le port et le contexte refuse de démarrer) ;
+authentification Wazuh en **deux temps** (Basic Auth → JWT, validité
+~15 min, mis en cache 13 min côté plateforme) — modèle différent des
+clés d'API statiques des services IA, découvert en pratique plutôt que
+supposé identique. Réconciliation en **transaction par élément**
+(`AgentReconciliationService`, un bean séparé de l'orchestrateur non
+transactionnel `AgentSyncService`, même schéma que
+`IndicatorFeedIngestionService`) : un agent rejeté n'empoisonne jamais
+la synchronisation des suivants. Scheduler configurable
+(`@EnableScheduling`, absent du projet jusqu'ici).
+
+**Réalisé — santé du gestionnaire.** `ManagerStatsPort` interroge
+`/manager/status` (10 démons critiques identifiés parmi la liste
+complète — 6 autres, comme `clusterd` ou `maild`, sont légitimement
+arrêtés sur un déploiement mono-nœud sans faire échouer la santé) : un
+démon critique arrêté fait passer le connecteur en **DEGRADED**, une
+valeur du domaine définie dès le départ mais encore jamais déclenchée
+en pratique avant cette PR.
+
+**Réalisé — inventaire système (syscollector).** Troisième capacité :
+`SystemInventoryPort` interroge `/syscollector/{id}/os` et
+`/hardware` par agent pour enrichir `Asset` d'une description OS plus
+riche et d'un résumé matériel, en **best-effort** — un échec syscollector
+ne bloque jamais la synchronisation de base, et `hardwareSummary` ne
+s'efface jamais sur une valeur `null` (contrairement à `operatingSystem`,
+toujours écrasé), car cet appel est distinct du reste et peut légitimement
+rater un cycle sans perte réelle de donnée.
+
+**Cinq bugs réels trouvés dans mes propres tests, tous par preuve plutôt
+que par supposition.**
+1. Deux `Instant.now()` distincts générés pour le « même » objet
+   `AgentSnapshot` (record) construit deux fois cassaient le
+   *stub-matching* Mockito par égalité — corrigé en réutilisant la même
+   instance pour le stub et l'assertion.
+2. Faux positif Mockito « strict stubbing argument mismatch » quand
+   `doThrow().when(mock).methode(argSpécifique)` coexistait avec d'autres
+   appels non stubbés de la même méthode — corrigé avec `lenient()`.
+3. Test écrit avec une hypothèse de domaine fausse (`recordFailure`
+   sensé faire passer un connecteur NOT_CONFIGURED à DISCONNECTED) alors
+   que la garde du domaine — déjà correcte et déjà testée — interdit
+   précisément cela : le test a été corrigé, pas le code.
+4. Assertion d'authentification WireMock fragile : `WazuhTokenCache` est
+   un singleton Spring partagé entre méthodes de test du même contexte,
+   donc un jeton mis en cache par un test antérieur rend un second appel
+   `/authenticate` absent dans le test suivant — comportement correct
+   (le cache fonctionne), assertion corrigée pour vérifier la présence du
+   Bearer plutôt que la fraîcheur de l'authentification.
+5. Fixture Wazuh figée (5 agents) mais test écrit sur la base d'une
+   capture d'écran postérieure montrant un 6ᵉ agent apparu depuis :
+   compteurs corrigés à 5 agents / 4 actifs non-manager, avec commentaire
+   explicite sur le caractère versionné (non live) de la fixture.
+
+**Réalité des données Wazuh, découverte en capturant de vraies réponses
+plutôt que supposée.** Agent `never_connected` sans objet `os` ni champ
+`lastKeepAlive` (absent, pas `null`) ; `ip` parfois littéralement
+`"any"` ; le Manager lui-même (id `"000"`) porte un `lastKeepAlive`
+sentinelle `9999-12-31T23:59:59+00:00`, exclu de la synchronisation des
+actifs (c'est le SIEM, pas un poste supervisé) ; deux agents distincts
+peuvent partager la même IP (réconciliation par id Wazuh uniquement) ;
+`board_serial` peut être la chaîne littérale `"None"` (fuite Python de
+l'API Wazuh) ; RAM syscollector exprimée en kilo-octets.
+
+**Vérification.** Domaine 158, application 85, infrastructure 39,
+api 166 — **448 tests verts**, zéro régression sur `clean verify`
+4 modules. Test d'intégration WireMock dédié prouvant l'enrichissement
+syscollector de bout en bout avec les valeurs réelles capturées sur
+l'agent 004 (WIN10-CLIENT, Windows 10 Home 22H2 build 19045.3803, i5-
+12450H, 1 cœur, 2,0 Go RAM) : la description syscollector l'emporte
+bien sur celle, plus pauvre, de la liste d'agents de base. Trois
+commits sur la branche `feature/connectors-wazuh-agents-backend`
+(PR #85) : agents (6bf19a8), santé du manager (09606bb), inventaire
+système (dbd1d71 + fixtures 3bb8e48).
+
+**Reste en phase 1.** Écran « Connecteurs » de la console Paramètres
+(actuellement « à venir ») ; phase 1.3 — vulnérabilités Wazuh, un
+module d'ampleur comparable à ce qui vient d'être livré ; revalidation
+MISP avant la phase 2, explicitement différée par Imane le temps de
+stabiliser la connectivité de cet outil.
