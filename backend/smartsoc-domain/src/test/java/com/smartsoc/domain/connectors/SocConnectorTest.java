@@ -89,6 +89,31 @@ class SocConnectorTest {
     }
 
     @Test
+    void recordDegradedKeepsFreshnessButFlagsTheStatus() {
+        SocConnector connector = SocConnector.notConfigured(ConnectorType.WAZUH);
+        Instant checkedAt = Instant.now();
+
+        connector.recordDegraded(checkedAt, "wazuh-analysisd stopped", ConnectorDescriptor.unknown());
+
+        assertThat(connector.getStatus()).isEqualTo(ConnectorStatus.DEGRADED);
+        // Les donnees ONT ete recuperees : la fraicheur reste reelle,
+        // contrairement a recordFailure qui NE la met jamais a jour.
+        assertThat(connector.getLastSuccessfulSyncAt()).isEqualTo(checkedAt);
+        assertThat(connector.getLastError()).isEqualTo("wazuh-analysisd stopped");
+    }
+
+    @Test
+    void recordDegradedNeverOverridesDisabled() {
+        SocConnector connector = SocConnector.notConfigured(ConnectorType.WAZUH);
+        connector.disable();
+
+        connector.recordDegraded(Instant.now(), "should be ignored", ConnectorDescriptor.unknown());
+
+        assertThat(connector.getStatus()).isEqualTo(ConnectorStatus.DISABLED);
+        assertThat(connector.getLastError()).isNull();
+    }
+
+    @Test
     void recordSuccessIgnoredWhileDisabled() {
         SocConnector connector = SocConnector.notConfigured(ConnectorType.WAZUH);
         connector.disable();

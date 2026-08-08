@@ -19,6 +19,11 @@ import java.util.List;
  * Chaque exécution ouvre un {@link SyncRun}, le clôt dans tous les cas
  * (succès, échec partiel, échec total), et met à jour l'état visible du
  * connecteur — jamais silencieuse.
+ *
+ * <p>Vérifie aussi la santé du gestionnaire ({@link ManagerStatsPort})
+ * dans le même cycle plutôt que via un second planificateur : les deux
+ * signaux (inventaire, santé) viennent de la même API authentifiée,
+ * doubler les appels toutes les 5 minutes n'apporterait rien.
  */
 @Slf4j
 @Service
@@ -27,6 +32,7 @@ public class AgentSyncService {
 
     private final AgentInventoryPort agentInventoryPort;
     private final AgentReconciliationService reconciliationService;
+    private final ManagerStatsPort managerStatsPort;
     private final SyncRunRepository syncRunRepository;
     private final SocConnectorRepository connectorRepository;
 
@@ -59,15 +65,35 @@ public class AgentSyncService {
 
         run.complete(processed, rejected);
         syncRunRepository.save(run);
-        recordSuccess();
+        recordSuccessWithHealth();
 
         log.info("Wazuh agent sync completed: {} processed, {} rejected", processed, rejected);
     }
 
-    private void recordSuccess() {
+    private void recordSuccessWithHealth() {
         SocConnector connector = connectorRepository.findByType(ConnectorType.WAZUH)
                 .orElseGet(() -> SocConnector.notConfigured(ConnectorType.WAZUH));
-        connector.recordSuccess(Instant.now(), connector.getDescriptor());
+
+        ManagerStatsPort.ManagerHealth health;
+        try {
+            health = managerStatsPort.checkHealth();
+        } catch (SocConnectorException e) {
+            // L'inventaire des agents a reussi ; seule la sonde de sante a
+            // echoue. On ne DEGRADE pas sur une supposition — l'etat de
+            // sante est simplement inconnu ce cycle-ci, pas mauvais.
+            log.warn("Wazuh manager health check failed: {}", e.getMessage());
+            connector.recordSuccess(Instant.now(), connector.getDescriptor());
+            connectorRepository.save(connector);
+            return;
+        }
+
+        if (health.healthy()) {
+            connector.recordSuccess(Instant.now(), connector.getDescriptor());
+        } else {
+            connector.recordDegraded(Instant.now(),
+                    "Daemons critiques arretes : " + String.join(", ", health.stoppedCriticalDaemons()),
+                    connector.getDescriptor());
+        }
         connectorRepository.save(connector);
     }
 

@@ -69,6 +69,29 @@ public class SocConnector {
         this.lastError = error;
     }
 
+    /**
+     * L'outil répond, mais un signe de dégradation a été observé (ex. un
+     * daemon critique du moteur Wazuh arrêté) — ni un succès plein, ni un
+     * échec de connexion. {@code reason} réutilise {@code lastError}
+     * (pas un champ dédié) : c'est la seule vitrine actuelle vers la
+     * console, la donnée reste utile même si le nom du champ ne colle
+     * pas parfaitement à ce cas.
+     */
+    public void recordDegraded(Instant checkedAt, String reason, ConnectorDescriptor descriptor) {
+        if (status == ConnectorStatus.DISABLED) {
+            return;
+        }
+        this.status = ConnectorStatus.DEGRADED;
+        this.lastCheckedAt = Objects.requireNonNull(checkedAt, "checkedAt");
+        // Les données ONT été récupérées avec succès (l'outil répond) —
+        // seule sa santé interne est en cause, la fraîcheur reste réelle.
+        this.lastSuccessfulSyncAt = checkedAt;
+        this.lastError = reason;
+        if (descriptor != null) {
+            this.descriptor = descriptor;
+        }
+    }
+
     public void disable() {
         this.status = ConnectorStatus.DISABLED;
         this.lastError = null;

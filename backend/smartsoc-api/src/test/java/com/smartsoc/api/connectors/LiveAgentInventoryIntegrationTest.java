@@ -83,6 +83,21 @@ class LiveAgentInventoryIntegrationTest {
                 .withBody("""
                         {"data": {"token": "fake-jwt-token-for-test"}}
                         """)));
+        // Manager sain par defaut (repris depuis l'echantillon reel) :
+        // AgentSyncService interroge aussi /manager/status a chaque cycle
+        // desormais (ADR-014, sante du gestionnaire dans le meme cycle).
+        WAZUH.stubFor(get(urlPathEqualTo("/manager/status")).willReturn(aResponse()
+                .withStatus(200)
+                .withHeader("Content-Type", "application/json")
+                .withBody("""
+                        {"data": {"affected_items": [{
+                          "wazuh-analysisd": "running", "wazuh-remoted": "running",
+                          "wazuh-db": "running", "wazuh-execd": "running",
+                          "wazuh-modulesd": "running", "wazuh-apid": "running",
+                          "wazuh-authd": "running", "wazuh-monitord": "running",
+                          "wazuh-logcollector": "running", "wazuh-syscheckd": "running"
+                        }]}, "message": "ok", "error": 0}
+                        """)));
     }
 
     @Test
@@ -135,6 +150,43 @@ class LiveAgentInventoryIntegrationTest {
                 connectorRepository.findByType(ConnectorType.WAZUH);
         assertThat(connector).isPresent();
         assertThat(connector.get().getStatus()).isEqualTo(ConnectorStatus.CONNECTED);
+    }
+
+    @Test
+    void aStoppedCriticalDaemonDegradesTheConnectorEvenThoughAgentsSynced() {
+        WAZUH.stubFor(get(urlPathEqualTo("/agents")).willReturn(aResponse()
+                .withStatus(200)
+                .withHeader("Content-Type", "application/json")
+                .withBody("""
+                        {"data": {"affected_items": [
+                          {"id": "004", "name": "WIN10-CLIENT", "ip": "10.100.0.9", "status": "active"}
+                        ], "total_affected_items": 1}, "message": "ok", "error": 0}
+                        """)));
+        WAZUH.stubFor(get(urlPathEqualTo("/manager/status")).willReturn(aResponse()
+                .withStatus(200)
+                .withHeader("Content-Type", "application/json")
+                .withBody("""
+                        {"data": {"affected_items": [{
+                          "wazuh-analysisd": "stopped", "wazuh-remoted": "running",
+                          "wazuh-db": "running", "wazuh-execd": "running",
+                          "wazuh-modulesd": "running", "wazuh-apid": "running",
+                          "wazuh-authd": "running", "wazuh-monitord": "running",
+                          "wazuh-logcollector": "running", "wazuh-syscheckd": "running"
+                        }]}, "message": "ok", "error": 0}
+                        """)));
+
+        agentSyncService.synchronize();
+
+        // L'agent est quand meme reconcilie : l'inventaire a reussi.
+        assertThat(assetRepository.findByExternalRef("wazuh", "004")).isPresent();
+
+        Optional<com.smartsoc.domain.connectors.SocConnector> connector =
+                connectorRepository.findByType(ConnectorType.WAZUH);
+        assertThat(connector).isPresent();
+        assertThat(connector.get().getStatus()).isEqualTo(ConnectorStatus.DEGRADED);
+        assertThat(connector.get().getLastError()).contains("wazuh-analysisd");
+        // Les donnees restent fraiches malgre la degradation.
+        assertThat(connector.get().getLastSuccessfulSyncAt()).isNotNull();
     }
 
     @Test

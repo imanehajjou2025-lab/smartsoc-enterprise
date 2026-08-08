@@ -1,5 +1,6 @@
 package com.smartsoc.application.connectors;
 
+import com.smartsoc.application.connectors.ManagerStatsPort.ManagerHealth;
 import com.smartsoc.domain.connectors.ConnectorDescriptor;
 import com.smartsoc.domain.connectors.ConnectorStatus;
 import com.smartsoc.domain.connectors.ConnectorType;
@@ -7,6 +8,7 @@ import com.smartsoc.domain.connectors.SocConnector;
 import com.smartsoc.domain.connectors.SocConnectorRepository;
 import com.smartsoc.domain.connectors.SyncRun;
 import com.smartsoc.domain.connectors.SyncRunRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -35,6 +37,9 @@ class AgentSyncServiceTest {
     private AgentReconciliationService reconciliationService;
 
     @Mock
+    private ManagerStatsPort managerStatsPort;
+
+    @Mock
     private SyncRunRepository syncRunRepository;
 
     @Mock
@@ -46,11 +51,16 @@ class AgentSyncServiceTest {
         return new AgentInventoryPort.AgentSnapshot(id, "host-" + id, "10.100.0.1", "Linux", Instant.now());
     }
 
+    @BeforeEach
+    void createService() {
+        service = new AgentSyncService(agentInventoryPort, reconciliationService,
+                managerStatsPort, syncRunRepository, connectorRepository);
+    }
+
     @Test
     void successfulSyncCompletesTheRunAndRecordsConnectorSuccess() {
-        service = new AgentSyncService(agentInventoryPort, reconciliationService,
-                syncRunRepository, connectorRepository);
         when(agentInventoryPort.listAgents()).thenReturn(List.of(snapshot("004"), snapshot("005")));
+        when(managerStatsPort.checkHealth()).thenReturn(new ManagerHealth(true, List.of()));
         when(connectorRepository.findByType(ConnectorType.WAZUH))
                 .thenReturn(Optional.of(SocConnector.notConfigured(ConnectorType.WAZUH)));
 
@@ -67,9 +77,45 @@ class AgentSyncServiceTest {
     }
 
     @Test
+    void unhealthyManagerDegradesTheConnectorEvenThoughAgentsSynced() {
+        when(agentInventoryPort.listAgents()).thenReturn(List.of(snapshot("004")));
+        when(managerStatsPort.checkHealth())
+                .thenReturn(new ManagerHealth(false, List.of("wazuh-analysisd", "wazuh-remoted")));
+        when(connectorRepository.findByType(ConnectorType.WAZUH))
+                .thenReturn(Optional.of(SocConnector.notConfigured(ConnectorType.WAZUH)));
+
+        service.synchronize();
+
+        // L'agent est quand meme reconcilie : l'inventaire a reussi.
+        verify(reconciliationService).reconcileOne(any());
+
+        ArgumentCaptor<SocConnector> connectorCaptor = ArgumentCaptor.forClass(SocConnector.class);
+        verify(connectorRepository).save(connectorCaptor.capture());
+        assertThat(connectorCaptor.getValue().getStatus()).isEqualTo(ConnectorStatus.DEGRADED);
+        assertThat(connectorCaptor.getValue().getLastError())
+                .contains("wazuh-analysisd").contains("wazuh-remoted");
+        // Les donnees d'inventaire restent fraiches malgre la degradation.
+        assertThat(connectorCaptor.getValue().getLastSuccessfulSyncAt()).isNotNull();
+    }
+
+    @Test
+    void managerHealthCheckFailureDoesNotDowngradeAnOtherwiseSuccessfulSync() {
+        when(agentInventoryPort.listAgents()).thenReturn(List.of(snapshot("004")));
+        when(managerStatsPort.checkHealth()).thenThrow(new SocConnectorException("stats endpoint timeout"));
+        when(connectorRepository.findByType(ConnectorType.WAZUH))
+                .thenReturn(Optional.of(SocConnector.notConfigured(ConnectorType.WAZUH)));
+
+        service.synchronize();
+
+        // Pas de degradation sur une supposition : l'inventaire a reussi,
+        // seule la sonde de sante a echoue -- CONNECTED, pas DEGRADED.
+        ArgumentCaptor<SocConnector> connectorCaptor = ArgumentCaptor.forClass(SocConnector.class);
+        verify(connectorRepository).save(connectorCaptor.capture());
+        assertThat(connectorCaptor.getValue().getStatus()).isEqualTo(ConnectorStatus.CONNECTED);
+    }
+
+    @Test
     void oneRejectedAgentDoesNotStopTheOthers() {
-        service = new AgentSyncService(agentInventoryPort, reconciliationService,
-                syncRunRepository, connectorRepository);
         // Instances RÉUTILISÉES (pas snapshot("bad") appelé deux fois) :
         // AgentSnapshot est un record dont l'égalité inclut lastSeenAt
         // (Instant.now()) — deux appels séparés produiraient des valeurs
@@ -85,6 +131,7 @@ class AgentSyncServiceTest {
         // MEMES instances (pas un probleme d'egalite de record).
         lenient().doThrow(new RuntimeException("hostname already taken by another asset"))
                 .when(reconciliationService).reconcileOne(bad);
+        when(managerStatsPort.checkHealth()).thenReturn(new ManagerHealth(true, List.of()));
         when(connectorRepository.findByType(ConnectorType.WAZUH))
                 .thenReturn(Optional.of(SocConnector.notConfigured(ConnectorType.WAZUH)));
 
@@ -100,8 +147,6 @@ class AgentSyncServiceTest {
 
     @Test
     void connectorUnreachableFailsTheRunAndNeverCallsReconciliation() {
-        service = new AgentSyncService(agentInventoryPort, reconciliationService,
-                syncRunRepository, connectorRepository);
         when(agentInventoryPort.listAgents()).thenThrow(new SocConnectorException("Connection refused"));
         // Part d'un connecteur DEJA CONNECTE : recordFailure() ignore
         // volontairement les echecs sur NOT_CONFIGURED/DISABLED (teste
@@ -126,8 +171,6 @@ class AgentSyncServiceTest {
 
     @Test
     void connectorFailureNeverOverridesADisabledConnector() {
-        service = new AgentSyncService(agentInventoryPort, reconciliationService,
-                syncRunRepository, connectorRepository);
         when(agentInventoryPort.listAgents()).thenThrow(new SocConnectorException("boom"));
         SocConnector disabled = SocConnector.notConfigured(ConnectorType.WAZUH);
         disabled.disable();
@@ -142,9 +185,8 @@ class AgentSyncServiceTest {
 
     @Test
     void preservesExistingDescriptorOnSuccess() {
-        service = new AgentSyncService(agentInventoryPort, reconciliationService,
-                syncRunRepository, connectorRepository);
         when(agentInventoryPort.listAgents()).thenReturn(List.of());
+        when(managerStatsPort.checkHealth()).thenReturn(new ManagerHealth(true, List.of()));
         SocConnector alreadyDescribed = SocConnector.notConfigured(ConnectorType.WAZUH);
         alreadyDescribed.recordSuccess(Instant.now().minusSeconds(60),
                 new ConnectorDescriptor("Wazuh v4.12.0", java.util.Set.of(), Instant.now()));
