@@ -68,6 +68,38 @@ export interface AuditLogFilters {
   size: number;
 }
 
+export type ConnectorType = 'WAZUH' | 'OPENSEARCH' | 'MISP' | 'VIRUSTOTAL' | 'SHUFFLE';
+
+export type ConnectorStatus = 'NOT_CONFIGURED' | 'DISABLED' | 'CONNECTED' | 'DEGRADED' | 'DISCONNECTED';
+
+export type SyncOutcome = 'SUCCESS' | 'PARTIAL' | 'FAILURE';
+
+export interface ConnectorLastSync {
+  startedAt: string;
+  finishedAt: string | null;
+  outcome: SyncOutcome | null;
+  itemsProcessed: number;
+  itemsRejected: number;
+  errorMessage: string | null;
+}
+
+export interface ConnectorOverview {
+  type: ConnectorType;
+  status: ConnectorStatus;
+  detectedVersion: string | null;
+  capabilities: string[];
+  lastCheckedAt: string | null;
+  lastSuccessfulSyncAt: string | null;
+  lastError: string | null;
+  lastSync: ConnectorLastSync | null;
+}
+
+/** État des connecteurs SOC (ADR-014) — un connecteur sans backend réel n'apparaît pas dans la réponse. */
+export async function listConnectors(): Promise<ConnectorOverview[]> {
+  const { data } = await api.get<ConnectorOverview[]>('/connectors');
+  return data;
+}
+
 export async function getSecuritySettings(): Promise<SecuritySettings> {
   const { data } = await api.get<SecuritySettings>('/settings/security');
   return data;
