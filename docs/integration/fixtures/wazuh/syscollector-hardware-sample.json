@@ -1,0 +1,29 @@
+{
+  "data": {
+    "affected_items": [
+      {
+        "cpu": {
+          "cores": 1,
+          "mhz": 2496,
+          "name": "12th Gen Intel(R) Core(TM) i5-12450H"
+        },
+        "ram": {
+          "free": 974272,
+          "total": 2096180,
+          "usage": 53
+        },
+        "scan": {
+          "id": 0,
+          "time": "2026-08-08T16:23:02+00:00"
+        },
+        "board_serial": "None",
+        "agent_id": "004"
+      }
+    ],
+    "total_affected_items": 1,
+    "total_failed_items": 0,
+    "failed_items": []
+  },
+  "message": "All specified syscollector information was returned",
+  "error": 0
+}
