@@ -40,6 +40,12 @@ public class AssetRepositoryAdapter implements AssetRepository {
     }
 
     @Override
+    public Optional<Asset> findByExternalRef(String externalSource, String externalId) {
+        return springDataRepository.findByExternalSourceAndExternalId(externalSource, externalId)
+                .map(mapper::toDomain);
+    }
+
+    @Override
     public PageResult<Asset> search(AssetQuery query) {
         Specification<AssetJpaEntity> spec = Specification.unrestricted();
         if (query.type() != null) {

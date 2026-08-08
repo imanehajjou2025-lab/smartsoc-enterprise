@@ -2472,3 +2472,94 @@ les deux boucles concernées avec des `if ... goto ...` en ligne simple.
 deux services affichés « UP ». Lanceur Bureau : exécuté pour de vrai
 (code de sortie 0), a réellement lancé les deux fenêtres de service et
 détecté leur disponibilité.
+
+---
+
+## 2026-08-08 — Intégration SOC, phase 0 et phase 1.1 — premier connecteur réel (ADR-014, ADR-015)
+
+**Contexte.** Baseline d'architecture d'intégration SOC figée (ADR-014,
+v1.1) après audit complet du dépôt et validation en trois passes avec
+Imane. Documentation d'architecture d'entreprise produite en parallèle
+(C4, Context Map DDD, événements de domaine, diagrammes de séquence,
+chapitres IA et SOAR, référence des connecteurs — 9 documents, 22
+diagrammes Mermaid), aucune décision structurante modifiée depuis.
+Chantier lancé dès le tunnel WireGuard monté entre le poste de
+développement et le hub SOC (`vm-siem`, 10.100.0.1).
+
+**Phase 0 — validation réseau (ADR-015).** Le risque R1 identifié dans la
+baseline — un conteneur sur un réseau Docker *bridge* peut-il joindre un
+tunnel WireGuard monté sur l'hôte ? — est **levé sans aucun aménagement** :
+Docker Desktop route via WSL2 vers l'hôte, qui possède la route. Les
+quatre outils SOC (Wazuh API, OpenSearch, MISP, Shuffle) sont confirmés
+joignables **depuis un conteneur** du réseau `smartsoc-net`, ainsi que
+VirusTotal via le second chemin (Internet, hors WireGuard). Risque R2
+(certificats auto-signés) confirmé et qualifié plus finement que prévu :
+sur les quatre certificats SOC, un seul (OpenSearch) couvre son adresse
+WireGuard en SAN — les trois autres (Wazuh API, MISP, Shuffle, ce dernier
+étant le certificat par défaut du produit, clé privée publique) ont été
+régénérés côté SOC avec l'IP WireGuard ajoutée en SAN, sans retirer
+`localhost` pour ne pas casser les accès locaux existants. Deux défauts de
+configuration réseau relevés au passage et corrigés : le peer Kali actif
+à chaud mais absent du fichier `wg0.conf` (aurait disparu au redémarrage),
+et `wg-quick@wg0` non activé au démarrage sur au moins une VM spoke.
+
+**Phase 1.1 — alertes Wazuh en push, bout en bout réel.** Script
+d'intégration Wazuh (`custom-smartsoc.py`) écrit et déployé sur `vm-siem`,
+poussant vers `POST /api/v1/ingest/alerts` (endpoint déjà construit,
+zéro code plateforme). Seuil de déclenchement niveau ≥ 7 initialement
+retenu (relevé à 10 par la suite, aligné sur les intégrations MISP/Shuffle
+déjà en place sur cette VM).
+
+**Cinq bugs réels trouvés et corrigés en vérification, aucun par
+supposition.**
+1. `<name>custom-smartsoc</name>` sans l'extension `.py` dans
+   `ossec.conf` : Wazuh n'invoquait jamais le script, silence total, sans
+   la moindre erreur nulle part — trouvé par comparaison avec le bloc
+   `custom-misp.py` fonctionnel, dont le nom incluait l'extension.
+2. Ordre des arguments Wazuh mal supposé initialement
+   (`hook_url`=argv[3], `api_key`=argv[4]) : l'ordre réel documenté par
+   Wazuh est `alert_file`=argv[1], `api_key`=argv[2], `hook_url`=argv[3].
+   Diagnostiqué en ajoutant une trace explicite de chaque argument
+   (longueur + 6 derniers caractères, jamais la valeur complète) plutôt
+   que de re-deviner un troisième ordre au hasard.
+3. Clé d'API corrompue lors d'un copier-coller manuel (68 caractères
+   collés au lieu de 64, terminée par un fragment de chemin de fichier
+   `.env`) — trouvé en comparant les longueurs des deux côtés plutôt
+   qu'en supposant la valeur correcte.
+4. Champ `detectedAt` (`@NotNull Instant`, obligatoire côté
+   `IngestAlertRequest`) jamais envoyé par le script initial : 400
+   `VALIDATION_FAILED`, diagnostiqué en relisant le contrat publié
+   (`docs/integration/alert-ingestion.md`) et le DTO source côte à côte.
+5. Format d'horodatage Wazuh (`+0000`, décalage sans deux-points) non
+   garanti compatible avec le désérialiseur Jackson du backend :
+   normalisé côté script avant envoi (regex d'insertion du deux-points,
+   conversion UTC, suffixe `Z`) plutôt que transmis tel quel.
+
+**Bug pré-existant trouvé dans `custom-misp.py`, hors périmètre mais
+signalé et corrigé à la demande d'Imane.** `KeyError: 'misp'` à chaque
+exécution : la fonction `merge_enrichment()` (qui transforme la sortie de
+`enrich_observables()` — clé `intel` — vers le format attendu par
+`build_enriched_alert()` — clé `misp`) existait dans le fichier mais
+n'était jamais appelée dans `main()`. Une ligne manquante, systématique,
+indépendante de la disponibilité de MISP. Corrigé par insertion `sed`
+ciblée (fichier trop long et rendu inégal du terminal pour une édition
+manuelle fiable), validé par `py_compile` avant et après.
+
+**Vérification réelle, chaîne complète.** Attaque brute-force SSH
+authentique (bots Internet déjà actifs sur `vm-siem`, puis déclenchement
+manuel contrôlé pour cadrer le test) → règle Wazuh 5712 (niveau 10,
+technique `T1110`) → `custom-smartsoc.py` → webhook SmartSOC (`HTTP 201`)
+→ PostgreSQL (16 → 19 alertes `source=wazuh` sur la session, mapping
+sévérité/hostname/ruleId/technique MITRE vérifié exact) → classification
+IA asynchrone. **Dégradation gracieuse démontrée sur ses deux états
+réels, pas supposée** : classifieur SocAI éteint → alerte persistée avec
+`ai_verdict` vide, immédiatement exploitable ; classifieur rallumé →
+alerte suivante classifiée en ~15 s par le vrai moteur (XGBoost + FAISS +
+MITRE + graphe de nouveauté), verdict `FALSE_POSITIVE`, zone `ARCHIVE`,
+score 0.0656, six justifications détaillées par outil.
+
+**Méthode.** Chaque hypothèse d'échec vérifiée par preuve directe
+(longueurs comparées, arguments tracés, requêtes SQL, logs backend, DTO
+source) avant correctif, jamais par supposition relancée au hasard —
+cinq itérations de diagnostic pour un seul webhook, cohérent avec la
+doctrine du projet établie sur l'IA et les certificats.

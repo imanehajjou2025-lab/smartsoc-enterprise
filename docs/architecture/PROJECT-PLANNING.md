@@ -141,7 +141,8 @@ réelles** et consigné dans le journal de bord.
 
 | Phase | État | ADR | PR | Vérification réelle |
 | --- | --- | --- | --- | --- |
-| 0 — Réseau + capacités | ⬜ **bloquée** — tunnel WireGuard absent de la machine | ADR-015 *(attendu)* | — | — |
+| 0 — Réseau + capacités | ✅ **terminée** — R1 levé, R2 qualifié et corrigé (3 certificats régénérés côté SOC) | [ADR-015](adr/ADR-015-soc-network-topology.md) ✅ | — | 4 outils SOC + VirusTotal joignables depuis le conteneur, TLS vérifié |
+| 1.1 — Alertes push | ✅ **terminée** | — | *(config Wazuh, hors dépôt)* | Chaîne réelle bout en bout : attaque SSH → règle 5712 → webhook → PostgreSQL → classification IA (voir journal PFE, 2026-08-08) |
 | 1.1 — Alertes push | ⬜ | — | — | — |
 | 1.2 — API Wazuh + socle | ⬜ | — | — | — |
 | 1.3 — Vulnérabilités | ⬜ | — | — | — |
@@ -151,10 +152,64 @@ réelles** et consigné dans le journal de bord.
 | 5 — Actions réelles | ⬜ | — | — | — |
 | 6 — Validation complète | ⬜ | — | — | — |
 
-### Prérequis bloquant identifié
+### Résultats de la phase 0 — 2026-08-05
 
-Vérifié le 2026-08-05 sur la machine de développement : **aucune interface
-WireGuard, aucun service WireGuard installé, aucune route vers `10.100.0.0/24`**.
+Tunnel monté (`10.100.0.10` ↔ hub `10.100.0.1`), mesures consignées dans
+l'[ADR-015](adr/ADR-015-soc-network-topology.md).
 
-La phase 0 ne peut pas démarrer tant que : les VM Azure ne sont pas démarrées, et
-que le tunnel WireGuard n'est pas monté sur ce poste avec sa clé de peer.
+| Point | Résultat |
+| --- | --- |
+| **R1** — accès au tunnel depuis un conteneur | ✅ **Levé** — aucun aménagement réseau nécessaire, l'isolation du Compose est conservée |
+| Joignabilité des 4 outils SOC depuis le conteneur | ✅ Wazuh 401 · OpenSearch 401 · MISP 302 · Shuffle 200 |
+| Routage inter-spokes (MISP, Shuffle via le hub) | ✅ Opérationnel de bout en bout |
+| Chemin Internet (VirusTotal) | ✅ Joignable depuis le conteneur, TLS public validé |
+| **R2** — certificats auto-signés | ⚠️ **Confirmé, plus étendu que prévu** : seul OpenSearch est exploitable en l'état |
+| Échantillons d'API pour les fixtures d'ACL | ✅ **Capturés** — `docs/integration/fixtures/wazuh/` (agents, statut du gestionnaire), via un compte `smartsoc-reader` dédié (rôle `readonly`) |
+
+### Certificats : un seul des quatre couvre son adresse
+
+| Service | SAN | Action requise |
+| --- | --- | --- |
+| OpenSearch | `IP:10.100.0.1` ✅ | Truststore seul — aucune action côté SOC |
+| Wazuh API | `DNS:localhost` ❌ | Régénérer avec `IP:10.100.0.1` — **bloque la phase 1.2** |
+| MISP | `localhost`, `127.0.0.1` ❌ | Régénérer avec `IP:10.100.0.3` — bloque la phase 2 |
+| Shuffle | **aucun SAN** ❌ | Régénérer avec `IP:10.100.0.4` — bloque la phase 5 |
+
+Le certificat de Shuffle est celui **livré par défaut avec le produit** (émis en
+2020, `frikky@shuffler.io`) : sa clé privée est publique, le TLS actuel
+n'authentifie donc rien.
+
+### Prérequis avant la phase 1.2 — tous levés
+
+1. **Certificat de l'API Wazuh régénéré** avec `IP:10.100.0.1` dans les SAN. ✅
+2. **Compte Wazuh dédié en lecture seule** (`smartsoc-reader`, rôle `readonly`,
+   id 100) créé via l'API de sécurité Wazuh, sans jamais réutiliser le compte
+   admin pour l'usage courant. ✅
+3. **Échantillons réels capturés et versionnés** —
+   `docs/integration/fixtures/wazuh/agents-sample.json` et
+   `manager-status-sample.json`. ✅ Cinq cas réels déjà identifiés dans les
+   données (voir note ci-dessous), qui devront être couverts par les tests
+   de l'ACL de la phase 1.2.
+
+**Ce que les échantillons réels ont révélé, avant même d'écrire le
+connecteur :**
+
+- Les agents `never_connected` n'ont **aucun** champ `os`, ni `lastKeepAlive`,
+  ni `group` — ces champs sont absents (pas `null`), pas seulement vides.
+- `ip` peut valoir littéralement la chaîne `"any"`, pas une adresse.
+- `lastKeepAlive` de l'agent 000 (le manager lui-même) vaut la sentinelle
+  `9999-12-31T23:59:59+00:00` — jamais une vraie date récente, à ne pas
+  interpréter comme fraîcheur.
+- **Deux agents peuvent partager la même IP** (`10.100.0.5`, agents 005 et
+  006) : la réconciliation ne peut donc pas se faire sur l'IP, uniquement sur
+  l'identifiant d'agent Wazuh.
+- Les noms d'agents sont bruts et incohérents dans la vraie vie
+  (`Windows-Endpoint` / `Windows_Endpoint` / `Windows-Endpoin` — trois
+  variantes pour des machines distinctes) : aucune déduplication par nom ne
+  serait fiable.
+- `GET /manager/status` renvoie l'état des **daemons internes** (utile pour
+  un `HealthIndicator`), pas des statistiques de débit — un futur besoin de
+  métriques d'événements demandera un autre endpoint (`/manager/stats` ou
+  équivalent), à vérifier en phase 1.2.
+
+Plus rien ne bloque le démarrage du code de la **phase 1.2**.
