@@ -22,7 +22,13 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { useAppSelector } from '../../app/hooks';
 import { problemDetail } from '../../shared/api/client';
 import { SeverityChip, StatusChip } from '../alerts/chips';
-import { ConfidenceBar, IocStatusChip, IocTypeChip, ReputationVerdictChip, TlpChip } from './iocChips';
+import {
+  ConfidenceBar,
+  IocStatusChip,
+  IocTypeChip,
+  ReputationVerdictChip,
+  TlpChip,
+} from './iocChips';
 import { getIoc, getReputation, listMatchingAlerts, revokeIoc } from './intelligenceApi';
 
 interface Props {

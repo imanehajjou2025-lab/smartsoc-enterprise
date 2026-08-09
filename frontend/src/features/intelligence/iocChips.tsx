@@ -3,7 +3,12 @@ import Chip from '@mui/material/Chip';
 import LinearProgress from '@mui/material/LinearProgress';
 import Typography from '@mui/material/Typography';
 import { severityColors } from '../../app/theme';
-import type { IndicatorStatus, IndicatorType, ReputationVerdict, TlpMarking } from './intelligenceApi';
+import type {
+  IndicatorStatus,
+  IndicatorType,
+  ReputationVerdict,
+  TlpMarking,
+} from './intelligenceApi';
 
 export const IOC_TYPE_LABELS: Record<IndicatorType, string> = {
   IPV4: 'IPv4',

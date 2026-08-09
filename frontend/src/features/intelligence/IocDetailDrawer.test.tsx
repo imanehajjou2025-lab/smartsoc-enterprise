@@ -29,7 +29,13 @@ const ioc: Indicator = {
   revokedAt: null,
 };
 
-const emptyAlerts: PageResponse<never> = { items: [], totalElements: 0, page: 0, size: 10, totalPages: 0 };
+const emptyAlerts: PageResponse<never> = {
+  items: [],
+  totalElements: 0,
+  page: 0,
+  size: 10,
+  totalPages: 0,
+};
 
 const reputation: Reputation = {
   id: 'rep-1',
@@ -95,6 +101,8 @@ describe('IocDetailDrawer — réputation VirusTotal', () => {
     renderDrawer('VIEWER');
 
     await screen.findByText('45.83.12.7');
-    expect(screen.queryByRole('button', { name: 'Vérifier la réputation' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Vérifier la réputation' }),
+    ).not.toBeInTheDocument();
   });
 });
