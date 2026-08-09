@@ -57,16 +57,24 @@ class AuditLogControllerIntegrationTest {
     @Test
     void entriesCanBeFilteredByATimeWindow() {
         String adminToken = loginToken("admin", "IntegrationTest123!");
-        Instant before = Instant.now().minusSeconds(60);
 
         ResponseEntity<String> windowed = exchange(HttpMethod.GET,
-                AUDIT_LOGS + "?from=" + before + "&to=" + Instant.now().plusSeconds(60),
+                AUDIT_LOGS + "?from=" + Instant.now().minusSeconds(60)
+                        + "&to=" + Instant.now().plusSeconds(60),
                 adminToken, String.class);
         assertThat(windowed.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(windowed.getBody()).contains("\"action\":\"LOGIN_SUCCEEDED\"");
 
+        // Bornée à une epoque bien avant que la plateforme n'existe, plutôt
+        // qu'à un delta relatif au moment du test (ex. "il y a 60s") : une
+        // suite lente (contexte Spring d'autres classes, CI chargée) peut
+        // faire déborder un delta relatif au-delà des vraies entrées d'audit
+        // déjà écrites par la classe elle-même (voir loginAttemptsAreTracedAndQueryableByAnAdmin,
+        // dont l'ordre d'exécution JUnit n'est pas garanti) — un rejeu flaky
+        // déjà rencontré en CI, jamais en local. Une borne absolue reste
+        // vraie quelle que soit la durée d'exécution de la suite.
         ResponseEntity<String> outOfWindow = exchange(HttpMethod.GET,
-                AUDIT_LOGS + "?to=" + before, adminToken, String.class);
+                AUDIT_LOGS + "?to=2000-01-01T00:00:00Z", adminToken, String.class);
         assertThat(outOfWindow.getBody()).contains("\"totalElements\":0");
     }
 

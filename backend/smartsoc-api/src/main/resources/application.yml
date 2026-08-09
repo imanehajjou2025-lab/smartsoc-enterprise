@@ -164,6 +164,16 @@ smartsoc:
       # ~15 min : un flux CTI evolue plus lentement qu'un etat d'agent ou
       # un scan de vulnerabilites -- pas besoin d'un cycle plus serre.
       sync-interval-ms: ${SMARTSOC_CONNECTORS_MISP_SYNC_INTERVAL_MS:900000}
+    # API REST publique VirusTotal -- clef statique en en-tete x-apikey.
+    # A LA DEMANDE d'un analyste uniquement (jamais sur le flux, R4) :
+    # aucun planificateur, contrairement aux autres connecteurs. Phase 3, ADR-014.
+    virustotal:
+      mode: ${SMARTSOC_CONNECTORS_VIRUSTOTAL_MODE:simulation}
+      url: ${SMARTSOC_CONNECTORS_VIRUSTOTAL_URL:https://www.virustotal.com/api/v3}
+      api-key: ${SMARTSOC_CONNECTORS_VIRUSTOTAL_API_KEY:}
+      # Duree de fraicheur du cache -- protege le quota strict (4 req/min,
+      # 500/jour en offre gratuite), pas une simple optimisation de latence.
+      cache-ttl-hours: ${SMARTSOC_CONNECTORS_VIRUSTOTAL_CACHE_TTL_HOURS:24}
 
 resilience4j:
   circuitbreaker:
@@ -218,3 +228,20 @@ resilience4j:
         failure-rate-threshold: 50
         wait-duration-in-open-state: 30s
         permitted-number-of-calls-in-half-open-state: 2
+      # Reputation VirusTotal : meme doctrine, ADR-014 phase 3.
+      virusTotalReputation:
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 2
+  ratelimiter:
+    instances:
+      # Quota VirusTotal reel (offre gratuite) : 4 requetes/minute. Timeout
+      # d'attente nul -- un appel qui ne peut pas passer immediatement
+      # echoue net (degradation gracieuse cote service, jamais un blocage
+      # de la requete HTTP de l'analyste).
+      virusTotalReputation:
+        limit-for-period: 4
+        limit-refresh-period: 60s
+        timeout-duration: 0s

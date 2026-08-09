@@ -1,6 +1,7 @@
 package com.smartsoc.api.common.error;
 
 import com.smartsoc.application.ai.AiServiceUnavailableException;
+import com.smartsoc.application.connectors.SocConnectorException;
 import com.smartsoc.application.settings.DatabaseBackupPort.BackupExecutionException;
 import com.smartsoc.application.settings.NotificationTestPort.NotificationTestException;
 import com.smartsoc.domain.common.BusinessRuleViolationException;
@@ -87,6 +88,22 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage());
         problem.setTitle("AI service unavailable");
         problem.setProperty(PROPERTY_CODE, ex.getCode());
+        problem.setProperty(PROPERTY_TIMESTAMP, Instant.now());
+        return problem;
+    }
+
+    /**
+     * Connecteur à la demande injoignable sans donnée en cache à servir
+     * (ADR-014 phase 3 — VirusTotal) : le seul cas où {@link SocConnectorException}
+     * remonte jusqu'à l'API plutôt que d'être avalée par un orchestrateur
+     * programmé.
+     */
+    @ExceptionHandler(SocConnectorException.class)
+    public ProblemDetail handleSocConnectorFailure(SocConnectorException ex) {
+        log.warn("SOC connector unavailable: {}", ex.getMessage());
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage());
+        problem.setTitle("Connector unavailable");
+        problem.setProperty(PROPERTY_CODE, "CONNECTOR_UNAVAILABLE");
         problem.setProperty(PROPERTY_TIMESTAMP, Instant.now());
         return problem;
     }
