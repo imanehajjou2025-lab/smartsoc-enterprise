@@ -7,10 +7,11 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * d'environnement : brancher un vrai outil = configuration pure, comme
  * pour l'IA (ADR-008).
  *
- * @param wazuh accès à l'API de gestion Wazuh (agents, inventaire) — lecture seule en V1
+ * @param wazuh      accès à l'API de gestion Wazuh (agents, inventaire) — lecture seule en V1
+ * @param openSearch accès à l'Indexer Wazuh (vulnérabilités, §1.3 — le Hunting live suivra en phase 4)
  */
 @ConfigurationProperties(prefix = "smartsoc.connectors")
-public record ConnectorProperties(Wazuh wazuh) {
+public record ConnectorProperties(Wazuh wazuh, OpenSearch openSearch) {
 
     public static final String MODE_SIMULATION = "simulation";
     public static final String MODE_LIVE = "live";
@@ -23,6 +24,23 @@ public record ConnectorProperties(Wazuh wazuh) {
      * @param password mot de passe du compte ci-dessus
      */
     public record Wazuh(String mode, String url, String username, String password) {
+
+        public String modeOrDefault() {
+            return (mode == null || mode.isBlank()) ? MODE_SIMULATION : mode;
+        }
+    }
+
+    /**
+     * @param mode          simulation (défaut) | live | disabled
+     * @param url            URL de base de l'Indexer (ex. {@code https://10.100.0.1:9200})
+     * @param username       compte dédié en LECTURE SEULE — Basic Auth à chaque requête, pas de jeton
+     *                       (contrairement à Wazuh — vérifié en réel, voir ADR-015)
+     * @param password       mot de passe du compte ci-dessus
+     * @param vulnerabilityIndexPattern motif d'index des vulnérabilités, confirmé en réel le
+     *                       2026-08-09 (voir {@code docs/architecture/soc-integration-plan.md} §1.3)
+     */
+    public record OpenSearch(String mode, String url, String username, String password,
+                              String vulnerabilityIndexPattern) {
 
         public String modeOrDefault() {
             return (mode == null || mode.isBlank()) ? MODE_SIMULATION : mode;

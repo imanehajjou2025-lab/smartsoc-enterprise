@@ -1,0 +1,80 @@
+{
+  "took": 2,
+  "timed_out": false,
+  "_shards": {
+    "total": 1,
+    "successful": 1,
+    "skipped": 0,
+    "failed": 0
+  },
+  "hits": {
+    "total": {
+      "value": 1994,
+      "relation": "eq"
+    },
+    "max_score": 1.0,
+    "hits": [
+      {
+        "_index": "wazuh-states-vulnerabilities-vm-siem",
+        "_id": "003_5550d6540be00f41aaf06c096551c53405185957_CVE-2025-3576",
+        "_score": 1.0,
+        "_source": {
+          "agent": {
+            "id": "003",
+            "name": "Ubuntu-Sensor",
+            "type": "Wazuh",
+            "version": "v4.12.0"
+          },
+          "host": {
+            "os": {
+              "full": "Ubuntu 24.04.4 LTS (Noble Numbat)",
+              "kernel": "6.17.0-1020-azure",
+              "name": "Ubuntu",
+              "platform": "ubuntu",
+              "type": "ubuntu",
+              "version": "24.04.4"
+            }
+          },
+          "package": {
+            "architecture": "amd64",
+            "description": "MIT Kerberos runtime libraries - krb5 GSS-API Mechanism",
+            "name": "libgssapi-krb5-2",
+            "size": 436224,
+            "type": "deb",
+            "version": "1.20.1-6ubuntu2.6"
+          },
+          "vulnerability": {
+            "category": "Packages",
+            "classification": "-",
+            "description": "A vulnerability in the MIT Kerberos implementation allows GSSAPI-protectedmessages using RC4-HMAC-MD5 to be spoofed due to weaknesses in the MD5checksum design. If RC4 is preferred over stronger encryption types, anattacker could exploit MD5 collisions to forge message integrity codes.This may lead to unauthorized message tampering.",
+            "detected_at": "2026-07-17T10:55:56.514Z",
+            "enumeration": "CVE",
+            "id": "CVE-2025-3576",
+            "published_at": "2025-04-15T06:15:44Z",
+            "reference": "https://ubuntu.com/security/CVE-2025-3576, https://www.cve.org/CVERecord?id=CVE-2025-3576",
+            "scanner": {
+              "condition": "Package default status",
+              "reference": "https://cti.wazuh.com/vulnerabilities/cves/CVE-2025-3576",
+              "source": "Canonical Security Tracker",
+              "vendor": "Wazuh"
+            },
+            "score": {
+              "base": 5.9,
+              "version": "3.1"
+            },
+            "severity": "Medium",
+            "under_evaluation": false
+          },
+          "wazuh": {
+            "cluster": {
+              "name": "vm-siem"
+            },
+            "schema": {
+              "version": "1.0.0"
+            }
+          }
+        }
+      }
+    ]
+  }
+}

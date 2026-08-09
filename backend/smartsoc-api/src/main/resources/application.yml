@@ -141,6 +141,19 @@ smartsoc:
       # ~5 min : meme doctrine que le reste du projet, une valeur mesuree
       # en reel plutot qu'estimee (voir ADR-014 §1.2, a affiner en usage).
       sync-interval-ms: ${SMARTSOC_CONNECTORS_WAZUH_SYNC_INTERVAL_MS:300000}
+    # Indexer Wazuh (OpenSearch) -- source confirmee en reel des
+    # vulnerabilites (ADR-014 §1.3, 2026-08-09). Basic Auth a chaque
+    # requete, pas de jeton (contrairement a wazuh ci-dessus).
+    open-search:
+      mode: ${SMARTSOC_CONNECTORS_OPENSEARCH_MODE:simulation}
+      url: ${SMARTSOC_CONNECTORS_OPENSEARCH_URL:https://localhost:9200}
+      username: ${SMARTSOC_CONNECTORS_OPENSEARCH_USERNAME:}
+      password: ${SMARTSOC_CONNECTORS_OPENSEARCH_PASSWORD:}
+      vulnerability-index-pattern: ${SMARTSOC_CONNECTORS_OPENSEARCH_VULN_INDEX_PATTERN:wazuh-states-vulnerabilities-*}
+      sync-initial-delay-ms: ${SMARTSOC_CONNECTORS_OPENSEARCH_SYNC_INITIAL_DELAY_MS:30000}
+      # ~10 min : cycle moins frequent que les agents, un scan de
+      # vulnerabilites evolue plus lentement qu'un etat d'agent.
+      sync-interval-ms: ${SMARTSOC_CONNECTORS_OPENSEARCH_SYNC_INTERVAL_MS:600000}
 
 resilience4j:
   circuitbreaker:
@@ -176,6 +189,13 @@ resilience4j:
         permitted-number-of-calls-in-half-open-state: 2
       # Inventaire systeme (syscollector) par agent : meme doctrine, ADR-014.
       wazuhSystemInventory:
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 2
+      # Flux de vulnerabilites (Indexer OpenSearch) : meme doctrine, ADR-014 §1.3.
+      openSearchVulnerabilityFeed:
         sliding-window-size: 10
         minimum-number-of-calls: 5
         failure-rate-threshold: 50

@@ -311,9 +311,28 @@ Module complet : domaine, migration, dépôt, service, endpoints, écran, tests 
 alimenté par Wazuh, rattaché aux actifs existants.
 
 **Étape la plus lourde de la phase 1** (contrainte 2), à planifier comme telle.
-Si la phase 0 établit que les vulnérabilités proviennent de l'Indexer et non de
-l'API, cette étape s'exécute **après la phase 4** (OpenSearch) — sans changer
-son appartenance au domaine fonctionnel Wazuh.
+
+**Tranché en réel le 2026-08-09** (pas en phase 0 comme initialement prévu —
+vérifié directement contre `vm-siem` une fois la question posée) :
+`GET /vulnerability/{agent_id}` de l'API Wazuh renvoie `404 Not Found` sur
+cette instance (Wazuh v4.12.0 — le détecteur de vulnérabilités classique de
+l'API a été retiré des versions récentes), confirmé sur un token valide et
+en contrôle croisé avec `/agents` qui répond normalement. L'Indexer, lui,
+porte bien l'index `wazuh-states-vulnerabilities-vm-siem` peuplé de 1994
+documents réels (`agent`, `host.os`, `package`, `vulnerability.{id, severity,
+score, description, detected_at, scanner…}` — échantillon capturé dans
+`docs/integration/fixtures/wazuh/vulnerabilities-indexer-sample.json`).
+**Source confirmée : l'Indexer.**
+
+Construite néanmoins **avant** le mapping Hunting de la phase 4 : la
+dépendance dure documentée pour la phase 4 (« le mapping exige un schéma réel,
+produit par plusieurs jours d'indexation ») concerne l'index **des alertes**
+(`wazuh-alerts-*`), pas celui des vulnérabilités — déjà mûr et au schéma
+stable (`wazuh.schema.version: "1.0.0"`), vérifié en réel ci-dessus. Un
+client OpenSearch partagé (config/Basic Auth/circuit breaker, même patron que
+le client Wazuh) est donc construit maintenant pour `VulnerabilityFeedPort` ;
+le mapping Hunting (8 champs × 3 opérateurs sur l'index d'alertes) reste pour
+la phase 4, quand cet index aura plus de recul.
 
 ---
 
@@ -793,6 +812,7 @@ interface.
 | Wazuh en deux étapes ? | **Oui, conservé** (alertes / API) | Lisibilité fonctionnelle, avec la contrainte technique documentée |
 | Alertes via l'API Wazuh ? | **Impossible** — push webhook, ou OpenSearch en phase 4 | L'API Wazuh est une API de gestion, pas un magasin d'événements |
 | Vulnérabilités ? | **Dans le périmètre Wazuh** (étape 1.3), identifiées comme module métier complet | Cohérence fonctionnelle demandée ; charge réelle non masquée |
+| Vulnérabilités : API ou Indexer ? | **Indexer, confirmé en réel le 2026-08-09** — `/vulnerability/{id}` de l'API 404 sur Wazuh v4.12.0, index `wazuh-states-vulnerabilities-*` peuplé et vérifié | Vérification directe contre `vm-siem` plutôt qu'une hypothèse de version |
 | VirusTotal ? | **Option C** — MISP en fond, VT à la demande | Deux usages réellement différents |
 | MISP remplace le module IOC ? | **Non** — il l'alimente, sans **aucune** modification du domaine | `feedSource` et `externalId` existent déjà |
 | Contrôle des agents ? | **Phase 5**, avec Shuffle | Même classe de risque : action sur le monde réel |
