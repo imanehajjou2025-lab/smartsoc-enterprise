@@ -61,6 +61,28 @@ export interface Observable {
   value: string;
 }
 
+/** Verdict DÉRIVÉ côté serveur des compteurs VirusTotal (règle « pire cas gagne »), jamais recalculé ici. */
+export type ReputationVerdict = 'MALICIOUS' | 'SUSPICIOUS' | 'HARMLESS' | 'UNDETECTED';
+
+/**
+ * Réputation d'un observable, obtenue à la demande (ADR-014 phase 3 —
+ * VirusTotal, jamais sur le flux). Peut provenir du cache serveur
+ * (jusqu'à 24 h) plutôt que d'un appel frais — `checkedAt` en fait foi.
+ */
+export interface Reputation {
+  id: string;
+  source: string;
+  type: IndicatorType;
+  value: string;
+  verdict: ReputationVerdict;
+  maliciousCount: number;
+  suspiciousCount: number;
+  harmlessCount: number;
+  undetectedCount: number;
+  firstCheckedAt: string;
+  checkedAt: string;
+}
+
 /**
  * Enrichissement CTI d'une alerte. `observables` liste TOUT ce que
  * l'alerte cite, y compris ce qui ne correspond à aucun indicateur ;
@@ -129,5 +151,17 @@ export async function listMatchingAlerts(
  */
 export async function getAlertThreatIntel(alertId: string): Promise<ThreatIntel> {
   const { data } = await api.get<ThreatIntel>(`/alerts/${alertId}/threat-intel`);
+  return data;
+}
+
+/**
+ * Interroge VirusTotal (ou sert le cache serveur) pour un observable.
+ * Réservé aux rôles d'écriture côté API : chaque appel consomme un quota
+ * externe réel, jamais déclenché automatiquement.
+ */
+export async function getReputation(type: IndicatorType, value: string): Promise<Reputation> {
+  const { data } = await api.get<Reputation>(
+    `/reputation?type=${encodeURIComponent(type)}&value=${encodeURIComponent(value)}`,
+  );
   return data;
 }

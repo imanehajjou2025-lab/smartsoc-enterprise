@@ -67,9 +67,9 @@ const CONNECTORS: ConnectorMeta[] = [
   {
     type: 'VIRUSTOTAL',
     label: 'VirusTotal',
-    description: "Réputation d'observables (hash, IP, domaine).",
+    description: "Réputation d'observables (hash, IP, domaine), à la demande d'un analyste.",
     icon: <BugReportOutlinedIcon />,
-    implemented: false,
+    implemented: true,
     plannedPhase: 'Phase 3',
   },
   {
