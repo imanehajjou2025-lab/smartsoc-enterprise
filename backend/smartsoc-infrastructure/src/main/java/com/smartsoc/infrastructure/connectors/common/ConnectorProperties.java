@@ -58,9 +58,5 @@ public record ConnectorProperties(Wazuh wazuh, OpenSearch openSearch, Misp misp)
      *               une instance MISP le 2026-08-09
      */
     public record Misp(String mode, String url, String apiKey) {
-
-        public String modeOrDefault() {
-            return (mode == null || mode.isBlank()) ? MODE_SIMULATION : mode;
-        }
     }
 }
