@@ -2931,4 +2931,90 @@ aucun changement de code frontend.
 capacités des connecteurs Wazuh et OpenSearch, exposition des champs
 de synchronisation sur `AssetResponse`, retrait du code mort
 `modeOrDefault()` résiduel) en tâches séparées. Phase 3 (VirusTotal) et
-Phase 4 (OpenSearch/Hunting live) restent à planifier.
+
+---
+
+## 2026-08-09 — Phase 3 : connecteur VirusTotal, réputation d'observables (PR #93)
+
+**Choisie explicitement par Imane** face à la phase 4 (Hunting OpenSearch,
+jugée prématurée — l'index d'alertes est encore jeune) et aux tâches en
+attente. Confirmation explicite de posséder une clé API VirusTotal avant
+tout code, doctrine des échantillons réels appliquée une fois de plus :
+deux `curl` réels exécutés par Imane elle-même avec sa propre clé
+(jamais partagée en clair) contre l'API v3 pour l'IP `8.8.8.8` et le
+domaine `google.com`, réponses collées intégralement et versionnées en
+fixtures (`docs/integration/fixtures/virustotal/`) avant d'écrire la
+moindre ligne d'ACL.
+
+**Un connecteur de nature différente des quatre précédents : à la
+demande, pas au fil de l'eau.** Wazuh, MISP et (à venir) OpenSearch
+synchronisent en tâche de fond ; VirusTotal est interrogé un observable
+à la fois, sur demande d'un analyste — le quota gratuit (4 requêtes/min,
+500/jour) l'impose. **Cache obligatoire, pas une optimisation** :
+`ObservableReputation` (nouvelle entité du domaine, identité
+`(source, type, value)`) sert toute lecture dont le dernier relevé a
+moins de `cache-ttl-hours` (24 h par défaut), et ne rappelle l'API que
+si le cache est absent ou périmé.
+
+**Verdict dérivé, jamais fabriqué.** Les réponses IP/domaine/URL de
+VirusTotal ne renvoient aucun champ de verdict unique, seulement des
+compteurs par catégorie (`last_analysis_stats`). Règle documentée
+« pire cas gagne » (`malicious > 0` → `MALICIOUS`, sinon `suspicious > 0`
+→ `SUSPICIOUS`, etc.) implémentée dans `ObservableReputation.deriveVerdict`
+— une traduction transparente des compteurs réels, pas une valeur
+inventée, conforme à la doctrine du projet.
+
+**Protection de quota réelle, pas symbolique.** Seul connecteur du
+projet à empiler `@CircuitBreaker` **et** `@RateLimiter` sur le même
+appel — les autres connecteurs n'ont qu'un disjoncteur. Effet de bord
+mineur constaté et non corrigé : les deux aspects partageant la même
+méthode de repli, un échec loggue l'avertissement deux fois (cosmétique,
+sans impact fonctionnel).
+
+**Bug réel trouvé par mon propre test WireMock, de la même famille
+qu'un bug déjà documenté ailleurs dans ce dépôt (rotation de refresh
+token).** `ObservableReputationService.getReputation()` appelait
+`recordFailure()` (écriture du statut `DISCONNECTED`) puis relançait
+l'exception `SocConnectorException` — dans une méthode `@Transactional`
+simple, cette relance déclenche le rollback Spring par défaut et annule
+silencieusement l'écriture de `recordFailure()` qui la précédait dans la
+même transaction. Détecté par
+`ReputationLiveIntegrationTest.degradesGracefullyWhenVirusTotalIsDown`
+qui attendait `DISCONNECTED` et observait `CONNECTED`. Corrigé par
+`@Transactional(noRollbackFor = SocConnectorException.class)`, comme
+pour `InvalidRefreshTokenException` sur la rotation de jeton.
+
+**CI rouge une fois, deux causes réelles distinctes, jamais reproduites
+en local malgré plusieurs `clean verify` complets — diagnostiquées par
+lecture des logs CI.**
+1. `ConnectorControllerIntegrationTest.aConnectorNeverSynchronizedIsHonestlyReported404NotFabricated`
+   ciblait VIRUSTOTAL, authentiquement jamais synchronisé avant ce lot —
+   plus vrai après : le nouveau code VirusTotal est désormais exercé par
+   d'autres tests du même contexte Spring partagé. Corrigé en retargetant
+   sur SHUFFLE, seul connecteur du dépôt sans aucune implémentation
+   backend nulle part.
+2. `AuditLogControllerIntegrationTest.entriesCanBeFilteredByATimeWindow`
+   supposait qu'aucune entrée d'audit n'existait plus de 60 secondes
+   avant l'exécution du test — vrai seulement si la classe s'exécute
+   bien en dessous de 60 s ; ce lot ajoutant plusieurs classes
+   `@SpringBootTest` supplémentaires au même job CI, la charge totale a
+   dépassé ce seuil implicite sur le runner. Corrigé en remplaçant la
+   borne relative par une borne absolue fixe (`2000-01-01T00:00:00Z`),
+   insensible à la durée de la suite.
+
+**Vérification réelle.** 524 tests backend verts sur les 4 modules
+(domaine 173, application 101, infrastructure 59, api 191 — +35 vs la
+phase 2), zéro régression, `clean verify` complet vert. ACL vérifiée
+contre les deux échantillons réels capturés (IP et domaine, compteurs
+`malicious`/`suspicious`/`harmless`/`undetected` fidèlement traduits).
+Test WireMock de mode live couvrant authentification (en-tête
+`x-apikey`), dégradation gracieuse et service du cache périmé en cas de
+panne. CI complète verte (CodeQL, SonarCloud, Trivy, build, qualité)
+après les deux correctifs.
+
+**Reste ouvert.** Contrairement à MISP (aucun frontend nécessaire, écran
+existant déjà générique), VirusTotal expose un point d'entrée à la
+demande sans surface UI existante pour le déclencher — évaluation du
+besoin frontend (bouton « Vérifier la réputation » dans le tiroir
+observable/IOC) à faire séparément. Phase 4 (OpenSearch/Hunting live)
+reste à planifier.
