@@ -59,34 +59,35 @@ porte le socle réutilisé ensuite. Un connecteur pur revient à 1 CÉ (MISP) co
 | **0** — Réseau + capacités | — | — | Point de départ | Tout |
 | **1.1** — Alertes push | 0 | **dure** | Sans route validée, rien ne se branche | 1.2, 4 (alimente l'Indexer) |
 | **1.2** — API Wazuh + socle | 0 | **dure** | Idem | 1.3, 2, 3, 4, 5 |
-| **1.3** — Vulnérabilités | 1.2 | **dure** | Réutilise socle et connecteur Wazuh | — |
-| **1.3** — *(si source = Indexer)* | 4 | **dure** *(conditionnelle)* | Tranché en phase 0 | — |
+| **1.3** — Vulnérabilités | 1.2 | **dure** | Réutilise socle et connecteur Wazuh ; source = Indexer, confirmé en réel le 2026-08-09 | 4 (réutilise le client OpenSearch construit ici) |
 | **2** — MISP | 1.2 | **dure** | Socle Connectors | — |
 | **3** — VirusTotal | 1.2 | **dure** | Socle Connectors | — |
 | **3** — VirusTotal | 2 | souple | Plus utile avec un fond CTI, mais indépendant | — |
-| **4** — OpenSearch | 1.2 | **dure** | Socle Connectors | 1.3 conditionnellement |
-| **4** — OpenSearch | 1.1 | **dure** | Le mapping exige un schéma **réel**, produit par l'indexation | — |
+| **4** — OpenSearch (Hunting) | 1.3 | **dure** | Réutilise le client OpenSearch construit pour 1.3 | — |
+| **4** — OpenSearch (Hunting) | 1.1 | **dure** | Le mapping exige un schéma **réel** de l'index d'alertes, produit par l'indexation | — |
 | **5** — Actions réelles | 1.2 | **dure** | Socle + 3ᵉ filtre de clé d'API | — |
 | **5** — Actions réelles | 1.1, 2 | souple | Agir suppose des alertes interprétables et un contexte CTI | — |
 | **6** — Validation | 0 → 5 | **dure** | Valide l'ensemble | Exposition Cloudflare |
 
-**Chemin critique :** `0 → 1.1 → 1.2 → 4 → 5 → 6`.
-Les phases **2 et 3 sont hors chemin critique** et parallélisables. La phase 1.3
-l'est aussi, **sauf** si la phase 0 établit que sa source est l'Indexer.
+**Chemin critique :** `0 → 1.1 → 1.2 → 1.3 → 4 → 5 → 6`.
+Les phases **2 et 3 sont hors chemin critique** et parallélisables. La 1.3
+rejoint le chemin critique le 2026-08-09 (source Indexer confirmée en réel) et
+passe désormais **avant** la phase 4 : elle construit le client OpenSearch
+partagé (schéma des vulnérabilités déjà mûr) que la phase 4 réutilisera pour
+son mapping Hunting (schéma des alertes, encore jeune).
 
 ```mermaid
 flowchart LR
     P0["Phase 0<br/>Réseau + capacités"] --> P11["1.1 · Alertes push"]
     P0 --> P12["1.2 · API Wazuh<br/>+ SOCLE"]
-    P11 --> P4["Phase 4<br/>OpenSearch"]
-    P12 --> P13["1.3 · Vulnérabilités"]
+    P12 --> P13["1.3 · Vulnérabilités<br/>+ client OpenSearch"]
     P12 --> P2["Phase 2 · MISP"]
     P12 --> P3["Phase 3 · VirusTotal"]
-    P12 --> P4
     P12 --> P5["Phase 5<br/>Actions réelles ⚠"]
+    P11 --> P4["Phase 4<br/>Hunting (OpenSearch)"]
+    P13 --> P4
     P2 -.souple.-> P3
     P2 -.souple.-> P5
-    P4 -.conditionnelle.-> P13
     P13 --> P6["Phase 6<br/>Validation complète"]
     P2 --> P6
     P3 --> P6
@@ -108,10 +109,10 @@ SonarCloud ≥ 80 % sur le code neuf, CodeQL, Trivy, Gitleaks).
 | 0 | *(aucune PR de code)* — ADR-015 + échantillons versionnés |
 | 1.1 | 1 PR : ajustements du guide de mapping + vérification consignée |
 | 1.2 | 3 PR : socle `connectors` · connecteur Wazuh lecture + `Asset` · frontend |
-| 1.3 | 2 PR : module vulnérabilités backend · frontend |
+| 1.3 | 2 PR : client OpenSearch partagé + module vulnérabilités backend · frontend |
 | 2 | 2 PR : connecteur MISP · affichage de provenance |
 | 3 | 2 PR : connecteur VirusTotal + cache · panneau frontend |
-| 4 | 1 PR : adaptateur OpenSearch *(aucun frontend — écran existant)* |
+| 4 | 1 PR : mapping Hunting sur le client OpenSearch existant *(aucun frontend — écran existant)* |
 | 5 | 3 PR : sous-contexte `actions` + contrôle agents · Shuffle + callback · frontend |
 | 6 | 1 PR : correctifs issus de la campagne + consignation |
 | | **≈ 15 PR** |
@@ -144,7 +145,7 @@ réelles** et consigné dans le journal de bord.
 | 0 — Réseau + capacités | ✅ **terminée** — R1 levé, R2 qualifié et corrigé (3 certificats régénérés côté SOC) | [ADR-015](adr/ADR-015-soc-network-topology.md) ✅ | — | 4 outils SOC + VirusTotal joignables depuis le conteneur, TLS vérifié |
 | 1.1 — Alertes push | ✅ **terminée** | — | *(config Wazuh, hors dépôt)* | Chaîne réelle bout en bout : attaque SSH → règle 5712 → webhook → PostgreSQL → classification IA (voir journal PFE, 2026-08-08) |
 | 1.2 — API Wazuh + socle | ✅ **terminée** | — | [#85](https://github.com/imanehajjou2025-lab/smartsoc-enterprise/pull/85) | Socle `connectors` + agents → actifs + santé manager (DEGRADED) + inventaire système (syscollector) + section Connecteurs (console), 448 tests backend verts, WireMock bout en bout, vérification navigateur réelle (voir journal PFE, 2026-08-08) |
-| 1.3 — Vulnérabilités | ⬜ | — | — | — |
+| 1.3 — Vulnérabilités | 🟡 **en cours** | — | — | Source tranchée en réel le 2026-08-09 (Indexer, `/vulnerability` API 404 sur Wazuh v4.12.0, index `wazuh-states-vulnerabilities-*` vérifié — voir journal PFE) |
 | 2 — MISP | ⬜ | — | — | — |
 | 3 — VirusTotal | ⬜ | — | — | — |
 | 4 — OpenSearch | ⬜ | — | — | — |
