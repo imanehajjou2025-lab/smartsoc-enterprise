@@ -10,9 +10,10 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param wazuh      accès à l'API de gestion Wazuh (agents, inventaire) — lecture seule en V1
  * @param openSearch accès à l'Indexer Wazuh (vulnérabilités, §1.3 — le Hunting live suivra en phase 4)
  * @param misp       accès à l'API REST MISP (threat intelligence, phase 2)
+ * @param virusTotal accès à l'API REST VirusTotal (réputation à la demande, phase 3)
  */
 @ConfigurationProperties(prefix = "smartsoc.connectors")
-public record ConnectorProperties(Wazuh wazuh, OpenSearch openSearch, Misp misp) {
+public record ConnectorProperties(Wazuh wazuh, OpenSearch openSearch, Misp misp, VirusTotal virusTotal) {
 
     public static final String MODE_SIMULATION = "simulation";
     public static final String MODE_LIVE = "live";
@@ -58,5 +59,16 @@ public record ConnectorProperties(Wazuh wazuh, OpenSearch openSearch, Misp misp)
      *               une instance MISP le 2026-08-09
      */
     public record Misp(String mode, String url, String apiKey) {
+    }
+
+    /**
+     * @param mode   simulation (défaut) | live | disabled
+     * @param url    URL de base de l'API VirusTotal (configurable pour les tests WireMock ;
+     *               {@code https://www.virustotal.com/api/v3} en réel)
+     * @param apiKey clé du compte VirusTotal — portée en en-tête {@code x-apikey}
+     *               (contrat public VirusTotal v3, pas de compte dédié en lecture
+     *               seule côté outil : un seul rôle d'accès existe sur ce service)
+     */
+    public record VirusTotal(String mode, String url, String apiKey) {
     }
 }
