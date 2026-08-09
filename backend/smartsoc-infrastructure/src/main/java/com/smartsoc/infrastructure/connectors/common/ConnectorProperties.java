@@ -9,9 +9,10 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  *
  * @param wazuh      accès à l'API de gestion Wazuh (agents, inventaire) — lecture seule en V1
  * @param openSearch accès à l'Indexer Wazuh (vulnérabilités, §1.3 — le Hunting live suivra en phase 4)
+ * @param misp       accès à l'API REST MISP (threat intelligence, phase 2)
  */
 @ConfigurationProperties(prefix = "smartsoc.connectors")
-public record ConnectorProperties(Wazuh wazuh, OpenSearch openSearch) {
+public record ConnectorProperties(Wazuh wazuh, OpenSearch openSearch, Misp misp) {
 
     public static final String MODE_SIMULATION = "simulation";
     public static final String MODE_LIVE = "live";
@@ -45,5 +46,17 @@ public record ConnectorProperties(Wazuh wazuh, OpenSearch openSearch) {
         public String modeOrDefault() {
             return (mode == null || mode.isBlank()) ? MODE_SIMULATION : mode;
         }
+    }
+
+    /**
+     * @param mode   simulation (défaut) | live | disabled
+     * @param url    URL de base de l'API MISP (ex. {@code https://10.100.0.3})
+     * @param apiKey clé d'un compte MISP dédié en LECTURE SEULE (rôle « Read Only »,
+     *               jamais le compte admin — même doctrine que Wazuh/ADR-015) ;
+     *               portée directement en en-tête {@code Authorization}, SANS
+     *               préfixe {@code Bearer}/{@code Basic} — vérifié en réel contre
+     *               une instance MISP le 2026-08-09
+     */
+    public record Misp(String mode, String url, String apiKey) {
     }
 }

@@ -154,6 +154,16 @@ smartsoc:
       # ~10 min : cycle moins frequent que les agents, un scan de
       # vulnerabilites evolue plus lentement qu'un etat d'agent.
       sync-interval-ms: ${SMARTSOC_CONNECTORS_OPENSEARCH_SYNC_INTERVAL_MS:600000}
+    # API REST MISP -- clef statique en en-tete Authorization (verifie en
+    # reel le 2026-08-09), aucun jeton a rafraichir. Phase 2, ADR-014.
+    misp:
+      mode: ${SMARTSOC_CONNECTORS_MISP_MODE:simulation}
+      url: ${SMARTSOC_CONNECTORS_MISP_URL:https://localhost}
+      api-key: ${SMARTSOC_CONNECTORS_MISP_API_KEY:}
+      sync-initial-delay-ms: ${SMARTSOC_CONNECTORS_MISP_SYNC_INITIAL_DELAY_MS:45000}
+      # ~15 min : un flux CTI evolue plus lentement qu'un etat d'agent ou
+      # un scan de vulnerabilites -- pas besoin d'un cycle plus serre.
+      sync-interval-ms: ${SMARTSOC_CONNECTORS_MISP_SYNC_INTERVAL_MS:900000}
 
 resilience4j:
   circuitbreaker:
@@ -196,6 +206,13 @@ resilience4j:
         permitted-number-of-calls-in-half-open-state: 2
       # Flux de vulnerabilites (Indexer OpenSearch) : meme doctrine, ADR-014 §1.3.
       openSearchVulnerabilityFeed:
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 2
+      # Flux CTI MISP : meme doctrine, ADR-014 phase 2.
+      mispThreatIntel:
         sliding-window-size: 10
         minimum-number-of-calls: 5
         failure-rate-threshold: 50
