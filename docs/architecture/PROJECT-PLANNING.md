@@ -146,7 +146,7 @@ réelles** et consigné dans le journal de bord.
 | 1.1 — Alertes push | ✅ **terminée** | — | *(config Wazuh, hors dépôt)* | Chaîne réelle bout en bout : attaque SSH → règle 5712 → webhook → PostgreSQL → classification IA (voir journal PFE, 2026-08-08) |
 | 1.2 — API Wazuh + socle | ✅ **terminée** | — | [#85](https://github.com/imanehajjou2025-lab/smartsoc-enterprise/pull/85) | Socle `connectors` + agents → actifs + santé manager (DEGRADED) + inventaire système (syscollector) + section Connecteurs (console), 448 tests backend verts, WireMock bout en bout, vérification navigateur réelle (voir journal PFE, 2026-08-08) |
 | 1.3 — Vulnérabilités | ✅ **terminée** | — | [#86](https://github.com/imanehajjou2025-lab/smartsoc-enterprise/pull/86) [#87](https://github.com/imanehajjou2025-lab/smartsoc-enterprise/pull/87) | Source tranchée en réel (Indexer, `/vulnerability` API 404 sur Wazuh v4.12.0) ; module complet + client OpenSearch partagé, 476 tests backend verts ; section Vulnérabilités de la fiche d'actif vérifiée au navigateur (voir journal PFE, 2026-08-09) |
-| 2 — MISP | ⬜ | — | — | — |
+| 2 — MISP | 🟡 **connectivité revalidée**, connecteur restant | — | — | Certificat régénéré (`IP:10.100.0.3`), API REST authentifiée (v2.5.44), échantillon réel capturé — voir journal PFE, 2026-08-09 |
 | 3 — VirusTotal | ⬜ | — | — | — |
 | 4 — OpenSearch | ⬜ | — | — | — |
 | 5 — Actions réelles | ⬜ | — | — | — |
@@ -172,7 +172,7 @@ l'[ADR-015](adr/ADR-015-soc-network-topology.md).
 | --- | --- | --- |
 | OpenSearch | `IP:10.100.0.1` ✅ | Truststore seul — aucune action côté SOC |
 | Wazuh API | `DNS:localhost` ❌ | Régénérer avec `IP:10.100.0.1` — **bloque la phase 1.2** |
-| MISP | `localhost`, `127.0.0.1` ❌ | Régénérer avec `IP:10.100.0.3` — bloque la phase 2 |
+| MISP | `IP:10.100.0.3` ✅ *(régénéré, vérifié le 2026-08-09)* | Fait — plus aucune action requise |
 | Shuffle | **aucun SAN** ❌ | Régénérer avec `IP:10.100.0.4` — bloque la phase 5 |
 
 Le certificat de Shuffle est celui **livré par défaut avec le produit** (émis en
@@ -213,3 +213,33 @@ connecteur :**
   équivalent), à vérifier en phase 1.2.
 
 Plus rien ne bloque le démarrage du code de la **phase 1.2**.
+
+### Prérequis avant la phase 2 (MISP) — tous levés, revalidés le 2026-08-09
+
+Revalidation explicitement différée par Imane depuis la fin de la phase 1.2
+(« avant commencer phase 2 on va retester MISP pour le valider ») — la
+connectivité MISP était jugée instable au moment de la baseline. Testée en
+réel une fois MISP relancé côté SOC.
+
+1. **Certificat MISP régénéré** avec `IP:10.100.0.3` dans les SAN — vérifié
+   directement (`openssl s_client`), CN désormais `misp` (`C=MA, O=SmartSOC`)
+   plutôt que le `CN=localhost` par défaut. ✅
+2. **API REST MISP fonctionnelle** — `GET /servers/getVersion.json` répond
+   authentifié (`version: 2.5.44`) ; testée d'abord SANS clé (403 explicite,
+   confirme que l'API elle-même répond) puis avec une clé dédiée. ✅
+3. **Clé API dédiée créée**, cochée « Read only » — jamais les clés
+   `Wazuh-Integration`/`Wazuh-Integration1` déjà en service pour l'enrichissement
+   Wazuh→MISP existant (`custom-misp.py`), pour ne pas polluer leur suivi
+   d'usage (« Seen IPs »). Compte porteur : `admin@admin.test` — **pas encore
+   un compte dédié en lecture seule côté MISP** (contrairement à
+   `smartsoc-reader` pour Wazuh) ; à créer avant l'implémentation réelle de la
+   phase 2, pas seulement la clé.
+4. **Échantillon réel capturé** — `docs/integration/fixtures/misp/
+   attributes-restsearch-sample.json` (`POST /attributes/restSearch`, un
+   événement de test « SmartSOC Test IOC » avec 3 attributs : `ip-dst`,
+   `domain`, `url`, tous `to_ids: true`). Confirme la forme réelle de la
+   réponse (attribut imbriqué dans son événement, `distribution`/
+   `threat_level_id` numériques en chaîne) pour l'ACL à venir.
+
+Plus rien ne bloque le démarrage du code de la **phase 2** — reste seulement
+la création d'un compte MISP dédié en lecture seule avant l'implémentation.
