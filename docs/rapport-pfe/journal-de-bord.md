@@ -2798,3 +2798,52 @@ Wazuh jamais réellement détectées, phase 1.2) et exposition des champs
 de synchronisation (`operatingSystem`, `hardwareSummary`, etc.) sur
 `AssetResponse`, actuellement invisibles côté API/console malgré leur
 présence en base.
+
+---
+
+## 2026-08-09 — Revalidation MISP avant la phase 2
+
+**Contexte.** Différée explicitement par Imane à la fin de la phase 1.2
+(« avant de commencer la phase 2 on va retester MISP pour le
+valider »), MISP ayant été jugée instable au moment de la baseline.
+Relancée côté SOC, testée en réel étape par étape.
+
+**Cinq vérifications réelles, dans l'ordre.**
+1. **Réseau** : `ping`/`curl` directs vers `10.100.0.3` depuis le poste
+   de travail — joignable, `HTTP 302` sur `/` (redirection de connexion,
+   comportement normal d'une appli MISP non authentifiée).
+2. **TLS** : `openssl s_client` sur `10.100.0.3:443` — SAN désormais
+   `IP:10.100.0.3, DNS:localhost, IP:127.0.0.1` (contre `DNS:localhost`
+   seul lors de l'audit ADR-015) : le certificat a bien été régénéré
+   côté SOC entre-temps.
+3. **API REST** : `GET /servers/getVersion.json` sans clé → `403` avec
+   un vrai message MISP (« pass the API key... ») — confirme que
+   l'application répond, pas seulement le port.
+4. **Authentification** : détour révélateur avant d'aboutir — Imane a
+   d'abord collé son **mot de passe web** en clair (changé depuis,
+   recommandé immédiatement — jamais reproduit ici) puis le texte
+   littéral du paramètre `$mispKey` non substitué. Clé API MISP ≠ mot
+   de passe de connexion : rappelé, puis guidé vers Mon Profil → Auth
+   keys.
+   **Nouvelle clé dédiée créée**, cochée « Read only », plutôt que de
+   réutiliser les clés `Wazuh-Integration`/`Wazuh-Integration1` déjà en
+   service pour l'enrichissement Wazuh→MISP existant (`custom-misp.py`)
+   — éviter de polluer leur suivi d'usage. Testée : `version 2.5.44`.
+5. **Données réelles** : `POST /attributes/restSearch` (`limit: 3`) →
+   un événement de test **« SmartSOC Test IOC »** avec 3 attributs
+   (`ip-dst` 185.220.101.25, `domain` evil-domain.com, `url`
+   http://malicious.test), tous `to_ids: true` — capturé en fixture
+   (`docs/integration/fixtures/misp/attributes-restsearch-sample.json`)
+   pour l'ACL de la future phase 2.
+
+**Écart relevé, pas bloquant mais à corriger avant l'implémentation
+réelle.** Le compte porteur de la nouvelle clé est `admin@admin.test`
+— le compte administrateur générique, pas un compte MISP dédié en
+lecture seule comme `smartsoc-reader` côté Wazuh. Suffisant pour ce
+test de connectivité, insuffisant pour la phase 2 elle-même (même
+doctrine de moindre privilège que partout ailleurs dans le projet).
+
+**Vérification.** MISP v2.5.44 confirmée, TLS vérifié, authentification
+réelle réussie, données réelles lues. Plus rien ne bloque le
+démarrage du code de la **phase 2** — reste seulement la création d'un
+compte MISP dédié en lecture seule avant l'implémentation.
