@@ -19,6 +19,8 @@ import { SeverityChip, StatusChip } from '../alerts/chips';
 import { AssetStatusChip, CriticalityChip, ExposureChip, ASSET_TYPE_LABELS } from './assetChips';
 import EditAssetDialog from './EditAssetDialog';
 import { decommissionAsset, getAsset, listCorrelatedAlerts, reactivateAsset } from './assetsApi';
+import { VulnerabilitySeverityChip } from '../vulnerabilities/vulnerabilityChips';
+import { listVulnerabilities } from '../vulnerabilities/vulnerabilitiesApi';
 
 interface Props {
   assetId: string | null;
@@ -52,6 +54,7 @@ function AssetDetailDrawer({ assetId, onClose }: Props) {
   const canWrite = role === 'ADMIN' || role === 'SOC_MANAGER' || role === 'SOC_ANALYST';
   const [editOpen, setEditOpen] = useState(false);
   const [alertsPage, setAlertsPage] = useState(0);
+  const [vulnsPage, setVulnsPage] = useState(0);
 
   const {
     data: asset,
@@ -78,6 +81,13 @@ function AssetDetailDrawer({ assetId, onClose }: Props) {
   const { data: correlated } = useQuery({
     queryKey: ['asset', assetId, 'alerts', alertsPage],
     queryFn: () => listCorrelatedAlerts(assetId!, alertsPage, 10),
+    enabled: Boolean(assetId),
+    placeholderData: keepPreviousData,
+  });
+
+  const { data: vulnerabilities } = useQuery({
+    queryKey: ['asset', assetId, 'vulnerabilities', vulnsPage],
+    queryFn: () => listVulnerabilities({ assetId: assetId!, page: vulnsPage, size: 10 }),
     enabled: Boolean(assetId),
     placeholderData: keepPreviousData,
   });
@@ -236,6 +246,47 @@ function AssetDetailDrawer({ assetId, onClose }: Props) {
                 count={correlated.totalElements}
                 page={alertsPage}
                 onPageChange={(_, newPage) => setAlertsPage(newPage)}
+                rowsPerPage={10}
+                rowsPerPageOptions={[10]}
+                labelRowsPerPage=""
+              />
+            )}
+
+            <Divider sx={{ my: 2 }} />
+            <Typography variant="subtitle2" sx={{ mb: 1 }}>
+              Vulnérabilités{vulnerabilities ? ` (${vulnerabilities.totalElements})` : ''}
+            </Typography>
+            {vulnerabilities && vulnerabilities.items.length === 0 && (
+              <Typography variant="body2" color="text.secondary">
+                Aucune vulnérabilité connue pour cet actif.
+              </Typography>
+            )}
+            {vulnerabilities?.items.map((vuln) => (
+              <Stack
+                key={vuln.id}
+                direction="row"
+                spacing={1}
+                sx={{ alignItems: 'center', mb: 0.5 }}
+              >
+                <VulnerabilitySeverityChip severity={vuln.severity} />
+                <Typography variant="body2" sx={{ flexGrow: 1 }} noWrap>
+                  {vuln.cveId}
+                  {vuln.packageName ? ` — ${vuln.packageName}` : ''}
+                </Typography>
+                {vuln.status === 'RESOLVED' && (
+                  <Chip label="Résolue" size="small" variant="outlined" />
+                )}
+                <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
+                  {formatDate(vuln.lastSeenAt)}
+                </Typography>
+              </Stack>
+            ))}
+            {vulnerabilities && vulnerabilities.totalElements > 10 && (
+              <TablePagination
+                component="div"
+                count={vulnerabilities.totalElements}
+                page={vulnsPage}
+                onPageChange={(_, newPage) => setVulnsPage(newPage)}
                 rowsPerPage={10}
                 rowsPerPageOptions={[10]}
                 labelRowsPerPage=""
