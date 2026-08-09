@@ -145,7 +145,7 @@ réelles** et consigné dans le journal de bord.
 | 0 — Réseau + capacités | ✅ **terminée** — R1 levé, R2 qualifié et corrigé (3 certificats régénérés côté SOC) | [ADR-015](adr/ADR-015-soc-network-topology.md) ✅ | — | 4 outils SOC + VirusTotal joignables depuis le conteneur, TLS vérifié |
 | 1.1 — Alertes push | ✅ **terminée** | — | *(config Wazuh, hors dépôt)* | Chaîne réelle bout en bout : attaque SSH → règle 5712 → webhook → PostgreSQL → classification IA (voir journal PFE, 2026-08-08) |
 | 1.2 — API Wazuh + socle | ✅ **terminée** | — | [#85](https://github.com/imanehajjou2025-lab/smartsoc-enterprise/pull/85) | Socle `connectors` + agents → actifs + santé manager (DEGRADED) + inventaire système (syscollector) + section Connecteurs (console), 448 tests backend verts, WireMock bout en bout, vérification navigateur réelle (voir journal PFE, 2026-08-08) |
-| 1.3 — Vulnérabilités | 🟡 **en cours** | — | — | Source tranchée en réel le 2026-08-09 (Indexer, `/vulnerability` API 404 sur Wazuh v4.12.0, index `wazuh-states-vulnerabilities-*` vérifié — voir journal PFE) |
+| 1.3 — Vulnérabilités | ✅ **terminée** | — | [#86](https://github.com/imanehajjou2025-lab/smartsoc-enterprise/pull/86) [#87](https://github.com/imanehajjou2025-lab/smartsoc-enterprise/pull/87) | Source tranchée en réel (Indexer, `/vulnerability` API 404 sur Wazuh v4.12.0) ; module complet + client OpenSearch partagé, 476 tests backend verts ; section Vulnérabilités de la fiche d'actif vérifiée au navigateur (voir journal PFE, 2026-08-09) |
 | 2 — MISP | ⬜ | — | — | — |
 | 3 — VirusTotal | ⬜ | — | — | — |
 | 4 — OpenSearch | ⬜ | — | — | — |
