@@ -28,6 +28,7 @@ import AiSection from './sections/AiSection';
 import AuditLogSection from './sections/AuditLogSection';
 import BackupSection from './sections/BackupSection';
 import ComingSoonSection from './sections/ComingSoonSection';
+import ConnectorsSection from './sections/ConnectorsSection';
 import HealthSection from './sections/HealthSection';
 import NotificationsSection from './sections/NotificationsSection';
 import OverviewSection from './sections/OverviewSection';
@@ -132,12 +133,7 @@ function renderSection(key: string) {
     case 'soar':
       return <SoarSection />;
     case 'connectors':
-      return (
-        <ComingSoonSection
-          title="Sources de données / Connecteurs"
-          description="Wazuh, Suricata, Shuffle, MISP, TheHive et VirusTotal ne sont pas encore réellement intégrés à la plateforme : cette section n'affichera leur configuration que le jour où ces connecteurs seront branchés pour de vrai."
-        />
-      );
+      return <ConnectorsSection />;
     case 'notifications':
       return <NotificationsSection />;
     case 'audit':

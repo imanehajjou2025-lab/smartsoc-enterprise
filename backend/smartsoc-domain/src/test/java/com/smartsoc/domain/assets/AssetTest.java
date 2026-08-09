@@ -3,6 +3,8 @@ package com.smartsoc.domain.assets;
 import com.smartsoc.domain.common.BusinessRuleViolationException;
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -144,5 +146,84 @@ class AssetTest {
         assertThat(query.page()).isNotNull();
         assertThat(query.page().page()).isZero();
         assertThat(query.page().size()).isEqualTo(25);
+    }
+
+    @Test
+    void applySyncMetadataIsPurelyAdditive() {
+        // Un actif enregistré à la main ne porte aucune métadonnée de
+        // connecteur tant qu'aucune synchronisation ne l'a touché.
+        Asset asset = sample();
+        assertThat(asset.getExternalId()).isNull();
+        assertThat(asset.getOperatingSystem()).isNull();
+        assertThat(asset.getLastSeenAt()).isNull();
+
+        Instant seenAt = Instant.now();
+        asset.applySyncMetadata("004", "wazuh", "Ubuntu 24.04.4 LTS", seenAt);
+
+        assertThat(asset.getExternalId()).isEqualTo("004");
+        assertThat(asset.getExternalSource()).isEqualTo("wazuh");
+        assertThat(asset.getOperatingSystem()).isEqualTo("Ubuntu 24.04.4 LTS");
+        assertThat(asset.getLastSeenAt()).isEqualTo(seenAt);
+        // Les champs métier existants n'ont pas bougé — c'est le point.
+        assertThat(asset.getCriticality()).isEqualTo(AssetCriticality.CRITICAL);
+        assertThat(asset.getOwner()).isEqualTo("Équipe infra");
+    }
+
+    @Test
+    void applySyncMetadataBlanksAreCleared() {
+        Asset asset = sample();
+        asset.applySyncMetadata("004", "wazuh", "Ubuntu", Instant.now());
+
+        asset.applySyncMetadata("  ", " ", null, null);
+
+        assertThat(asset.getExternalId()).isNull();
+        assertThat(asset.getExternalSource()).isNull();
+        assertThat(asset.getOperatingSystem()).isNull();
+        // lastSeenAt n'est jamais effacé par un null : c'est la dernière
+        // observation connue, une absence de nouvelle donnée ne doit pas
+        // effacer la précédente.
+        assertThat(asset.getLastSeenAt()).isNotNull();
+    }
+
+    @Test
+    void applySyncMetadataRejectedOnDecommissionedAsset() {
+        Asset asset = sample();
+        asset.decommission();
+
+        assertThatThrownBy(() -> asset.applySyncMetadata("004", "wazuh", "Ubuntu", Instant.now()))
+                .isInstanceOf(BusinessRuleViolationException.class)
+                .hasMessageContaining("decommissioned");
+    }
+
+    @Test
+    void hardwareSummaryIsSetWhenProvided() {
+        Asset asset = sample();
+
+        asset.applySyncMetadata("004", "wazuh", "Windows 10", Instant.now(),
+                "Intel Core i5-12450H, 1 coeur, 2 Go RAM");
+
+        assertThat(asset.getHardwareSummary()).isEqualTo("Intel Core i5-12450H, 1 coeur, 2 Go RAM");
+    }
+
+    @Test
+    void hardwareSummaryNullNeverErasesAPreviousValue() {
+        // Contrairement a operatingSystem : le syscollector peut echouer
+        // UN cycle sans que ce soit une vraie perte de donnee materielle.
+        Asset asset = sample();
+        asset.applySyncMetadata("004", "wazuh", "Windows 10", Instant.now(), "Intel Core i5-12450H");
+
+        asset.applySyncMetadata("004", "wazuh", "Windows 10", Instant.now(), null);
+
+        assertThat(asset.getHardwareSummary()).isEqualTo("Intel Core i5-12450H");
+    }
+
+    @Test
+    void hardwareSummaryBlankIsClearedExplicitly() {
+        Asset asset = sample();
+        asset.applySyncMetadata("004", "wazuh", "Windows 10", Instant.now(), "Intel Core i5-12450H");
+
+        asset.applySyncMetadata("004", "wazuh", "Windows 10", Instant.now(), "   ");
+
+        assertThat(asset.getHardwareSummary()).isNull();
     }
 }

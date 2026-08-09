@@ -64,4 +64,20 @@ public class AssetJpaEntity extends AbstractAuditableEntity {
 
     @Column(name = "decommissioned_at")
     private Instant decommissionedAt;
+
+    // Additif (connecteurs, ADR-014) : nullable, jamais requis.
+    @Column(name = "operating_system", length = 255)
+    private String operatingSystem;
+
+    @Column(name = "last_seen_at")
+    private Instant lastSeenAt;
+
+    @Column(name = "hardware_summary", length = 255)
+    private String hardwareSummary;
+
+    @Column(name = "external_id", length = 100)
+    private String externalId;
+
+    @Column(name = "external_source", length = 20)
+    private String externalSource;
 }

@@ -8,6 +8,7 @@ import SettingsPage from './SettingsPage';
 import type {
   AboutInfo,
   AiSettings,
+  ConnectorOverview,
   NotificationsSettings,
   PlatformHealth,
   SecuritySettings,
@@ -47,6 +48,26 @@ const about: AboutInfo = {
 };
 
 const health: PlatformHealth = { status: 'UP' };
+
+const connectors: ConnectorOverview[] = [
+  {
+    type: 'WAZUH',
+    status: 'CONNECTED',
+    detectedVersion: null,
+    capabilities: [],
+    lastCheckedAt: '2026-08-08T20:00:00Z',
+    lastSuccessfulSyncAt: '2026-08-08T20:00:00Z',
+    lastError: null,
+    lastSync: {
+      startedAt: '2026-08-08T20:00:00Z',
+      finishedAt: '2026-08-08T20:00:05Z',
+      outcome: 'SUCCESS',
+      itemsProcessed: 5,
+      itemsRejected: 0,
+      errorMessage: null,
+    },
+  },
+];
 
 const auditPage: PageResponse<AuditLogEntry> = {
   items: [
@@ -104,6 +125,7 @@ vi.mock('./settingsApi', async (importOriginal) => ({
   getAboutInfo: () => Promise.resolve(about),
   getPlatformHealth: () => Promise.resolve(health),
   listAuditLogs: () => Promise.resolve(auditPage),
+  listConnectors: () => Promise.resolve(connectors),
 }));
 
 vi.mock('../admin/usersApi', async (importOriginal) => ({
@@ -151,12 +173,14 @@ describe('SettingsPage', () => {
     expect(screen.getByText('15 min')).toBeInTheDocument();
   });
 
-  it('shows an honest placeholder for connectors, which are not built yet', async () => {
+  it('shows the real Wazuh connector state alongside honest "planned" cards for the rest', async () => {
     renderPage();
     await screen.findByText('Opérationnelle');
 
     fireEvent.click(screen.getByText('Sources de données / Connecteurs'));
 
-    expect(await screen.findByText('À venir')).toBeInTheDocument();
+    expect(await screen.findByText('Connecté')).toBeInTheDocument();
+    // OpenSearch n'a pas encore d'adaptateur backend : carte honnête "phase à venir".
+    expect(screen.getByText('Phase 4')).toBeInTheDocument();
   });
 });

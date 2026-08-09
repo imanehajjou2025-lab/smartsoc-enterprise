@@ -42,6 +42,15 @@ public class Asset {
     private final Instant registeredAt;
     private Instant decommissionedAt;
 
+    // Champs additifs (connecteurs, ADR-014) : nullables, jamais requis à
+    // la création. Un actif enregistré à la main reste pleinement valide
+    // sans jamais les renseigner.
+    private String operatingSystem;
+    private Instant lastSeenAt;
+    private String hardwareSummary;
+    private String externalId;
+    private String externalSource;
+
     /** Données d'enregistrement — parameter object du point d'entrée unique. */
     @Builder
     public record RegistrationData(
@@ -109,6 +118,42 @@ public class Asset {
         this.type = type;
         this.criticality = criticality;
         this.exposure = exposure;
+    }
+
+    /**
+     * Enrichissement par un connecteur (ADR-014) — SÉPARÉE de
+     * {@link #updateDetails}, purement additive : une synchronisation ne
+     * doit jamais nécessiter la criticité, l'exposition ou le propriétaire,
+     * qui restent un jugement d'analyste. Autorisée même sur un actif dont
+     * les autres champs ne sont pas modifiables autrement — l'origine
+     * externe reste traçable indépendamment du cycle de vie métier.
+     */
+    public void applySyncMetadata(String externalId, String externalSource,
+                                  String operatingSystem, Instant lastSeenAt) {
+        applySyncMetadata(externalId, externalSource, operatingSystem, lastSeenAt, null);
+    }
+
+    /**
+     * @param hardwareSummary vient d'un appel SÉPARÉ (syscollector), qui peut
+     *                        échouer indépendamment de l'inventaire de base sans
+     *                        que ce soit une vraie perte de donnée — {@code null}
+     *                        n'efface donc JAMAIS une valeur déjà connue,
+     *                        contrairement à {@code operatingSystem}/{@code externalId}
+     *                        qui reflètent l'état COURANT rapporté par la source.
+     */
+    public void applySyncMetadata(String externalId, String externalSource,
+                                  String operatingSystem, Instant lastSeenAt,
+                                  String hardwareSummary) {
+        requireActive();
+        this.externalId = TextNormalization.blankToNull(externalId);
+        this.externalSource = TextNormalization.blankToNull(externalSource);
+        this.operatingSystem = TextNormalization.blankToNull(operatingSystem);
+        if (lastSeenAt != null) {
+            this.lastSeenAt = lastSeenAt;
+        }
+        if (hardwareSummary != null) {
+            this.hardwareSummary = TextNormalization.blankToNull(hardwareSummary);
+        }
     }
 
     public void decommission() {

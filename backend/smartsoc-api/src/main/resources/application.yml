@@ -128,6 +128,19 @@ smartsoc:
     # live = e-mail reel via spring.mail.* (ADR-005). Meme doctrine que ai.mode.
     mode: ${SMARTSOC_NOTIFICATIONS_MODE:simulation}
     from-address: ${SMARTSOC_NOTIFICATIONS_FROM:smartsoc@localhost}
+  connectors:
+    # simulation (defaut) = stub embarque ; live = vraie API Wazuh (Feign) ;
+    # disabled = coupe franc, aucune tentative. ADR-014, amendement v1.1.
+    wazuh:
+      mode: ${SMARTSOC_CONNECTORS_WAZUH_MODE:simulation}
+      url: ${SMARTSOC_CONNECTORS_WAZUH_URL:https://localhost:55000}
+      # Compte API dedie en LECTURE SEULE (ADR-015) -- jamais le compte admin.
+      username: ${SMARTSOC_CONNECTORS_WAZUH_USERNAME:}
+      password: ${SMARTSOC_CONNECTORS_WAZUH_PASSWORD:}
+      sync-initial-delay-ms: ${SMARTSOC_CONNECTORS_WAZUH_SYNC_INITIAL_DELAY_MS:15000}
+      # ~5 min : meme doctrine que le reste du projet, une valeur mesuree
+      # en reel plutot qu'estimee (voir ADR-014 §1.2, a affiner en usage).
+      sync-interval-ms: ${SMARTSOC_CONNECTORS_WAZUH_SYNC_INTERVAL_MS:300000}
 
 resilience4j:
   circuitbreaker:
@@ -142,6 +155,27 @@ resilience4j:
         permitted-number-of-calls-in-half-open-state: 2
       # Assistant conversationnel : meme doctrine que le classifieur (ADR-008).
       socAssistant:
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 2
+      # Inventaire d'agents Wazuh : meme doctrine, ADR-014.
+      wazuhAgentInventory:
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 2
+      # Sante du gestionnaire Wazuh : meme doctrine, ADR-014.
+      wazuhManagerStats:
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 2
+      # Inventaire systeme (syscollector) par agent : meme doctrine, ADR-014.
+      wazuhSystemInventory:
         sliding-window-size: 10
         minimum-number-of-calls: 5
         failure-rate-threshold: 50

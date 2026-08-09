@@ -2472,3 +2472,230 @@ les deux boucles concernées avec des `if ... goto ...` en ligne simple.
 deux services affichés « UP ». Lanceur Bureau : exécuté pour de vrai
 (code de sortie 0), a réellement lancé les deux fenêtres de service et
 détecté leur disponibilité.
+
+---
+
+## 2026-08-08 — Intégration SOC, phase 0 et phase 1.1 — premier connecteur réel (ADR-014, ADR-015)
+
+**Contexte.** Baseline d'architecture d'intégration SOC figée (ADR-014,
+v1.1) après audit complet du dépôt et validation en trois passes avec
+Imane. Documentation d'architecture d'entreprise produite en parallèle
+(C4, Context Map DDD, événements de domaine, diagrammes de séquence,
+chapitres IA et SOAR, référence des connecteurs — 9 documents, 22
+diagrammes Mermaid), aucune décision structurante modifiée depuis.
+Chantier lancé dès le tunnel WireGuard monté entre le poste de
+développement et le hub SOC (`vm-siem`, 10.100.0.1).
+
+**Phase 0 — validation réseau (ADR-015).** Le risque R1 identifié dans la
+baseline — un conteneur sur un réseau Docker *bridge* peut-il joindre un
+tunnel WireGuard monté sur l'hôte ? — est **levé sans aucun aménagement** :
+Docker Desktop route via WSL2 vers l'hôte, qui possède la route. Les
+quatre outils SOC (Wazuh API, OpenSearch, MISP, Shuffle) sont confirmés
+joignables **depuis un conteneur** du réseau `smartsoc-net`, ainsi que
+VirusTotal via le second chemin (Internet, hors WireGuard). Risque R2
+(certificats auto-signés) confirmé et qualifié plus finement que prévu :
+sur les quatre certificats SOC, un seul (OpenSearch) couvre son adresse
+WireGuard en SAN — les trois autres (Wazuh API, MISP, Shuffle, ce dernier
+étant le certificat par défaut du produit, clé privée publique) ont été
+régénérés côté SOC avec l'IP WireGuard ajoutée en SAN, sans retirer
+`localhost` pour ne pas casser les accès locaux existants. Deux défauts de
+configuration réseau relevés au passage et corrigés : le peer Kali actif
+à chaud mais absent du fichier `wg0.conf` (aurait disparu au redémarrage),
+et `wg-quick@wg0` non activé au démarrage sur au moins une VM spoke.
+
+**Phase 1.1 — alertes Wazuh en push, bout en bout réel.** Script
+d'intégration Wazuh (`custom-smartsoc.py`) écrit et déployé sur `vm-siem`,
+poussant vers `POST /api/v1/ingest/alerts` (endpoint déjà construit,
+zéro code plateforme). Seuil de déclenchement niveau ≥ 7 initialement
+retenu (relevé à 10 par la suite, aligné sur les intégrations MISP/Shuffle
+déjà en place sur cette VM).
+
+**Cinq bugs réels trouvés et corrigés en vérification, aucun par
+supposition.**
+1. `<name>custom-smartsoc</name>` sans l'extension `.py` dans
+   `ossec.conf` : Wazuh n'invoquait jamais le script, silence total, sans
+   la moindre erreur nulle part — trouvé par comparaison avec le bloc
+   `custom-misp.py` fonctionnel, dont le nom incluait l'extension.
+2. Ordre des arguments Wazuh mal supposé initialement
+   (`hook_url`=argv[3], `api_key`=argv[4]) : l'ordre réel documenté par
+   Wazuh est `alert_file`=argv[1], `api_key`=argv[2], `hook_url`=argv[3].
+   Diagnostiqué en ajoutant une trace explicite de chaque argument
+   (longueur + 6 derniers caractères, jamais la valeur complète) plutôt
+   que de re-deviner un troisième ordre au hasard.
+3. Clé d'API corrompue lors d'un copier-coller manuel (68 caractères
+   collés au lieu de 64, terminée par un fragment de chemin de fichier
+   `.env`) — trouvé en comparant les longueurs des deux côtés plutôt
+   qu'en supposant la valeur correcte.
+4. Champ `detectedAt` (`@NotNull Instant`, obligatoire côté
+   `IngestAlertRequest`) jamais envoyé par le script initial : 400
+   `VALIDATION_FAILED`, diagnostiqué en relisant le contrat publié
+   (`docs/integration/alert-ingestion.md`) et le DTO source côte à côte.
+5. Format d'horodatage Wazuh (`+0000`, décalage sans deux-points) non
+   garanti compatible avec le désérialiseur Jackson du backend :
+   normalisé côté script avant envoi (regex d'insertion du deux-points,
+   conversion UTC, suffixe `Z`) plutôt que transmis tel quel.
+
+**Bug pré-existant trouvé dans `custom-misp.py`, hors périmètre mais
+signalé et corrigé à la demande d'Imane.** `KeyError: 'misp'` à chaque
+exécution : la fonction `merge_enrichment()` (qui transforme la sortie de
+`enrich_observables()` — clé `intel` — vers le format attendu par
+`build_enriched_alert()` — clé `misp`) existait dans le fichier mais
+n'était jamais appelée dans `main()`. Une ligne manquante, systématique,
+indépendante de la disponibilité de MISP. Corrigé par insertion `sed`
+ciblée (fichier trop long et rendu inégal du terminal pour une édition
+manuelle fiable), validé par `py_compile` avant et après.
+
+**Vérification réelle, chaîne complète.** Attaque brute-force SSH
+authentique (bots Internet déjà actifs sur `vm-siem`, puis déclenchement
+manuel contrôlé pour cadrer le test) → règle Wazuh 5712 (niveau 10,
+technique `T1110`) → `custom-smartsoc.py` → webhook SmartSOC (`HTTP 201`)
+→ PostgreSQL (16 → 19 alertes `source=wazuh` sur la session, mapping
+sévérité/hostname/ruleId/technique MITRE vérifié exact) → classification
+IA asynchrone. **Dégradation gracieuse démontrée sur ses deux états
+réels, pas supposée** : classifieur SocAI éteint → alerte persistée avec
+`ai_verdict` vide, immédiatement exploitable ; classifieur rallumé →
+alerte suivante classifiée en ~15 s par le vrai moteur (XGBoost + FAISS +
+MITRE + graphe de nouveauté), verdict `FALSE_POSITIVE`, zone `ARCHIVE`,
+score 0.0656, six justifications détaillées par outil.
+
+**Méthode.** Chaque hypothèse d'échec vérifiée par preuve directe
+(longueurs comparées, arguments tracés, requêtes SQL, logs backend, DTO
+source) avant correctif, jamais par supposition relancée au hasard —
+cinq itérations de diagnostic pour un seul webhook, cohérent avec la
+doctrine du projet établie sur l'IA et les certificats.
+
+---
+
+## 2026-08-08 — Phase 1.2 : premier connecteur bidirectionnel — agents, santé et inventaire système Wazuh (PR #85)
+
+**Contexte.** Après le flux push (alertes, phase 1.1), la phase 1.2
+construit le premier connecteur *pull* : la plateforme interroge
+activement l'API de gestion Wazuh (distincte du flux d'événements) pour
+peupler et enrichir le contexte `assets`. Trois VM réelles allumées côté
+SOC pour ce chantier (Ubuntu-Sensor, Windows endpoint, Win10-client),
+avec des agents `never_connected`/`disconnected` volontairement laissés
+dans Wazuh comme bruit réaliste plutôt que nettoyés avant capture.
+
+**Réalisé — socle `connectors` (domaine).** Bounded context dédié
+(ADR-014) : `SocConnector` (entité riche, statuts NOT_CONFIGURED /
+DISABLED / CONNECTED / DEGRADED / DISCONNECTED, gardes empêchant tout
+`recordSuccess`/`recordFailure` d'écraser NOT_CONFIGURED ou DISABLED),
+`ConnectorDescriptor` (version et capacités détectées), `SyncRun`
+(cycle de vie d'une synchronisation). Extension additive d'`Asset`
+(operatingSystem, lastSeenAt, externalId/externalSource pour la
+réconciliation, puis hardwareSummary) — **jamais de champ retiré ni de
+contrat cassé**, conformément à la clause « additive-only » de
+l'ADR-014.
+
+**Réalisé — connecteur agents → actifs.** `AgentInventoryPort` (ACL
+neutre côté application) ; trois adaptateurs simulation/live/disabled
+sélectionnés par `smartsoc.connectors.wazuh.mode` (le mode `disabled`
+est **obligatoire**, pas un simple raccourci : sans lui, Spring ne
+trouve aucun bean pour le port et le contexte refuse de démarrer) ;
+authentification Wazuh en **deux temps** (Basic Auth → JWT, validité
+~15 min, mis en cache 13 min côté plateforme) — modèle différent des
+clés d'API statiques des services IA, découvert en pratique plutôt que
+supposé identique. Réconciliation en **transaction par élément**
+(`AgentReconciliationService`, un bean séparé de l'orchestrateur non
+transactionnel `AgentSyncService`, même schéma que
+`IndicatorFeedIngestionService`) : un agent rejeté n'empoisonne jamais
+la synchronisation des suivants. Scheduler configurable
+(`@EnableScheduling`, absent du projet jusqu'ici).
+
+**Réalisé — santé du gestionnaire.** `ManagerStatsPort` interroge
+`/manager/status` (10 démons critiques identifiés parmi la liste
+complète — 6 autres, comme `clusterd` ou `maild`, sont légitimement
+arrêtés sur un déploiement mono-nœud sans faire échouer la santé) : un
+démon critique arrêté fait passer le connecteur en **DEGRADED**, une
+valeur du domaine définie dès le départ mais encore jamais déclenchée
+en pratique avant cette PR.
+
+**Réalisé — inventaire système (syscollector).** Troisième capacité :
+`SystemInventoryPort` interroge `/syscollector/{id}/os` et
+`/hardware` par agent pour enrichir `Asset` d'une description OS plus
+riche et d'un résumé matériel, en **best-effort** — un échec syscollector
+ne bloque jamais la synchronisation de base, et `hardwareSummary` ne
+s'efface jamais sur une valeur `null` (contrairement à `operatingSystem`,
+toujours écrasé), car cet appel est distinct du reste et peut légitimement
+rater un cycle sans perte réelle de donnée.
+
+**Cinq bugs réels trouvés dans mes propres tests, tous par preuve plutôt
+que par supposition.**
+1. Deux `Instant.now()` distincts générés pour le « même » objet
+   `AgentSnapshot` (record) construit deux fois cassaient le
+   *stub-matching* Mockito par égalité — corrigé en réutilisant la même
+   instance pour le stub et l'assertion.
+2. Faux positif Mockito « strict stubbing argument mismatch » quand
+   `doThrow().when(mock).methode(argSpécifique)` coexistait avec d'autres
+   appels non stubbés de la même méthode — corrigé avec `lenient()`.
+3. Test écrit avec une hypothèse de domaine fausse (`recordFailure`
+   sensé faire passer un connecteur NOT_CONFIGURED à DISCONNECTED) alors
+   que la garde du domaine — déjà correcte et déjà testée — interdit
+   précisément cela : le test a été corrigé, pas le code.
+4. Assertion d'authentification WireMock fragile : `WazuhTokenCache` est
+   un singleton Spring partagé entre méthodes de test du même contexte,
+   donc un jeton mis en cache par un test antérieur rend un second appel
+   `/authenticate` absent dans le test suivant — comportement correct
+   (le cache fonctionne), assertion corrigée pour vérifier la présence du
+   Bearer plutôt que la fraîcheur de l'authentification.
+5. Fixture Wazuh figée (5 agents) mais test écrit sur la base d'une
+   capture d'écran postérieure montrant un 6ᵉ agent apparu depuis :
+   compteurs corrigés à 5 agents / 4 actifs non-manager, avec commentaire
+   explicite sur le caractère versionné (non live) de la fixture.
+
+**Réalité des données Wazuh, découverte en capturant de vraies réponses
+plutôt que supposée.** Agent `never_connected` sans objet `os` ni champ
+`lastKeepAlive` (absent, pas `null`) ; `ip` parfois littéralement
+`"any"` ; le Manager lui-même (id `"000"`) porte un `lastKeepAlive`
+sentinelle `9999-12-31T23:59:59+00:00`, exclu de la synchronisation des
+actifs (c'est le SIEM, pas un poste supervisé) ; deux agents distincts
+peuvent partager la même IP (réconciliation par id Wazuh uniquement) ;
+`board_serial` peut être la chaîne littérale `"None"` (fuite Python de
+l'API Wazuh) ; RAM syscollector exprimée en kilo-octets.
+
+**Vérification.** Domaine 158, application 85, infrastructure 39,
+api 166 — **448 tests verts**, zéro régression sur `clean verify`
+4 modules. Test d'intégration WireMock dédié prouvant l'enrichissement
+syscollector de bout en bout avec les valeurs réelles capturées sur
+l'agent 004 (WIN10-CLIENT, Windows 10 Home 22H2 build 19045.3803, i5-
+12450H, 1 cœur, 2,0 Go RAM) : la description syscollector l'emporte
+bien sur celle, plus pauvre, de la liste d'agents de base. Trois
+commits sur la branche `feature/connectors-wazuh-agents-backend`
+(PR #85) : agents (6bf19a8), santé du manager (09606bb), inventaire
+système (dbd1d71 + fixtures 3bb8e48).
+
+**Complément le même jour — section « Connecteurs » de la console
+(PR #85, même branche).** Le backend étant terminé et tournant en réel
+(scheduler en mode simulation par défaut), la console Paramètres
+affichait encore le placeholder « à venir » — dernière pièce
+manquante de la phase 1.2. `GET /api/v1/connectors` (déjà construit)
+alimente une carte par connecteur SOC : **seul Wazuh a un adaptateur
+backend aujourd'hui**, donc seule sa carte affiche de vraies données
+(statut, dernière sonde/synchronisation, capacités) — les quatre
+autres (OpenSearch, MISP, VirusTotal, Shuffle) restent des cartes
+honnêtes « phase à venir » plutôt que des `NOT_CONFIGURED` trompeurs,
+même doctrine que le reste du module Paramètres.
+
+**Constat fait en lisant le code plutôt que supposé.** `detectedVersion`
+et `capabilities` de `ConnectorDescriptor` sont conçus depuis l'ADR-014
+v1.1 mais **jamais réellement peuplés** : `WazuhAgentMapper.
+detectManagerVersion()` existe et est testé isolément, mais n'est
+appelé nulle part dans `AgentSyncService` — celui-ci réutilise
+`connector.getDescriptor()` tel quel à chaque cycle. Vérifié en
+navigateur contre le backend réel reconstruit : la carte Wazuh affiche
+bien « Non détectée » / « Aucune capacité confirmée », jamais une
+valeur inventée. Écart de câblage réel, signalé pour un futur lot
+plutôt que corrigé ici (hors périmètre de ce PR frontend).
+
+**Vérification réelle.** Backend Docker reconstruit depuis le code du
+jour (le conteneur tournant datait de la veille, sans ce PR) ; section
+testée dans le navigateur contre l'API réelle après connexion admin :
+Wazuh « Connecté », dernier cycle « Succès · 3 traités · 0 rejetés » ;
+navigation par clic entre sections vérifiée. `tsc --noEmit` propre,
+3 tests Vitest verts, lint propre, build de production réussi.
+
+**Reste en phase 1.** Phase 1.3 — vulnérabilités Wazuh, un module
+d'ampleur comparable à ce qui vient d'être livré ; revalidation MISP
+avant la phase 2, explicitement différée par Imane le temps de
+stabiliser la connectivité de cet outil. Écart signalé ci-dessus
+(câblage du `CapabilityProbe`) à traiter en tâche séparée.

@@ -10,4 +10,6 @@ public interface SpringDataAssetRepository
         extends JpaRepository<AssetJpaEntity, UUID>, JpaSpecificationExecutor<AssetJpaEntity> {
 
     Optional<AssetJpaEntity> findByHostname(String hostname);
+
+    Optional<AssetJpaEntity> findByExternalSourceAndExternalId(String externalSource, String externalId);
 }

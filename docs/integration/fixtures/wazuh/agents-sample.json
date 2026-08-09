@@ -1,0 +1,111 @@
+{
+  "data": {
+    "affected_items": [
+      {
+        "os": {
+          "arch": "x86_64",
+          "codename": "Noble Numbat",
+          "major": "24",
+          "minor": "04",
+          "name": "Ubuntu",
+          "platform": "ubuntu",
+          "uname": "Linux |vm-siem |6.17.0-1021-azure |#21~24.04.1-Ubuntu SMP Wed Jul  1 21:45:31 UTC 2026 |x86_64",
+          "version": "24.04.4 LTS"
+        },
+        "group_config_status": "synced",
+        "version": "Wazuh v4.12.0",
+        "registerIP": "127.0.0.1",
+        "node_name": "node01",
+        "lastKeepAlive": "9999-12-31T23:59:59+00:00",
+        "status_code": 0,
+        "id": "000",
+        "status": "active",
+        "manager": "vm-siem",
+        "dateAdd": "2026-07-16T09:47:58+00:00",
+        "name": "vm-siem",
+        "ip": "127.0.0.1"
+      },
+      {
+        "group_config_status": "not synced",
+        "registerIP": "any",
+        "node_name": "unknown",
+        "status_code": 0,
+        "id": "001",
+        "status": "never_connected",
+        "dateAdd": "2026-07-16T15:29:21+00:00",
+        "name": "Windows-Endpoint",
+        "ip": "any"
+      },
+      {
+        "os": {
+          "build": "19045.3803",
+          "major": "10",
+          "minor": "0",
+          "name": "Microsoft Windows 10 Home",
+          "platform": "windows",
+          "uname": "Microsoft Windows 10 Home",
+          "version": "10.0.19045.3803"
+        },
+        "group_config_status": "synced",
+        "version": "Wazuh v4.12.0",
+        "registerIP": "any",
+        "disconnection_time": "2026-08-06T22:51:13+00:00",
+        "group": ["default"],
+        "node_name": "node01",
+        "lastKeepAlive": "2026-08-06T22:33:58+00:00",
+        "status_code": 4,
+        "id": "004",
+        "configSum": "ab73af41699f13fdd81903b5f23d8d00",
+        "status": "disconnected",
+        "manager": "vm-siem",
+        "dateAdd": "2026-07-21T14:06:39+00:00",
+        "name": "WIN10-CLIENT",
+        "mergedSum": "cb5dc59d195320bb20b6039a519a8c0e",
+        "ip": "10.100.0.9"
+      },
+      {
+        "os": {
+          "build": "26100.33158",
+          "major": "10",
+          "minor": "0",
+          "name": "Microsoft Windows Server 2025 Datacenter Azure Edition",
+          "platform": "windows",
+          "uname": "Microsoft Windows Server 2025 Datacenter Azure Edition",
+          "version": "10.0.26100.33158"
+        },
+        "group_config_status": "synced",
+        "version": "Wazuh v4.12.0",
+        "registerIP": "any",
+        "disconnection_time": "2026-08-07T15:08:23+00:00",
+        "group": ["default"],
+        "node_name": "node01",
+        "lastKeepAlive": "2026-08-07T02:03:59+00:00",
+        "status_code": 5,
+        "id": "005",
+        "configSum": "ab73af41699f13fdd81903b5f23d8d00",
+        "status": "disconnected",
+        "manager": "vm-siem",
+        "dateAdd": "2026-08-05T09:42:17+00:00",
+        "name": "Windows-Endpoin",
+        "mergedSum": "cb5dc59d195320bb20b6039a519a8c0e",
+        "ip": "10.100.0.5"
+      },
+      {
+        "group_config_status": "not synced",
+        "registerIP": "10.100.0.5",
+        "node_name": "unknown",
+        "status_code": 0,
+        "id": "006",
+        "status": "never_connected",
+        "dateAdd": "2026-08-05T09:42:37+00:00",
+        "name": "Windows_Endpoint",
+        "ip": "10.100.0.5"
+      }
+    ],
+    "total_affected_items": 6,
+    "total_failed_items": 0,
+    "failed_items": []
+  },
+  "message": "All selected agents information was returned",
+  "error": 0
+}

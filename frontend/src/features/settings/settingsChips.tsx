@@ -5,7 +5,7 @@ import {
   softChipSx,
   type ChipPaletteColor,
 } from '../../shared/components/chipStyles';
-import type { AiServiceHealthStatus, AuditAction } from './settingsApi';
+import type { AiServiceHealthStatus, AuditAction, ConnectorStatus } from './settingsApi';
 
 const STATUS_LABELS: Record<AiServiceHealthStatus, string> = {
   UP: 'Disponible',
@@ -65,6 +65,28 @@ export function AuditActionChip({ action }: { action: AuditAction }) {
   const theme = useTheme();
   const color = resolveChipColor(theme, AUDIT_ACTION_COLORS[action]);
   return <Chip label={AUDIT_ACTION_LABELS[action]} size="small" sx={softChipSx(color)} />;
+}
+
+const CONNECTOR_STATUS_LABELS: Record<ConnectorStatus, string> = {
+  NOT_CONFIGURED: 'Non configuré',
+  DISABLED: 'Désactivé',
+  CONNECTED: 'Connecté',
+  DEGRADED: 'Dégradé',
+  DISCONNECTED: 'Déconnecté',
+};
+
+const CONNECTOR_STATUS_COLORS: Record<ConnectorStatus, ChipPaletteColor> = {
+  NOT_CONFIGURED: 'default',
+  DISABLED: 'default',
+  CONNECTED: 'success',
+  DEGRADED: 'warning',
+  DISCONNECTED: 'error',
+};
+
+export function ConnectorStatusChip({ status }: { status: ConnectorStatus }) {
+  const theme = useTheme();
+  const color = resolveChipColor(theme, CONNECTOR_STATUS_COLORS[status]);
+  return <Chip label={CONNECTOR_STATUS_LABELS[status]} size="small" sx={softChipSx(color)} />;
 }
 
 export function ConfiguredChip({ configured }: { configured: boolean }) {
