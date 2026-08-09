@@ -70,14 +70,17 @@ class ConnectorControllerIntegrationTest {
 
     @Test
     void aConnectorNeverSynchronizedIsHonestlyReported404NotFabricated() {
-        // Aucun service de synchronisation MISP n'existe encore dans ce
-        // lot : aucune ligne n'a jamais ete creee pour lui — le 404 est
+        // Aucun service de synchronisation VirusTotal n'existe encore dans
+        // ce lot : aucune ligne n'a jamais ete creee pour lui — le 404 est
         // le comportement honnete, pas une donnee inventee pour combler.
+        // (MISP ne convient plus depuis son connecteur, phase 2 : son
+        // planificateur tourne des l'application context et peut deja
+        // avoir cree sa ligne au moment de ce test.)
         String admin = loginToken("admin", "IntegrationTest123!");
 
-        ResponseEntity<String> misp = exchange(HttpMethod.GET, CONNECTORS + "/MISP", admin, String.class);
+        ResponseEntity<String> virusTotal = exchange(HttpMethod.GET, CONNECTORS + "/VIRUSTOTAL", admin, String.class);
 
-        assertThat(misp.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(virusTotal.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     }
 
     @Test
