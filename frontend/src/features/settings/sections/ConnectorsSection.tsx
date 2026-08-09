@@ -59,9 +59,9 @@ const CONNECTORS: ConnectorMeta[] = [
   {
     type: 'MISP',
     label: 'MISP',
-    description: "Threat intelligence — alimentera le modèle d'indicateurs existant.",
+    description: "Threat intelligence — alimente le modèle d'indicateurs existant.",
     icon: <HubOutlinedIcon />,
-    implemented: false,
+    implemented: true,
     plannedPhase: 'Phase 2',
   },
   {
