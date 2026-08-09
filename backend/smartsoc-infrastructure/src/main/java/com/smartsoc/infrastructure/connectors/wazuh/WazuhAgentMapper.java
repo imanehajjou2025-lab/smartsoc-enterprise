@@ -25,7 +25,7 @@ public class WazuhAgentMapper {
     static final String MANAGER_AGENT_ID = "000";
 
     /** Wazuh renvoie cette sentinelle pour l'agent 000 : "toujours vivant", pas une vraie observation. */
-    private static final Duration SENTINEL_THRESHOLD = Duration.ofDays(365 * 50);
+    private static final Duration SENTINEL_THRESHOLD = Duration.ofDays(365L * 50);
 
     /**
      * Traduit la liste brute en snapshots exploitables, en EXCLUANT le

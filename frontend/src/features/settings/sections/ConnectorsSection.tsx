@@ -129,7 +129,11 @@ function ImplementedConnectorCard({
           overview.capabilities.length === 0 ? (
             'Aucune capacité confirmée pour l’instant'
           ) : (
-            <Stack direction="row" spacing={0.5} sx={{ justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+            <Stack
+              direction="row"
+              spacing={0.5}
+              sx={{ justifyContent: 'flex-end', flexWrap: 'wrap' }}
+            >
               {overview.capabilities.map((capability) => (
                 <Chip
                   key={capability}
@@ -223,7 +227,11 @@ function ConnectorsSection() {
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
         {CONNECTORS.map((meta) =>
           meta.implemented ? (
-            <ImplementedConnectorCard key={meta.type} meta={meta} overview={byType.get(meta.type)} />
+            <ImplementedConnectorCard
+              key={meta.type}
+              meta={meta}
+              overview={byType.get(meta.type)}
+            />
           ) : (
             <PlannedConnectorCard key={meta.type} meta={meta} />
           ),

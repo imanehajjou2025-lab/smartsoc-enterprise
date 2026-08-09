@@ -70,7 +70,8 @@ export interface AuditLogFilters {
 
 export type ConnectorType = 'WAZUH' | 'OPENSEARCH' | 'MISP' | 'VIRUSTOTAL' | 'SHUFFLE';
 
-export type ConnectorStatus = 'NOT_CONFIGURED' | 'DISABLED' | 'CONNECTED' | 'DEGRADED' | 'DISCONNECTED';
+export type ConnectorStatus =
+  'NOT_CONFIGURED' | 'DISABLED' | 'CONNECTED' | 'DEGRADED' | 'DISCONNECTED';
 
 export type SyncOutcome = 'SUCCESS' | 'PARTIAL' | 'FAILURE';
 
