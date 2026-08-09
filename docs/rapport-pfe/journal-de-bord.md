@@ -3012,9 +3012,36 @@ Test WireMock de mode live couvrant authentification (en-tête
 panne. CI complète verte (CodeQL, SonarCloud, Trivy, build, qualité)
 après les deux correctifs.
 
-**Reste ouvert.** Contrairement à MISP (aucun frontend nécessaire, écran
-existant déjà générique), VirusTotal expose un point d'entrée à la
-demande sans surface UI existante pour le déclencher — évaluation du
-besoin frontend (bouton « Vérifier la réputation » dans le tiroir
-observable/IOC) à faire séparément. Phase 4 (OpenSearch/Hunting live)
-reste à planifier.
+**Frontend (PR #95), contrairement à MISP.** MISP n'avait nécessité
+aucun changement frontend (écran existant déjà générique) ; VirusTotal
+est à la demande et n'avait aucune surface UI pour le déclencher.
+Vérification par lecture de code (`grep reputation` sur `frontend/src`)
+plutôt que supposée : zéro résultat, confirmant le besoin. Bouton
+« Vérifier la réputation » ajouté dans `IocDetailDrawer` (Threat
+Intelligence uniquement, choix explicite d'Imane — pas le tiroir
+d'observable d'alerte), réservé aux mêmes rôles d'écriture que le RBAC
+backend (`ADMIN`/`SOC_MANAGER`/`SOC_ANALYST`) : un VIEWER ne voit même
+pas la section, cohérent avec le fait qu'il recevrait un 403 de toute
+façon. Verdict affiché via un chip dérivé (jamais recalculé côté
+client), type EMAIL explicitement signalé comme non supporté plutôt que
+proposer un bouton qui échouerait.
+
+**Régression découverte en testant au navigateur, même défaut que MISP
+avant son intégration.** La carte VirusTotal de l'écran Connecteurs
+(`ConnectorsSection.tsx`) restait figée sur `implemented: false` /
+« Phase 3 » malgré le connecteur déjà branché côté backend — capture
+d'écran fournie par Imane après un premier passage en revue. Corrigé
+en un mot (`implemented: true`), vérifié au navigateur : la carte passe
+bien à « Connecté » avec sa sonde réelle.
+
+**Vérification réelle complète.** `npm run build` (tsc + vite) vert ;
+47 tests frontend verts dont 2 nouveaux pour le tiroir (déclenchement
++ affichage du verdict, absence du bouton pour un rôle VIEWER) ; image
+Docker backend reconstruite depuis `develop` fusionné (le conteneur
+tournait encore sur le code d'avant la fusion de la PR #93) ; test de
+bout en bout au navigateur connecté en Admin : clic sur un IOC IPv4 réel
+→ requête `GET /api/v1/reputation` → 200 → verdict « Inoffensif » et
+compteurs réels affichés, aucune erreur console ; écran Connecteurs
+revérifié après le correctif.
+
+Phase 4 (OpenSearch/Hunting live) reste à planifier.
