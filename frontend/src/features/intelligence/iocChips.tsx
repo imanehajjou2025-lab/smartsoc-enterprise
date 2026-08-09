@@ -3,7 +3,12 @@ import Chip from '@mui/material/Chip';
 import LinearProgress from '@mui/material/LinearProgress';
 import Typography from '@mui/material/Typography';
 import { severityColors } from '../../app/theme';
-import type { IndicatorStatus, IndicatorType, TlpMarking } from './intelligenceApi';
+import type {
+  IndicatorStatus,
+  IndicatorType,
+  ReputationVerdict,
+  TlpMarking,
+} from './intelligenceApi';
 
 export const IOC_TYPE_LABELS: Record<IndicatorType, string> = {
   IPV4: 'IPv4',
@@ -75,6 +80,31 @@ export function TlpChip({ tlp }: { tlp: TlpMarking }) {
       }}
     />
   );
+}
+
+export const REPUTATION_VERDICT_LABELS: Record<ReputationVerdict, string> = {
+  MALICIOUS: 'Malveillant',
+  SUSPICIOUS: 'Suspect',
+  HARMLESS: 'Inoffensif',
+  UNDETECTED: 'Non détecté',
+};
+
+/**
+ * Verdict VirusTotal — DÉRIVÉ côté serveur des compteurs réels (« pire cas
+ * gagne »), jamais recalculé ici. Non détecté reste neutre : l'absence de
+ * détection n'est pas une preuve d'innocuité.
+ */
+export function ReputationVerdictChip({ verdict }: { verdict: ReputationVerdict }) {
+  if (verdict === 'MALICIOUS') {
+    return <Chip label={REPUTATION_VERDICT_LABELS.MALICIOUS} size="small" color="error" />;
+  }
+  if (verdict === 'SUSPICIOUS') {
+    return <Chip label={REPUTATION_VERDICT_LABELS.SUSPICIOUS} size="small" color="warning" />;
+  }
+  if (verdict === 'HARMLESS') {
+    return <Chip label={REPUTATION_VERDICT_LABELS.HARMLESS} size="small" color="success" />;
+  }
+  return <Chip label={REPUTATION_VERDICT_LABELS.UNDETECTED} size="small" variant="outlined" />;
 }
 
 /**
