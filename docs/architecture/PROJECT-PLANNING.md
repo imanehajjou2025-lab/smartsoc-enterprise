@@ -110,7 +110,7 @@ SonarCloud ≥ 80 % sur le code neuf, CodeQL, Trivy, Gitleaks).
 | 1.1 | 1 PR : ajustements du guide de mapping + vérification consignée |
 | 1.2 | 3 PR : socle `connectors` · connecteur Wazuh lecture + `Asset` · frontend |
 | 1.3 | 2 PR : client OpenSearch partagé + module vulnérabilités backend · frontend |
-| 2 | 2 PR : connecteur MISP · affichage de provenance |
+| 2 | 1 PR : connecteur MISP (l'écran Threat Intelligence affiche déjà `feedSource`, construit avant ce chantier — aucune PR frontend nécessaire) |
 | 3 | 2 PR : connecteur VirusTotal + cache · panneau frontend |
 | 4 | 1 PR : mapping Hunting sur le client OpenSearch existant *(aucun frontend — écran existant)* |
 | 5 | 3 PR : sous-contexte `actions` + contrôle agents · Shuffle + callback · frontend |
@@ -146,7 +146,7 @@ réelles** et consigné dans le journal de bord.
 | 1.1 — Alertes push | ✅ **terminée** | — | *(config Wazuh, hors dépôt)* | Chaîne réelle bout en bout : attaque SSH → règle 5712 → webhook → PostgreSQL → classification IA (voir journal PFE, 2026-08-08) |
 | 1.2 — API Wazuh + socle | ✅ **terminée** | — | [#85](https://github.com/imanehajjou2025-lab/smartsoc-enterprise/pull/85) | Socle `connectors` + agents → actifs + santé manager (DEGRADED) + inventaire système (syscollector) + section Connecteurs (console), 448 tests backend verts, WireMock bout en bout, vérification navigateur réelle (voir journal PFE, 2026-08-08) |
 | 1.3 — Vulnérabilités | ✅ **terminée** | — | [#86](https://github.com/imanehajjou2025-lab/smartsoc-enterprise/pull/86) [#87](https://github.com/imanehajjou2025-lab/smartsoc-enterprise/pull/87) | Source tranchée en réel (Indexer, `/vulnerability` API 404 sur Wazuh v4.12.0) ; module complet + client OpenSearch partagé, 476 tests backend verts ; section Vulnérabilités de la fiche d'actif vérifiée au navigateur (voir journal PFE, 2026-08-09) |
-| 2 — MISP | 🟡 **connectivité revalidée**, connecteur restant | — | — | Certificat régénéré (`IP:10.100.0.3`), API REST authentifiée (v2.5.44), échantillon réel capturé — voir journal PFE, 2026-08-09 |
+| 2 — MISP | ✅ **terminée** | — | [#90](https://github.com/imanehajjou2025-lab/smartsoc-enterprise/pull/90) | Connecteur complet (0 modification du domaine), 489 tests backend verts ; écran Threat Intelligence existant affiche déjà la provenance sans aucun changement frontend — vérifié au navigateur (voir journal PFE, 2026-08-09) |
 | 3 — VirusTotal | ⬜ | — | — | — |
 | 4 — OpenSearch | ⬜ | — | — | — |
 | 5 — Actions réelles | ⬜ | — | — | — |

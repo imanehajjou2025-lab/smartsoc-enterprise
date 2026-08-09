@@ -2847,3 +2847,88 @@ doctrine de moindre privilège que partout ailleurs dans le projet).
 réelle réussie, données réelles lues. Plus rien ne bloque le
 démarrage du code de la **phase 2** — reste seulement la création d'un
 compte MISP dédié en lecture seule avant l'implémentation.
+
+---
+
+## 2026-08-09 — Phase 2 : connecteur MISP, threat intelligence (PR #90)
+
+**Compte dédié créé avant tout code**, comme prévu à l'issue de la
+revalidation ci-dessus : rôle `Read Only` MISP déjà existant (aucune
+permission cochée, trouvé tel quel dans la liste des rôles), utilisateur
+`smartsoc-reader@smartsoc.local` créé dessus, clé API générée **pour ce
+compte depuis le menu déroulant « User » de la fenêtre MISP d'ajout de
+clé** — sans jamais se connecter avec lui ni connaître son mot de passe
+auto-généré. Revérifiée sur `/servers/getVersion.json` avant tout code.
+
+**Le connecteur le plus simple des cinq, confirmé par les chiffres.**
+Zéro modification du domaine : les tests du module `domain` sont restés
+à 165 avant et après ce lot. Zéro modification frontend non plus,
+constat fait en vérifiant le code existant plutôt que supposé :
+`IntelligencePage.tsx`/`IocDetailDrawer.tsx` affichent déjà
+`feedSource` (colonne, filtre, tiroir de détail) — construits bien
+avant ce chantier, génériques dès l'origine. L'estimation à 1 CÉ
+(contre 2,5 pour Wazuh/vulnérabilités) tenait donc, et même en dessous
+en réalité côté frontend.
+
+**Réutilisation totale de l'existant plutôt qu'une nouvelle
+réconciliation.** `IndicatorFeedIngestionService` — déjà construite
+pour le webhook de push `/api/v1/ingest/iocs` (jalon CTI antérieur) —
+gère déjà l'upsert (`déclarer`/`rafraîchir`) et la tolérance par
+élément. `MispSyncService` (nouvel orchestrateur programmé) ne fait
+que traduire « un cycle de synchronisation » en « un lot pour cette
+méthode existante » : aucun bean de réconciliation dédié à écrire,
+contrairement aux connecteurs Wazuh et OpenSearch.
+
+**Traductions ACL assumées et documentées, jamais des valeurs
+inventées.** `ip-src`/`ip-dst` MISP ne distinguent pas IPv4 d'IPv6 :
+désambiguïsé par la **forme** de la valeur (présence de « : »), pas
+par le type annoncé. Aucun score de confiance natif côté MISP sur un
+attribut : dérivé du `threat_level_id` de l'événement (seul signal
+analyste disponible sur `restSearch`), traduction documentée plutôt
+qu'un nombre sorti de nulle part. TLP laissé `null` faute de tags
+fiables dans la réponse observée — le défaut restrictif déjà du
+domaine (AMBER) s'applique plutôt qu'un TLP supposé.
+
+**CI rouge deux fois de suite, deux causes réelles distinctes,
+diagnostiquées par lecture des logs plutôt que par supposition.**
+1. `ConnectorControllerIntegrationTest.aConnectorNeverSynchronizedIsHonestlyReported404NotFabricated`
+   supposait qu'aucun service de synchronisation MISP n'existait — vrai
+   avant ce lot, plus après : le planificateur MISP tourne dès le
+   contexte applicatif (mode simulation par défaut) et peut avoir créé
+   sa ligne avant que ce test ne s'exécute (délai initial 45 s,
+   dépassé sur un run complet de suite — jamais reproduit en local
+   malgré plusieurs `clean verify`, seulement en CI où les exécutions
+   sont plus lentes). Corrigé en visant `VIRUSTOTAL`, toujours
+   authentiquement jamais synchronisé.
+2. Gate SonarCloud : `new_reliability_rating` (règle S5841 —
+   `allSatisfy()` sur une liste non vérifiée non-vide au préalable) et
+   `new_coverage` à 65,1 % (seuil 80 %) — le mode live MISP
+   (adaptateur, client Feign, configuration d'authentification)
+   n'était exercé par aucun test, contrairement aux connecteurs
+   Wazuh/OpenSearch qui ont chacun leur test WireMock de mode live.
+   Corrigé par l'ajout de ce test manquant plutôt que par
+   contournement — au passage, retrait d'une méthode `modeOrDefault()`
+   ajoutée sur le nouveau record `Misp` mais jamais appelée nulle
+   part : code mort constaté en cherchant la source du trou de
+   couverture. Le même défaut existe déjà, non testé, sur les records
+   `Wazuh`/`OpenSearch` — antérieur à ce lot, signalé en tâche séparée
+   plutôt que traité ici.
+
+**Vérification réelle.** 489 tests backend verts sur les 4 modules
+(+13 vs la phase 1.3), zéro régression, zéro nouveau test domaine.
+Test d'intégration API bout en bout (sync simulée → lecture réelle
+via `/api/v1/iocs?feedSource=misp`, connecteur `CONNECTED`,
+re-synchronisation prouvée idempotente) et test WireMock de mode live
+(authentification vérifiée sur le vrai en-tête envoyé, dégradation
+gracieuse). Backend Docker reconstruit depuis `develop` fusionné,
+vérifié au navigateur après connexion admin : l'écran Threat
+Intelligence affiche bien les deux indicateurs simulés MISP
+(`203.0.113.42`, `phishing-simule.test`, `feedSource=misp`,
+TLP:AMBER) mêlés aux indicateurs de démonstration existants, sans
+aucun changement de code frontend.
+
+**Reste en phase 1/2.** Écarts signalés (câblage de la détection version/
+capacités des connecteurs Wazuh et OpenSearch, exposition des champs
+de synchronisation sur `AssetResponse`, retrait du code mort
+`modeOrDefault()` résiduel) en tâches séparées. Phase 3 (VirusTotal) et
+Phase 4 (OpenSearch/Hunting live) restent à planifier.
