@@ -2699,3 +2699,102 @@ d'ampleur comparable à ce qui vient d'être livré ; revalidation MISP
 avant la phase 2, explicitement différée par Imane le temps de
 stabiliser la connectivité de cet outil. Écart signalé ci-dessus
 (câblage du `CapabilityProbe`) à traiter en tâche séparée.
+
+---
+
+## 2026-08-09 — Phase 1.3 : vulnérabilités Wazuh — de la question au module complet (PR #86, #87)
+
+**Point de bascule architectural, tranché en réel plutôt que deviné.**
+La baseline documentait un fork non résolu pour cette étape : les
+vulnérabilités viennent-elles de l'API de gestion Wazuh ou de
+l'Indexer (OpenSearch) ? La réponse conditionne toute la conception
+(port différent, client différent, ordre des phases). Plutôt que de
+suivre l'hypothèse la plus probable (Wazuh v4.12.0, capturé en phase
+1.2, est postérieur au retrait de l'API classique de vulnérabilités),
+vérification menée en direct avec Imane sur `vm-siem` :
+`GET /vulnerability/004` de l'API renvoie `404 Not Found` avec un
+jeton confirmé valide (contrôle croisé sur `/agents`, qui répond
+normalement) ; l'Indexer, lui, porte l'index
+`wazuh-states-vulnerabilities-vm-siem` peuplé de **1994 documents
+réels**, schéma capturé en fixture
+(`docs/integration/fixtures/wazuh/vulnerabilities-indexer-sample.json`) :
+agent, host.os, package, vulnerability (id CVE, sévérité, score CVSS,
+description, dates, scanner). **Source confirmée : l'Indexer.**
+
+**Conséquence sur l'ordonnancement, assumée et documentée plutôt que
+suivie aveuglément.** Le plan liait cette conditionnelle à la phase 4
+(« si Indexer, la 1.3 s'exécute après OpenSearch/Hunting »). Décision
+prise avec Imane : construire le client OpenSearch partagé
+**maintenant**, dans la 1.3, plutôt que d'attendre la phase 4 — le
+schéma des vulnérabilités est déjà mûr et vérifié en réel, alors que
+celui des alertes (visé par le futur mapping Hunting) n'a que
+quelques heures de recul depuis la phase 1.1. Le chemin critique et le
+diagramme de dépendances (`PROJECT-PLANNING.md`) ont été corrigés en
+conséquence, pas seulement le code.
+
+**Réalisé — module complet (PR #86, backend).** Contexte domaine
+`vulnerabilities` : entité `Vulnerability`, identité immuable
+`(source, externalId)` — le doc id du scanner, qui encode déjà
+agent + paquet + CVE — cycle `OPEN`/`RESOLVED`, même patron
+déclarer/rafraîchir qu'`Indicator` mais `resolve()` **idempotent**
+(constat de réconciliation automatique, pas une décision d'analyste
+comme `Indicator.revoke`) ; **une vulnérabilité résolue retrouvée
+rouvre automatiquement** — une récurrence réelle (ex. rétrogradation
+de paquet) ne doit jamais rester masquée. `VulnerabilityFeedPort` :
+**un seul appel pour tout le parc** (l'Indexer le permet, contrairement
+aux ports Wazuh paginés par agent) ; réconciliation par actif en
+transaction par élément (`VulnerabilityReconciliationService`, même
+isolement qu'`AgentReconciliationService`), orchestrateur qui regroupe
+les trouvailles par agent, résout chaque agent vers son `Asset` déjà
+connu (rejet tracé et compté si l'agent est inconnu, jamais un crash),
+puis réconcilie présence **et absence** (`resolveMissing`) actif par
+actif. Client OpenSearch : Basic Auth à chaque requête — **vérifié en
+réel** qu'il n'y a pas de jeton à rafraîchir, contrairement à l'API de
+gestion Wazuh. ACL avec parsing défensif de la sévérité (valeur
+inconnue → `UNTRIAGED` journalisé, jamais un cycle entier en échec).
+Migration V18, `GET /api/v1/vulnerabilities` (filtres
+assetId/status/severity/recherche, pagination) et `/{id}`.
+
+**Deux bugs réels trouvés dans mes propres tests, déjà rencontrés sur
+le connecteur Wazuh (phase 1.2) — reconnus immédiatement cette fois.**
+Faux positif Mockito « strict stubbing » sur un `doThrow` ciblé à côté
+d'un appel non stubbé de la même méthode (`lenient()`) ; hypothèse de
+règle domaine fausse dans un test (`recordFailure` ne dégrade jamais
+un connecteur `NOT_CONFIGURED` — corrigé en semant un connecteur déjà
+`CONNECTED`, même remède que sur `AgentSyncServiceTest`).
+
+**Réalisé — fiche d'actif (PR #87, frontend).** Plutôt qu'un nouvel
+écran ou item de navigation (les 13 routes du cahier des charges sont
+figées depuis la PR #21), section « Vulnérabilités » ajoutée à la
+fiche d'actif existante, même patron que « Alertes corrélées » déjà en
+place — cohérent avec le critère de fin de la 1.3 : « les
+vulnérabilités réelles d'un agent sont visibles et rattachées à son
+actif ».
+
+**Vérification réelle, les deux PR.** 476 tests backend verts sur les
+4 modules (+28 vs la phase 1.2), zéro régression sur `clean verify` ;
+test d'intégration PostgreSQL réel (unicité `(source, external_id)`
+vérifiée par une vraie violation de contrainte, réouverture d'une
+vulnérabilité résolue, recherche filtrée) ; test d'intégration API
+bout en bout (sync agents → sync vulnérabilités → liste HTTP réelle).
+Frontend : backend Docker reconstruit depuis `develop` (PR #86
+fusionnée), vérifié au navigateur après connexion admin — la fiche de
+l'actif `sim-web-01` (connecteur Wazuh simulé, agent `sim-001`)
+affiche « Vulnérabilités (1) » avec CVE-2025-3576 / Moyenne /
+libgssapi-krb5-2 ; appel réseau réel `GET /api/v1/vulnerabilities?
+assetId=...` confirmé 200 OK.
+
+**Méthode.** Le point de bascule architectural (API vs Indexer) a été
+vérifié par preuve directe avant d'écrire une seule ligne de domaine —
+pas supposé à partir du numéro de version, même si l'hypothèse s'est
+révélée juste. Cinq allers-retours de vérification pour trancher un
+seul port, cohérent avec la doctrine du projet établie sur l'IA, les
+certificats et les alertes Wazuh.
+
+**Reste en phase 1.** Revalidation MISP avant la phase 2, explicitement
+différée par Imane. Deux écarts signalés en tâches séparées plutôt que
+traités dans ce lot : câblage du `CapabilityProbe` (version/capacités
+Wazuh jamais réellement détectées, phase 1.2) et exposition des champs
+de synchronisation (`operatingSystem`, `hardwareSummary`, etc.) sur
+`AssetResponse`, actuellement invisibles côté API/console malgré leur
+présence en base.
