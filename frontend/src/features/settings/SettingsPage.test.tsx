@@ -180,7 +180,7 @@ describe('SettingsPage', () => {
     fireEvent.click(screen.getByText('Sources de données / Connecteurs'));
 
     expect(await screen.findByText('Connecté')).toBeInTheDocument();
-    // OpenSearch n'a pas encore d'adaptateur backend : carte honnête "phase à venir".
-    expect(screen.getByText('Phase 4')).toBeInTheDocument();
+    // Shuffle n'a pas encore d'adaptateur backend : carte honnête "phase à venir".
+    expect(screen.getByText('Phase 5')).toBeInTheDocument();
   });
 });
