@@ -38,12 +38,14 @@ const emptyPage: PageResponse<never> = {
   totalPages: 0,
 };
 const restartAgentMock = vi.fn();
+const blockIpMock = vi.fn();
 
 vi.mock('./assetsApi', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./assetsApi')>()),
   getAsset: () => Promise.resolve(wazuhAsset),
   listCorrelatedAlerts: () => Promise.resolve(emptyPage),
   restartAgent: (...args: unknown[]) => restartAgentMock(...args),
+  blockIp: (...args: unknown[]) => blockIpMock(...args),
 }));
 
 vi.mock('../vulnerabilities/vulnerabilitiesApi', () => ({
@@ -112,5 +114,53 @@ describe('AssetDetailDrawer — redémarrage agent Wazuh', () => {
 
     await screen.findByText('win10-client');
     expect(screen.queryByRole('button', { name: /Redémarrer l'agent/i })).not.toBeInTheDocument();
+  });
+});
+
+describe('AssetDetailDrawer — blocage IP (active-response)', () => {
+  it('exige hostname exact et IPv4 valide avant d’activer la confirmation', async () => {
+    renderDrawer('SOC_ANALYST');
+
+    fireEvent.click(await screen.findByRole('button', { name: /Bloquer une IP/i }));
+
+    const confirmButton = await screen.findByRole('button', { name: 'Confirmer le blocage' });
+    expect(confirmButton).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText(/Hostname/), { target: { value: 'win10-client' } });
+    fireEvent.change(screen.getByLabelText(/Adresse IP/), { target: { value: 'not-an-ip' } });
+    fireEvent.change(screen.getByLabelText(/Motif/), { target: { value: 'test' } });
+    expect(confirmButton).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText(/Adresse IP/), { target: { value: '203.0.113.42' } });
+    expect(confirmButton).not.toBeDisabled();
+  });
+
+  it('envoie la demande avec le hostname, l’IP et le motif une fois validée', async () => {
+    blockIpMock.mockResolvedValueOnce(undefined);
+    renderDrawer('SOC_ANALYST');
+
+    fireEvent.click(await screen.findByRole('button', { name: /Bloquer une IP/i }));
+    fireEvent.change(await screen.findByLabelText(/Hostname/), {
+      target: { value: 'win10-client' },
+    });
+    fireEvent.change(screen.getByLabelText(/Adresse IP/), { target: { value: '203.0.113.42' } });
+    fireEvent.change(screen.getByLabelText(/Motif/), { target: { value: 'IP malveillante' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmer le blocage' }));
+
+    await waitFor(() =>
+      expect(blockIpMock).toHaveBeenCalledWith(
+        'asset-1',
+        'win10-client',
+        '203.0.113.42',
+        'IP malveillante',
+      ),
+    );
+  });
+
+  it("n'affiche aucun déclencheur pour un rôle sans droit d'écriture", async () => {
+    renderDrawer('VIEWER');
+
+    await screen.findByText('win10-client');
+    expect(screen.queryByRole('button', { name: /Bloquer une IP/i })).not.toBeInTheDocument();
   });
 });

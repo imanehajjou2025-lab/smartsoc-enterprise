@@ -129,6 +129,21 @@ export async function restartAgent(
   await api.post(`/assets/${id}/restart-agent`, { confirmHostname, reason });
 }
 
+/**
+ * Active-response Wazuh `firewall-drop` (ADR-014 phase 5) — bloque une IP
+ * sur le pare-feu LOCAL de l'agent ciblé, effet réel. Mêmes garde-fous que
+ * `restartAgent` : `confirmHostname` revérifié côté serveur, motif
+ * obligatoire ; l'IP est aussi revalidée côté serveur.
+ */
+export async function blockIp(
+  id: string,
+  confirmHostname: string,
+  ipAddress: string,
+  reason: string,
+): Promise<void> {
+  await api.post(`/assets/${id}/block-ip`, { confirmHostname, ipAddress, reason });
+}
+
 /** Alertes corrélées : totalElements = LE compteur de corrélation. */
 export async function listCorrelatedAlerts(
   id: string,
