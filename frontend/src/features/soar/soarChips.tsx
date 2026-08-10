@@ -5,12 +5,21 @@ export const EXECUTION_STATUS_LABELS: Record<ExecutionStatus, string> = {
   IN_PROGRESS: 'En cours',
   COMPLETED: 'Terminée',
   CANCELLED: 'Annulée',
+  START_FAILED: 'Échec du démarrage',
+  ORPHANED: 'Orpheline',
+  PARTIAL_FAILURE: 'Échec',
 };
 
-const EXECUTION_STATUS_COLORS: Record<ExecutionStatus, 'info' | 'success' | 'default'> = {
+const EXECUTION_STATUS_COLORS: Record<
+  ExecutionStatus,
+  'info' | 'success' | 'default' | 'error' | 'warning'
+> = {
   IN_PROGRESS: 'info',
   COMPLETED: 'success',
   CANCELLED: 'default',
+  START_FAILED: 'error',
+  ORPHANED: 'warning',
+  PARTIAL_FAILURE: 'error',
 };
 
 export function ExecutionStatusChip({ status }: { status: ExecutionStatus }) {

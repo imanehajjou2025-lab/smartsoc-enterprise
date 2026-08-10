@@ -2,7 +2,8 @@ import { api } from '../../shared/api/client';
 import type { PageResponse } from '../alerts/alertsApi';
 
 export type StepStatus = 'TODO' | 'IN_PROGRESS' | 'DONE' | 'SKIPPED';
-export type ExecutionStatus = 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+export type ExecutionStatus =
+  'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED' | 'START_FAILED' | 'ORPHANED' | 'PARTIAL_FAILURE';
 
 /** {@code order} est ignoré à l'envoi : le serveur le dérive toujours de la position dans la liste. */
 export interface PlaybookStep {
@@ -18,12 +19,21 @@ export interface Playbook {
   version: number;
   steps: PlaybookStep[];
   archived: boolean;
+  /** Les deux présents ensemble, ou aucun — voir {@link isLinkedToShuffle}. */
+  shuffleWorkflowId: string | null;
+  shuffleWebhookPath: string | null;
+}
+
+export function isLinkedToShuffle(playbook: Playbook): boolean {
+  return Boolean(playbook.shuffleWorkflowId && playbook.shuffleWebhookPath);
 }
 
 export interface DeclarePlaybookPayload {
   name: string;
   description?: string;
   steps: { order: number; title: string; description: string }[];
+  shuffleWorkflowId?: string;
+  shuffleWebhookPath?: string;
 }
 
 export interface PlaybookExecutionStep {
@@ -44,6 +54,9 @@ export interface PlaybookExecution {
   status: ExecutionStatus;
   startedAt: string;
   completedAt: string | null;
+  /** Identifiant Shuffle mémorisé au déclenchement — {@code null} pour une exécution guidée manuelle. */
+  externalExecutionId: string | null;
+  resultSummary: string | null;
   steps: PlaybookExecutionStep[];
 }
 
@@ -93,6 +106,32 @@ export async function startExecution(
   const { data } = await api.post<PlaybookExecution>(
     `/incidents/${incidentId}/playbook-executions`,
     { playbookId },
+  );
+  return data;
+}
+
+/**
+ * Déclenchement RÉEL d'un workflow Shuffle (ADR-014 phase 5) —
+ * {@code confirmPlaybookName} doit correspondre EXACTEMENT au nom du
+ * playbook ciblé, le serveur revérifie de toute façon.
+ */
+export async function triggerShuffleExecution(
+  incidentId: string,
+  playbookId: string,
+  confirmPlaybookName: string,
+  reason: string,
+): Promise<PlaybookExecution> {
+  const { data } = await api.post<PlaybookExecution>(
+    `/incidents/${incidentId}/playbook-executions/trigger-shuffle`,
+    { playbookId, confirmPlaybookName, reason },
+  );
+  return data;
+}
+
+/** Réconciliation à la demande (lecture) : interroge Shuffle et aligne le statut sur la réalité. */
+export async function refreshShuffleStatus(executionId: string): Promise<PlaybookExecution> {
+  const { data } = await api.post<PlaybookExecution>(
+    `/playbook-executions/${executionId}/refresh-shuffle-status`,
   );
   return data;
 }

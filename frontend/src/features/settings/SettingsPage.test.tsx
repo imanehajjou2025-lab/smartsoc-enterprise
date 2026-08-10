@@ -67,6 +67,16 @@ const connectors: ConnectorOverview[] = [
       errorMessage: null,
     },
   },
+  {
+    type: 'SHUFFLE',
+    status: 'CONNECTED',
+    detectedVersion: null,
+    capabilities: [],
+    lastCheckedAt: '2026-08-10T20:00:00Z',
+    lastSuccessfulSyncAt: '2026-08-10T20:00:00Z',
+    lastError: null,
+    lastSync: null,
+  },
 ];
 
 const auditPage: PageResponse<AuditLogEntry> = {
@@ -109,6 +119,8 @@ const playbooksPage: PageResponse<Playbook> = {
       version: 1,
       steps: [],
       archived: false,
+      shuffleWorkflowId: null,
+      shuffleWebhookPath: null,
     },
   ],
   totalElements: 1,
@@ -173,14 +185,14 @@ describe('SettingsPage', () => {
     expect(screen.getByText('15 min')).toBeInTheDocument();
   });
 
-  it('shows the real Wazuh connector state alongside honest "planned" cards for the rest', async () => {
+  it('shows the real connector state for Wazuh and Shuffle, both now implemented', async () => {
     renderPage();
     await screen.findByText('Opérationnelle');
 
     fireEvent.click(screen.getByText('Sources de données / Connecteurs'));
 
-    expect(await screen.findByText('Connecté')).toBeInTheDocument();
-    // Shuffle n'a pas encore d'adaptateur backend : carte honnête "phase à venir".
-    expect(screen.getByText('Phase 5')).toBeInTheDocument();
+    // Deux cartes "Connecté" : Wazuh et Shuffle (phase 5, connecteur d'action sans planificateur).
+    expect(await screen.findAllByText('Connecté')).toHaveLength(2);
+    expect(screen.getByText('Shuffle')).toBeInTheDocument();
   });
 });

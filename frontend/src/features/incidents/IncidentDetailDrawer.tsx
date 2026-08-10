@@ -13,6 +13,7 @@ import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutlined';
+import AccountTreeOutlinedIcon from '@mui/icons-material/AccountTreeOutlined';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { useAppSelector } from '../../app/hooks';
@@ -23,6 +24,7 @@ import { openCaseFromIncident } from '../investigations/investigationsApi';
 import { ExecutionStatusChip } from '../soar/soarChips';
 import { listExecutionsForIncident } from '../soar/soarApi';
 import StartPlaybookExecutionDialog from '../soar/StartPlaybookExecutionDialog';
+import TriggerShuffleExecutionDialog from '../soar/TriggerShuffleExecutionDialog';
 import { IncidentStatusChip, INCIDENT_STATUS_LABELS } from './incidentChips';
 import {
   ALLOWED_TRANSITIONS,
@@ -63,6 +65,7 @@ function IncidentDetailDrawer({ incidentId, onClose }: Props) {
   const [assignee, setAssignee] = useState('');
   const [note, setNote] = useState('');
   const [startPlaybookOpen, setStartPlaybookOpen] = useState(false);
+  const [triggerShuffleOpen, setTriggerShuffleOpen] = useState(false);
 
   const { data: executions } = useQuery({
     queryKey: ['playbook-executions', incidentId],
@@ -175,6 +178,15 @@ function IncidentDetailDrawer({ incidentId, onClose }: Props) {
                     onClick={() => setStartPlaybookOpen(true)}
                   >
                     Exécuter un playbook
+                  </Button>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    color="warning"
+                    startIcon={<AccountTreeOutlinedIcon />}
+                    onClick={() => setTriggerShuffleOpen(true)}
+                  >
+                    Déclencher via Shuffle
                   </Button>
                 </>
               )}
@@ -356,6 +368,18 @@ function IncidentDetailDrawer({ incidentId, onClose }: Props) {
           incidentId={incidentId}
           onStarted={(execution) => {
             setStartPlaybookOpen(false);
+            onClose();
+            navigate(`/soar?execution=${execution.id}`);
+          }}
+        />
+      )}
+      {incidentId && (
+        <TriggerShuffleExecutionDialog
+          open={triggerShuffleOpen}
+          onClose={() => setTriggerShuffleOpen(false)}
+          incidentId={incidentId}
+          onTriggered={(execution) => {
+            setTriggerShuffleOpen(false);
             onClose();
             navigate(`/soar?execution=${execution.id}`);
           }}

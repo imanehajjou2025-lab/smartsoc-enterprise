@@ -38,12 +38,16 @@ function PlaybookDialog({ open, onClose, playbook }: Props) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [steps, setSteps] = useState<StepDraft[]>([{ title: '', description: '' }]);
+  const [shuffleWorkflowId, setShuffleWorkflowId] = useState('');
+  const [shuffleWebhookPath, setShuffleWebhookPath] = useState('');
 
   useEffect(() => {
     if (open) {
       setName(playbook?.name ?? '');
       setDescription(playbook?.description ?? '');
       setSteps(toDrafts(playbook));
+      setShuffleWorkflowId(playbook?.shuffleWorkflowId ?? '');
+      setShuffleWebhookPath(playbook?.shuffleWebhookPath ?? '');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, playbook?.id]);
@@ -58,6 +62,8 @@ function PlaybookDialog({ open, onClose, playbook }: Props) {
           title: s.title.trim(),
           description: s.description.trim(),
         })),
+        shuffleWorkflowId: shuffleWorkflowId.trim() || undefined,
+        shuffleWebhookPath: shuffleWebhookPath.trim() || undefined,
       };
       return playbook ? updatePlaybook(playbook.id, payload) : createPlaybook(payload);
     },
@@ -157,6 +163,30 @@ function PlaybookDialog({ open, onClose, playbook }: Props) {
         >
           Ajouter une étape
         </Button>
+
+        <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>
+          Lien Shuffle (optionnel)
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+          Les deux identifiants sont nécessaires pour activer le déclenchement réel — un playbook
+          sans lien reste purement documentaire (suivi guidé manuel).
+        </Typography>
+        <TextField
+          label="Identifiant du workflow Shuffle"
+          value={shuffleWorkflowId}
+          onChange={(e) => setShuffleWorkflowId(e.target.value)}
+          fullWidth
+          margin="dense"
+          placeholder="Ex. fb0e09e3-402f-4d20-9bc1-f7fa845d4314"
+        />
+        <TextField
+          label="Chemin du webhook de déclenchement"
+          value={shuffleWebhookPath}
+          onChange={(e) => setShuffleWebhookPath(e.target.value)}
+          fullWidth
+          margin="dense"
+          placeholder="Ex. webhook_a0fa6c78-fa6c-41a1-ac56-3c7f514ba8f4"
+        />
       </DialogContent>
       <DialogActions>
         <Button onClick={handleClose}>Annuler</Button>

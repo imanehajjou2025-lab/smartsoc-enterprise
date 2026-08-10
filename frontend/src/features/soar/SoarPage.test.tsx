@@ -20,6 +20,8 @@ const playbook: Playbook = {
     { order: 1, title: "Notifier l'équipe", description: null },
   ],
   archived: false,
+  shuffleWorkflowId: null,
+  shuffleWebhookPath: null,
 };
 
 const playbooksPage: PageResponse<Playbook> = {
