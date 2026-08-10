@@ -40,11 +40,13 @@ public class LiveWorkflowStatusAdapter implements WorkflowStatusPort {
 
     private final ShuffleClient client;
     private final ObjectMapper objectMapper;
+    private final ShuffleConnectorStatusRecorder connectorStatus;
 
     @Override
     @CircuitBreaker(name = CIRCUIT_BREAKER, fallbackMethod = "statusUnavailable")
     public WorkflowExecutionStatus statusOf(String workflowId, String externalExecutionId) {
         ShuffleExecutionsResponse response = client.listExecutions(workflowId);
+        connectorStatus.recordSuccess();
         return response.executions().stream()
                 .filter(execution -> externalExecutionId.equals(execution.executionId()))
                 .findFirst()
@@ -88,6 +90,7 @@ public class LiveWorkflowStatusAdapter implements WorkflowStatusPort {
 
     @SuppressWarnings("unused") // invoqué par Resilience4j (fallbackMethod)
     private WorkflowExecutionStatus statusUnavailable(String workflowId, String externalExecutionId, Throwable cause) {
+        connectorStatus.recordFailure(cause.getMessage());
         log.warn("Shuffle workflow status unavailable: {}", cause.getMessage());
         throw new SocConnectorException("Shuffle workflow status unavailable: " + cause.getMessage(), cause);
     }

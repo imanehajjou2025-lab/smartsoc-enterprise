@@ -193,6 +193,17 @@ class LiveShuffleWorkflowIntegrationTest {
         assertThat(status.outcome()).isEqualTo(Outcome.NOT_FOUND);
     }
 
+    @Test
+    void statusOfDegradesGracefullyWhenShuffleIsDown() {
+        SHUFFLE.stubFor(get(urlPathEqualTo("/api/v2/workflows/" + WORKFLOW_ID + "/executions"))
+                .willReturn(aResponse().withStatus(503)));
+
+        assertThatThrownBy(() -> workflowStatusPort.statusOf(WORKFLOW_ID, EXECUTION_ID))
+                .isInstanceOf(SocConnectorException.class);
+
+        SHUFFLE.verify(1, getRequestedFor(urlPathEqualTo("/api/v2/workflows/" + WORKFLOW_ID + "/executions")));
+    }
+
     private static void stubExecutionsList(String body) {
         SHUFFLE.stubFor(get(urlPathEqualTo("/api/v2/workflows/" + WORKFLOW_ID + "/executions")).willReturn(aResponse()
                 .withStatus(200)
