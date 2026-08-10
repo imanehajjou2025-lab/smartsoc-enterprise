@@ -20,6 +20,7 @@ import Typography from '@mui/material/Typography';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { problemDetail } from '../../shared/api/client';
 import {
+  AgentConnectionStatusChip,
   AssetStatusChip,
   CriticalityChip,
   ExposureChip,
@@ -197,12 +198,13 @@ function AssetsPage() {
                 <TableCell>Criticité</TableCell>
                 <TableCell>Exposition</TableCell>
                 <TableCell>Statut</TableCell>
+                <TableCell>Connexion</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {data.items.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6}>
+                  <TableCell colSpan={7}>
                     <Typography color="text.secondary" sx={{ py: 3, textAlign: 'center' }}>
                       Aucun actif inventorié — enregistrez le premier.
                     </Typography>
@@ -231,6 +233,9 @@ function AssetsPage() {
                   </TableCell>
                   <TableCell>
                     <AssetStatusChip status={asset.status} />
+                  </TableCell>
+                  <TableCell>
+                    <AgentConnectionStatusChip status={asset.agentConnectionStatus} />
                   </TableCell>
                 </TableRow>
               ))}

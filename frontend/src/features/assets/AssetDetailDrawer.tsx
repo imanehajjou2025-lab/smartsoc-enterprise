@@ -16,7 +16,13 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { useAppSelector } from '../../app/hooks';
 import { problemDetail } from '../../shared/api/client';
 import { SeverityChip, StatusChip } from '../alerts/chips';
-import { AssetStatusChip, CriticalityChip, ExposureChip, ASSET_TYPE_LABELS } from './assetChips';
+import {
+  AgentConnectionStatusChip,
+  AssetStatusChip,
+  CriticalityChip,
+  ExposureChip,
+  ASSET_TYPE_LABELS,
+} from './assetChips';
 import EditAssetDialog from './EditAssetDialog';
 import { decommissionAsset, getAsset, listCorrelatedAlerts, reactivateAsset } from './assetsApi';
 import { VulnerabilitySeverityChip } from '../vulnerabilities/vulnerabilityChips';
@@ -135,6 +141,7 @@ function AssetDetailDrawer({ assetId, onClose }: Props) {
               <CriticalityChip criticality={asset.criticality} />
               <ExposureChip exposure={asset.exposure} />
               <AssetStatusChip status={asset.status} />
+              <AgentConnectionStatusChip status={asset.agentConnectionStatus} />
               {isDecommissioned && (
                 <Chip icon={<LockIcon />} label="Lecture seule" size="small" color="default" />
               )}
@@ -198,6 +205,21 @@ function AssetDetailDrawer({ assetId, onClose }: Props) {
             {asset.owner && (
               <Field label="Propriétaire">
                 <Typography variant="body2">{asset.owner}</Typography>
+              </Field>
+            )}
+            {asset.operatingSystem && (
+              <Field label="Système d'exploitation">
+                <Typography variant="body2">{asset.operatingSystem}</Typography>
+              </Field>
+            )}
+            {asset.hardwareSummary && (
+              <Field label="Matériel">
+                <Typography variant="body2">{asset.hardwareSummary}</Typography>
+              </Field>
+            )}
+            {asset.lastSeenAt && (
+              <Field label="Dernier contact">
+                <Typography variant="body2">{formatDate(asset.lastSeenAt)}</Typography>
               </Field>
             )}
             {asset.description && (

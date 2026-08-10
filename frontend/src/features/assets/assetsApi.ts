@@ -16,6 +16,13 @@ export type AssetExposure = 'INTERNET_FACING' | 'INTERNAL' | 'ISOLATED';
 
 export type AssetStatus = 'ACTIVE' | 'DECOMMISSIONED';
 
+/**
+ * Statut de connexion RAPPORTÉ par un connecteur d'agents (Wazuh) — pas le
+ * cycle de vie de l'actif (AssetStatus). `null` pour un actif enregistré à
+ * la main, jamais rapporté par un connecteur.
+ */
+export type AgentConnectionStatus = 'ACTIVE' | 'DISCONNECTED' | 'NEVER_CONNECTED';
+
 export interface Asset {
   id: string;
   hostname: string;
@@ -29,6 +36,11 @@ export interface Asset {
   status: AssetStatus;
   registeredAt: string;
   decommissionedAt: string | null;
+  operatingSystem: string | null;
+  lastSeenAt: string | null;
+  hardwareSummary: string | null;
+  externalSource: string | null;
+  agentConnectionStatus: AgentConnectionStatus | null;
 }
 
 export interface AssetFilters {

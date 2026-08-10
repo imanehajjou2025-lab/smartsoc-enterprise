@@ -24,6 +24,11 @@ const assets: Asset[] = [
     status: 'ACTIVE',
     registeredAt: '2026-07-18T08:00:00Z',
     decommissionedAt: null,
+    operatingSystem: 'Ubuntu 24.04.4 LTS',
+    lastSeenAt: '2026-08-09T20:00:00Z',
+    hardwareSummary: null,
+    externalSource: 'wazuh',
+    agentConnectionStatus: 'ACTIVE',
   },
   {
     id: 'a-2',
@@ -38,6 +43,11 @@ const assets: Asset[] = [
     status: 'DECOMMISSIONED',
     registeredAt: '2026-07-17T09:00:00Z',
     decommissionedAt: '2026-07-18T07:00:00Z',
+    operatingSystem: null,
+    lastSeenAt: null,
+    hardwareSummary: null,
+    externalSource: null,
+    agentConnectionStatus: null,
   },
 ];
 
@@ -82,6 +92,10 @@ describe('AssetsPage', () => {
     // « Actif » (chip) ≠ titre « Actifs » : correspondance exacte.
     expect(screen.getByText('Actif')).toBeInTheDocument();
     expect(screen.getByText('Décommissionné')).toBeInTheDocument();
+    // Statut de connexion RAPPORTÉ par le connecteur (distinct du statut
+    // d'inventaire) : présent pour l'actif synchronisé, absent pour le
+    // second (enregistré à la main, jamais rapporté par un connecteur).
+    expect(screen.getByText('Connecté')).toBeInTheDocument();
   });
 
   it('offers registration, search and filters', async () => {
