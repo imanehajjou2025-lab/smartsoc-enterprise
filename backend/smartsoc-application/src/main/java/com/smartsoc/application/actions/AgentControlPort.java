@@ -12,4 +12,11 @@ package com.smartsoc.application.actions;
 public interface AgentControlPort {
 
     void restart(String wazuhAgentId);
+
+    /**
+     * Active-response {@code firewall-drop} — seule commande réellement
+     * configurée sur le manager SOC (confirmé en réel, ADR-014 phase 5) :
+     * bloque {@code ipAddress} sur le pare-feu local de l'agent ciblé.
+     */
+    void blockIp(String wazuhAgentId, String ipAddress);
 }

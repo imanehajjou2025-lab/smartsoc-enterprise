@@ -30,6 +30,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
@@ -175,7 +176,7 @@ class SocActionServiceTest {
 
         assertThatThrownBy(() -> service.restartAgent(asset.getId(), "win10-client", "test", actor))
                 .isInstanceOf(BusinessRuleViolationException.class)
-                .hasMessageContaining("Too many restart attempts");
+                .hasMessageContaining("Too many attempts of this action on this asset");
 
         verify(agentControlPort, never()).restart(anyString());
     }
@@ -192,5 +193,70 @@ class SocActionServiceTest {
         assertThat(queryCaptor.getValue().action()).isEqualTo(AuditAction.WAZUH_AGENT_RESTART_REQUESTED);
         assertThat(queryCaptor.getValue().targetType()).isEqualTo("ASSET");
         assertThat(queryCaptor.getValue().targetId()).isEqualTo(asset.getId().toString());
+    }
+
+    // --- blockIp (active-response firewall-drop) ---
+
+    @Test
+    void blocksTheIpWhenHostnameIsConfirmedAndRecordsSuccessWithTheIpInDetails() {
+        Asset asset = wazuhManagedAsset();
+        when(assetRepository.findById(asset.getId())).thenReturn(Optional.of(asset));
+
+        service.blockIp(asset.getId(), "win10-client", "203.0.113.42", "IP malveillante", actor);
+
+        verify(agentControlPort).blockIp("004", "203.0.113.42");
+        ArgumentCaptor<String> details = ArgumentCaptor.forClass(String.class);
+        verify(auditRecorder).record(eq(AuditAction.WAZUH_AGENT_FIREWALL_DROP_REQUESTED), eq("analyst1"),
+                eq(actor.userId()), eq("ASSET"), eq(asset.getId().toString()), details.capture(), eq("10.0.0.5"));
+        assertThat(details.getValue()).contains("outcome=SUCCESS").contains("ip=203.0.113.42");
+    }
+
+    @Test
+    void rejectsAnInvalidIpAddressFormat() {
+        Asset asset = wazuhManagedAsset();
+        when(assetRepository.findById(asset.getId())).thenReturn(Optional.of(asset));
+
+        assertThatThrownBy(() -> service.blockIp(asset.getId(), "win10-client", "not-an-ip", "test", actor))
+                .isInstanceOf(BusinessRuleViolationException.class)
+                .hasMessageContaining("IPv4");
+
+        verify(agentControlPort, never()).blockIp(anyString(), anyString());
+    }
+
+    @Test
+    void blockIpAndRestartRateCapsAreCountedSeparately() {
+        Asset asset = wazuhManagedAsset();
+        when(assetRepository.findById(asset.getId())).thenReturn(Optional.of(asset));
+        // 3 redemarrages deja au plafond pour WAZUH_AGENT_RESTART_REQUESTED...
+        when(auditLogRepository.search(argThat(q ->
+                q != null && q.action() == AuditAction.WAZUH_AGENT_RESTART_REQUESTED)))
+                .thenReturn(new PageResult<>(java.util.List.of(), 3, 0, 1));
+        // ...mais aucune tentative de blocage IP enregistree : le quota est distinct.
+        when(auditLogRepository.search(argThat(q ->
+                q != null && q.action() == AuditAction.WAZUH_AGENT_FIREWALL_DROP_REQUESTED)))
+                .thenReturn(new PageResult<>(java.util.List.of(), 0, 0, 1));
+
+        assertThatThrownBy(() -> service.restartAgent(asset.getId(), "win10-client", "test", actor))
+                .isInstanceOf(BusinessRuleViolationException.class);
+        service.blockIp(asset.getId(), "win10-client", "203.0.113.42", "test", actor);
+
+        verify(agentControlPort).blockIp("004", "203.0.113.42");
+        verify(agentControlPort, never()).restart(anyString());
+    }
+
+    @Test
+    void recordsFailureAndRethrowsWhenTheConnectorFailsToBlockTheIp() {
+        Asset asset = wazuhManagedAsset();
+        when(assetRepository.findById(asset.getId())).thenReturn(Optional.of(asset));
+        doThrow(new SocConnectorException("Wazuh unavailable"))
+                .when(agentControlPort).blockIp("004", "203.0.113.42");
+
+        assertThatThrownBy(() -> service.blockIp(asset.getId(), "win10-client", "203.0.113.42", "test", actor))
+                .isInstanceOf(SocConnectorException.class);
+
+        ArgumentCaptor<String> details = ArgumentCaptor.forClass(String.class);
+        verify(auditRecorder).record(eq(AuditAction.WAZUH_AGENT_FIREWALL_DROP_REQUESTED), any(), any(),
+                any(), any(), details.capture(), any());
+        assertThat(details.getValue()).contains("outcome=FAILURE").contains("ip=203.0.113.42");
     }
 }

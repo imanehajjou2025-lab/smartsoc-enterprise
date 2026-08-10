@@ -1,5 +1,6 @@
 package com.smartsoc.api.actions;
 
+import com.smartsoc.api.actions.dto.ActionDtos.BlockIpRequest;
 import com.smartsoc.api.actions.dto.ActionDtos.RestartAgentRequest;
 import com.smartsoc.application.actions.SocActionService;
 import com.smartsoc.application.audit.ActorContext;
@@ -40,8 +41,21 @@ public class AgentActionController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void restartAgent(@PathVariable UUID id, @Valid @RequestBody RestartAgentRequest request,
                              @AuthenticationPrincipal Jwt jwt, HttpServletRequest httpRequest) {
-        ActorContext actor = new ActorContext(jwt.getSubject(),
-                UUID.fromString(jwt.getClaimAsString("userId")), httpRequest.getRemoteAddr());
+        ActorContext actor = actorFrom(jwt, httpRequest);
         actionService.restartAgent(id, request.confirmHostname(), request.reason(), actor);
+    }
+
+    /** Active-response {@code firewall-drop} — bloque une IP sur le pare-feu local de l'agent ciblé. */
+    @PostMapping("/block-ip")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void blockIp(@PathVariable UUID id, @Valid @RequestBody BlockIpRequest request,
+                        @AuthenticationPrincipal Jwt jwt, HttpServletRequest httpRequest) {
+        ActorContext actor = actorFrom(jwt, httpRequest);
+        actionService.blockIp(id, request.confirmHostname(), request.ipAddress(), request.reason(), actor);
+    }
+
+    private static ActorContext actorFrom(Jwt jwt, HttpServletRequest httpRequest) {
+        return new ActorContext(jwt.getSubject(),
+                UUID.fromString(jwt.getClaimAsString("userId")), httpRequest.getRemoteAddr());
     }
 }

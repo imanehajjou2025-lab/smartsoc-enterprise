@@ -23,5 +23,12 @@ public enum AuditAction {
      * horaire de {@code SocActionService} compte tout appel réel en un
      * seul filtre).
      */
-    WAZUH_AGENT_RESTART_REQUESTED
+    WAZUH_AGENT_RESTART_REQUESTED,
+    /**
+     * Active-response {@code firewall-drop} (ADR-014 phase 5) — seule
+     * commande active-response réellement configurée sur le manager SOC,
+     * confirmée en réel avant tout code. Même doctrine que le redémarrage :
+     * un seul type d'audit, succès ET échec, {@code details} porte l'issue.
+     */
+    WAZUH_AGENT_FIREWALL_DROP_REQUESTED
 }

@@ -6,16 +6,16 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 
 /**
- * Réponse de {@code PUT /agents/restart} — enveloppe confirmée en réel sur
- * TOUS les autres endpoints Wazuh de ce dépôt ({@code affected_items}/
- * {@code failed_items}, voir {@code WazuhAgentsResponse}), jamais
- * déclenchée pour de vrai ici : redémarrer un agent a un effet réel sur
- * une machine, décision volontairement laissée à l'analyste (ADR-014
- * phase 5). Forme du contrat API officiel Wazuh v4, pas une supposition
- * isolée — cohérente avec chaque échantillon réel déjà capturé.
+ * Réponse de {@code PUT /agents/restart} ET {@code PUT /active-response}
+ * (même enveloppe {@code ApiResponse}, confirmée dans la spec OpenAPI
+ * réelle du manager SOC — pas une supposition) — {@code affected_items}/
+ * {@code failed_items}, même patron que {@code WazuhAgentsResponse}.
+ * Jamais déclenchée pour de vrai en test : ces deux commandes ont un
+ * effet réel sur une machine, décision volontairement laissée à
+ * l'analyste (ADR-014 phase 5).
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
-public record WazuhAgentRestartResponse(Data data, String message, int error) {
+public record WazuhAgentCommandResponse(Data data, String message, int error) {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record Data(

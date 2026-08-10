@@ -14,9 +14,10 @@ import java.util.List;
 /**
  * Adaptateur live du contrôle d'agents (ADR-014 phase 5, EFFET RÉEL) —
  * AUCUN {@code @Retry} : {@code SocActionService} l'exige explicitement,
- * rejouer un redémarrage agirait une seconde fois sur une vraie machine.
- * Le {@code @CircuitBreaker} ci-dessous ne fait qu'échouer vite quand
- * Wazuh est dégradé, jamais retenter.
+ * rejouer une action agirait une seconde fois sur une vraie machine. Le
+ * {@code @CircuitBreaker} ci-dessous ne fait qu'échouer vite quand Wazuh
+ * est dégradé, jamais retenter — PARTAGÉ entre {@code restart} et
+ * {@code blockIp} : même identité, même serveur, même domaine de panne.
  */
 @Slf4j
 @Component
@@ -31,11 +32,16 @@ public class LiveAgentControlAdapter implements AgentControlPort {
     @Override
     @CircuitBreaker(name = CIRCUIT_BREAKER, fallbackMethod = "restartUnavailable")
     public void restart(String wazuhAgentId) {
-        WazuhAgentRestartResponse response = client.restart(wazuhAgentId);
-        if (response.error() != 0 || hasFailedItem(response, wazuhAgentId)) {
-            throw new SocConnectorException(
-                    "Wazuh refused to restart agent %s: %s".formatted(wazuhAgentId, response.message()));
-        }
+        WazuhAgentCommandResponse response = client.restart(wazuhAgentId);
+        requireNoFailedItem(response, wazuhAgentId, "restart");
+    }
+
+    @Override
+    @CircuitBreaker(name = CIRCUIT_BREAKER, fallbackMethod = "blockIpUnavailable")
+    public void blockIp(String wazuhAgentId, String ipAddress) {
+        WazuhAgentCommandResponse response = client.activeResponse(
+                wazuhAgentId, WazuhActiveResponseRequest.firewallDrop(ipAddress));
+        requireNoFailedItem(response, wazuhAgentId, "firewall-drop");
     }
 
     /**
@@ -43,8 +49,15 @@ public class LiveAgentControlAdapter implements AgentControlPort {
      * {@code failed_items} — un succès global ne garantit pas le succès
      * de CETTE cible précise.
      */
-    private static boolean hasFailedItem(WazuhAgentRestartResponse response, String agentId) {
-        List<WazuhAgentRestartResponse.FailedItem> failedItems = response.data() == null
+    private static void requireNoFailedItem(WazuhAgentCommandResponse response, String agentId, String action) {
+        if (response.error() != 0 || hasFailedItem(response, agentId)) {
+            throw new SocConnectorException(
+                    "Wazuh refused %s for agent %s: %s".formatted(action, agentId, response.message()));
+        }
+    }
+
+    private static boolean hasFailedItem(WazuhAgentCommandResponse response, String agentId) {
+        List<WazuhAgentCommandResponse.FailedItem> failedItems = response.data() == null
                 ? List.of() : response.data().failedItems();
         if (failedItems == null) {
             return false;
@@ -55,7 +68,14 @@ public class LiveAgentControlAdapter implements AgentControlPort {
 
     @SuppressWarnings("unused") // invoqué par Resilience4j (fallbackMethod)
     private void restartUnavailable(String wazuhAgentId, Throwable cause) {
-        log.warn("Wazuh agent control unavailable for agent {}: {}", wazuhAgentId, cause.getMessage());
+        log.warn("Wazuh agent control (restart) unavailable for agent {}: {}", wazuhAgentId, cause.getMessage());
+        throw new SocConnectorException("Wazuh agent control unavailable: " + cause.getMessage(), cause);
+    }
+
+    @SuppressWarnings("unused") // invoqué par Resilience4j (fallbackMethod)
+    private void blockIpUnavailable(String wazuhAgentId, String ipAddress, Throwable cause) {
+        log.warn("Wazuh agent control (firewall-drop) unavailable for agent {}: {}",
+                wazuhAgentId, cause.getMessage());
         throw new SocConnectorException("Wazuh agent control unavailable: " + cause.getMessage(), cause);
     }
 }
