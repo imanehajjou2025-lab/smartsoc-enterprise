@@ -1,5 +1,6 @@
 package com.smartsoc.application.connectors;
 
+import com.smartsoc.domain.assets.AgentConnectionStatus;
 import com.smartsoc.domain.assets.Asset;
 import com.smartsoc.domain.assets.AssetCriticality;
 import com.smartsoc.domain.assets.AssetExposure;
@@ -32,7 +33,8 @@ class AgentReconciliationServiceTest {
         service = new AgentReconciliationService(assetRepository);
         Instant seenAt = Instant.now();
         var snapshot = new AgentInventoryPort.AgentSnapshot(
-                "004", "WIN10-CLIENT", "10.100.0.9", "Microsoft Windows 10 Home", seenAt);
+                "004", "WIN10-CLIENT", "10.100.0.9", "Microsoft Windows 10 Home", seenAt,
+                AgentConnectionStatus.DISCONNECTED);
         when(assetRepository.findByExternalRef("wazuh", "004")).thenReturn(Optional.empty());
         when(assetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -49,6 +51,7 @@ class AgentReconciliationServiceTest {
         assertThat(created.getExternalSource()).isEqualTo("wazuh");
         assertThat(created.getOperatingSystem()).isEqualTo("Microsoft Windows 10 Home");
         assertThat(created.getLastSeenAt()).isEqualTo(seenAt);
+        assertThat(created.getAgentConnectionStatus()).isEqualTo(AgentConnectionStatus.DISCONNECTED);
     }
 
     @Test
@@ -67,7 +70,8 @@ class AgentReconciliationServiceTest {
 
         Instant freshSeen = Instant.now();
         service.reconcileOne(new AgentInventoryPort.AgentSnapshot(
-                "004", "WIN10-CLIENT", "10.100.0.9", "Windows 10 Pro", freshSeen));
+                "004", "WIN10-CLIENT", "10.100.0.9", "Windows 10 Pro", freshSeen,
+                AgentConnectionStatus.ACTIVE));
 
         ArgumentCaptor<Asset> captor = ArgumentCaptor.forClass(Asset.class);
         verify(assetRepository).save(captor.capture());
@@ -78,13 +82,16 @@ class AgentReconciliationServiceTest {
         assertThat(updated.getLastSeenAt()).isEqualTo(freshSeen);
         // Le jugement métier déjà porté par un analyste (HIGH) n'est PAS écrasé.
         assertThat(updated.getCriticality()).isEqualTo(AssetCriticality.HIGH);
+        // Le statut de connexion, lui, REFLÈTE l'état courant rapporté par Wazuh.
+        assertThat(updated.getAgentConnectionStatus()).isEqualTo(AgentConnectionStatus.ACTIVE);
     }
 
     @Test
     void systemDetailsOsDescriptionTakesPrecedenceOverTheBaseSnapshot() {
         service = new AgentReconciliationService(assetRepository);
         var snapshot = new AgentInventoryPort.AgentSnapshot(
-                "004", "WIN10-CLIENT", "10.100.0.9", "Microsoft Windows 10 Home", Instant.now());
+                "004", "WIN10-CLIENT", "10.100.0.9", "Microsoft Windows 10 Home", Instant.now(),
+                AgentConnectionStatus.ACTIVE);
         var systemDetails = new SystemInventoryPort.SystemDetails(
                 "Microsoft Windows 10 Home 22H2 (build 19045.3803)",
                 "12th Gen Intel(R) Core(TM) i5-12450H, 1 coeur, 2 Go RAM");
@@ -107,7 +114,8 @@ class AgentReconciliationServiceTest {
     void nullSystemDetailsFallsBackToTheBaseSnapshotOsAndLeavesHardwareUnset() {
         service = new AgentReconciliationService(assetRepository);
         var snapshot = new AgentInventoryPort.AgentSnapshot(
-                "004", "WIN10-CLIENT", "10.100.0.9", "Microsoft Windows 10 Home", Instant.now());
+                "004", "WIN10-CLIENT", "10.100.0.9", "Microsoft Windows 10 Home", Instant.now(),
+                AgentConnectionStatus.ACTIVE);
         when(assetRepository.findByExternalRef("wazuh", "004")).thenReturn(Optional.empty());
         when(assetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -125,7 +133,8 @@ class AgentReconciliationServiceTest {
     void systemDetailsHardwareOnlyStillFallsBackToBaseOsDescription() {
         service = new AgentReconciliationService(assetRepository);
         var snapshot = new AgentInventoryPort.AgentSnapshot(
-                "004", "WIN10-CLIENT", "10.100.0.9", "Microsoft Windows 10 Home", Instant.now());
+                "004", "WIN10-CLIENT", "10.100.0.9", "Microsoft Windows 10 Home", Instant.now(),
+                AgentConnectionStatus.ACTIVE);
         // Le endpoint /os a echoue ce cycle mais /hardware a repondu :
         // operatingSystemDetail() est null, on retombe sur le snapshot de base.
         var systemDetails = new SystemInventoryPort.SystemDetails(null, "Intel Core i5, 1 coeur, 2 Go RAM");

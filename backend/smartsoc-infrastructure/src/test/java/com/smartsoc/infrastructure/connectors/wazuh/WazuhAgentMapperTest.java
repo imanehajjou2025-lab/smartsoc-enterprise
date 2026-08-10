@@ -3,6 +3,7 @@ package com.smartsoc.infrastructure.connectors.wazuh;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.smartsoc.application.connectors.AgentInventoryPort.AgentSnapshot;
+import com.smartsoc.domain.assets.AgentConnectionStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -66,6 +67,7 @@ class WazuhAgentMapperTest {
         // Aucun objet "os" dans le JSON brut (champ absent, pas vide).
         assertThat(neverConnected.operatingSystem()).isNull();
         assertThat(neverConnected.lastSeenAt()).isNull();
+        assertThat(neverConnected.connectionStatus()).isEqualTo(AgentConnectionStatus.NEVER_CONNECTED);
     }
 
     @Test
@@ -80,6 +82,19 @@ class WazuhAgentMapperTest {
         assertThat(winClient.ipAddress()).isEqualTo("10.100.0.9");
         assertThat(winClient.operatingSystem()).isEqualTo("Microsoft Windows 10 Home 10.0.19045.3803");
         assertThat(winClient.lastSeenAt()).isEqualTo(Instant.parse("2026-08-06T22:33:58Z"));
+        // "disconnected" dans l'échantillon réel : un agent connu peut avoir
+        // des métadonnées complètes tout en n'étant plus joignable.
+        assertThat(winClient.connectionStatus()).isEqualTo(AgentConnectionStatus.DISCONNECTED);
+    }
+
+    @Test
+    void unrecognizedStatusValueDegradesSilentlyToNull() {
+        WazuhAgentDto unusual = new WazuhAgentDto("099", "future-agent", null,
+                "quantum_entangled", null, null, null);
+
+        AgentSnapshot snapshot = mapper.toSnapshots(List.of(unusual)).get(0);
+
+        assertThat(snapshot.connectionStatus()).isNull();
     }
 
     @Test

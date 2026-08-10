@@ -226,4 +226,30 @@ class AssetTest {
 
         assertThat(asset.getHardwareSummary()).isNull();
     }
+
+    @Test
+    void agentConnectionStatusIsNullByDefaultAndUnsetByOlderOverloads() {
+        Asset asset = sample();
+        assertThat(asset.getAgentConnectionStatus()).isNull();
+
+        // Les surcharges historiques (sans ce paramètre) ne le renseignent
+        // jamais -- un connecteur qui ne le fournit pas ne doit pas fabriquer
+        // une valeur.
+        asset.applySyncMetadata("004", "wazuh", "Windows 10", Instant.now());
+        assertThat(asset.getAgentConnectionStatus()).isNull();
+    }
+
+    @Test
+    void agentConnectionStatusReflectsTheCurrentSourceValueEachCycle() {
+        Asset asset = sample();
+
+        asset.applySyncMetadata("004", "wazuh", "Windows 10", Instant.now(), null,
+                AgentConnectionStatus.ACTIVE);
+        assertThat(asset.getAgentConnectionStatus()).isEqualTo(AgentConnectionStatus.ACTIVE);
+
+        // Contrairement a hardwareSummary : reflete l'etat COURANT, meme s'il
+        // redevient null (l'outil ne fournit plus cette notion ce cycle).
+        asset.applySyncMetadata("004", "wazuh", "Windows 10", Instant.now(), null, null);
+        assertThat(asset.getAgentConnectionStatus()).isNull();
+    }
 }

@@ -1,6 +1,7 @@
 package com.smartsoc.infrastructure.connectors.wazuh;
 
 import com.smartsoc.application.connectors.AgentInventoryPort;
+import com.smartsoc.domain.assets.AgentConnectionStatus;
 import com.smartsoc.infrastructure.connectors.common.ConnectorProperties;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -24,9 +25,12 @@ public class SimulatedAgentInventoryAdapter implements AgentInventoryPort {
     public List<AgentSnapshot> listAgents() {
         return List.of(
                 new AgentSnapshot("sim-001", "sim-web-01", "10.0.0.11",
-                        "Ubuntu 24.04.4 LTS", Instant.now().minusSeconds(120)),
+                        "Ubuntu 24.04.4 LTS", Instant.now().minusSeconds(120),
+                        AgentConnectionStatus.ACTIVE),
                 new AgentSnapshot("sim-002", "sim-win-desktop", "10.0.0.12",
-                        "Microsoft Windows 10 Home", Instant.now().minusSeconds(90)),
-                new AgentSnapshot("sim-003", "sim-never-connected", null, null, null));
+                        "Microsoft Windows 10 Home", Instant.now().minusSeconds(90),
+                        AgentConnectionStatus.ACTIVE),
+                new AgentSnapshot("sim-003", "sim-never-connected", null, null, null,
+                        AgentConnectionStatus.NEVER_CONNECTED));
     }
 }

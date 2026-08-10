@@ -145,10 +145,14 @@ class LiveAgentInventoryIntegrationTest {
         assertThat(winClient.getHostname()).isEqualTo("win10-client");
         assertThat(winClient.getOperatingSystem()).isEqualTo("Microsoft Windows 10 Home 10.0.19045.3803");
         assertThat(winClient.getIpAddress()).isEqualTo("10.100.0.9");
+        assertThat(winClient.getAgentConnectionStatus())
+                .isEqualTo(com.smartsoc.domain.assets.AgentConnectionStatus.DISCONNECTED);
 
         Asset neverConnected = assetRepository.findByExternalRef("wazuh", "001").orElseThrow();
         assertThat(neverConnected.getOperatingSystem()).isNull();
         assertThat(neverConnected.getIpAddress()).isNull();
+        assertThat(neverConnected.getAgentConnectionStatus())
+                .isEqualTo(com.smartsoc.domain.assets.AgentConnectionStatus.NEVER_CONNECTED);
 
         assertThat(assetRepository.findByExternalRef("wazuh", "000")).isEmpty();
 

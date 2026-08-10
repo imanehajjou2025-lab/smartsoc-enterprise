@@ -1,6 +1,7 @@
 package com.smartsoc.application.connectors;
 
 import com.smartsoc.application.connectors.ManagerStatsPort.ManagerHealth;
+import com.smartsoc.domain.assets.AgentConnectionStatus;
 import com.smartsoc.domain.connectors.ConnectorDescriptor;
 import com.smartsoc.domain.connectors.ConnectorStatus;
 import com.smartsoc.domain.connectors.ConnectorType;
@@ -52,7 +53,8 @@ class AgentSyncServiceTest {
     private AgentSyncService service;
 
     private static AgentInventoryPort.AgentSnapshot snapshot(String id) {
-        return new AgentInventoryPort.AgentSnapshot(id, "host-" + id, "10.100.0.1", "Linux", Instant.now());
+        return new AgentInventoryPort.AgentSnapshot(id, "host-" + id, "10.100.0.1", "Linux", Instant.now(),
+                AgentConnectionStatus.ACTIVE);
     }
 
     @BeforeEach

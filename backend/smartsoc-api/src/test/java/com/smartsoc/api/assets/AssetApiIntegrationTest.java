@@ -62,6 +62,25 @@ class AssetApiIntegrationTest {
     }
 
     @Test
+    void connectorEnrichmentFieldsAreExposedOnTheResponseEvenWhenUnset() {
+        // Verrou de régression : ces champs (alimentés uniquement par un
+        // connecteur, jamais l'enregistrement manuel) ont longtemps existé
+        // en base sans jamais apparaître sur AssetResponse -- silencieusement
+        // absents plutôt qu'un bug visible. Un actif manuel doit les exposer
+        // en clé présente, valeur null (jamais une valeur fabriquée).
+        String admin = adminToken();
+        Map<String, Object> asset = exchange(HttpMethod.POST, ASSETS, admin,
+                assetPayload("srv-manual-" + suffix(), "LOW"), Map.class).getBody();
+
+        assertThat(asset).containsKey("operatingSystem");
+        assertThat(asset).containsKey("lastSeenAt");
+        assertThat(asset).containsKey("agentConnectionStatus");
+        assertThat(asset.get("operatingSystem")).isNull();
+        assertThat(asset.get("lastSeenAt")).isNull();
+        assertThat(asset.get("agentConnectionStatus")).isNull();
+    }
+
+    @Test
     @SuppressWarnings("unchecked")
     void correlatesRawWebhookHostnameThroughNormalizedJoin() {
         String admin = adminToken();

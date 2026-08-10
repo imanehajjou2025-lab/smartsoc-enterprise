@@ -1,5 +1,6 @@
 package com.smartsoc.infrastructure.persistence.assets;
 
+import com.smartsoc.domain.assets.AgentConnectionStatus;
 import com.smartsoc.domain.assets.AssetCriticality;
 import com.smartsoc.domain.assets.AssetExposure;
 import com.smartsoc.domain.assets.AssetStatus;
@@ -80,4 +81,8 @@ public class AssetJpaEntity extends AbstractAuditableEntity {
 
     @Column(name = "external_source", length = 20)
     private String externalSource;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "agent_connection_status", length = 20)
+    private AgentConnectionStatus agentConnectionStatus;
 }

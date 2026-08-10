@@ -1,6 +1,7 @@
 package com.smartsoc.infrastructure.connectors.wazuh;
 
 import com.smartsoc.application.connectors.AgentInventoryPort.AgentSnapshot;
+import com.smartsoc.domain.assets.AgentConnectionStatus;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
@@ -59,7 +60,26 @@ public class WazuhAgentMapper {
                 dto.name(),
                 normalizeIp(dto.ip()),
                 describeOs(dto.os()),
-                parseObservationInstant(dto.lastKeepAlive()));
+                parseObservationInstant(dto.lastKeepAlive()),
+                describeConnectionStatus(dto.status()));
+    }
+
+    /**
+     * Trois valeurs réelles observées ({@code active}, {@code disconnected},
+     * {@code never_connected} — voir l'échantillon capturé) ; toute autre
+     * valeur dégrade silencieusement à {@code null} plutôt que de faire
+     * échouer la traduction de l'agent entier.
+     */
+    private static AgentConnectionStatus describeConnectionStatus(String status) {
+        if (status == null) {
+            return null;
+        }
+        return switch (status) {
+            case "active" -> AgentConnectionStatus.ACTIVE;
+            case "disconnected" -> AgentConnectionStatus.DISCONNECTED;
+            case "never_connected" -> AgentConnectionStatus.NEVER_CONNECTED;
+            default -> null;
+        };
     }
 
     /**
