@@ -50,6 +50,7 @@ public class Asset {
     private String hardwareSummary;
     private String externalId;
     private String externalSource;
+    private AgentConnectionStatus agentConnectionStatus;
 
     /** Données d'enregistrement — parameter object du point d'entrée unique. */
     @Builder
@@ -130,7 +131,7 @@ public class Asset {
      */
     public void applySyncMetadata(String externalId, String externalSource,
                                   String operatingSystem, Instant lastSeenAt) {
-        applySyncMetadata(externalId, externalSource, operatingSystem, lastSeenAt, null);
+        applySyncMetadata(externalId, externalSource, operatingSystem, lastSeenAt, null, null);
     }
 
     /**
@@ -144,10 +145,23 @@ public class Asset {
     public void applySyncMetadata(String externalId, String externalSource,
                                   String operatingSystem, Instant lastSeenAt,
                                   String hardwareSummary) {
+        applySyncMetadata(externalId, externalSource, operatingSystem, lastSeenAt, hardwareSummary, null);
+    }
+
+    /**
+     * @param agentConnectionStatus vient du MÊME appel que {@code operatingSystem}
+     *                               (liste d'agents Wazuh) : reflète l'état COURANT
+     *                               rapporté par la source, jamais préservé si absent
+     *                               — contrairement à {@code hardwareSummary}.
+     */
+    public void applySyncMetadata(String externalId, String externalSource,
+                                  String operatingSystem, Instant lastSeenAt,
+                                  String hardwareSummary, AgentConnectionStatus agentConnectionStatus) {
         requireActive();
         this.externalId = TextNormalization.blankToNull(externalId);
         this.externalSource = TextNormalization.blankToNull(externalSource);
         this.operatingSystem = TextNormalization.blankToNull(operatingSystem);
+        this.agentConnectionStatus = agentConnectionStatus;
         if (lastSeenAt != null) {
             this.lastSeenAt = lastSeenAt;
         }

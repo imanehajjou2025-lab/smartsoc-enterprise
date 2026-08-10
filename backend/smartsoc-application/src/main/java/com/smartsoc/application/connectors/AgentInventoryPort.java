@@ -1,5 +1,7 @@
 package com.smartsoc.application.connectors;
 
+import com.smartsoc.domain.assets.AgentConnectionStatus;
+
 import java.time.Instant;
 import java.util.List;
 
@@ -30,12 +32,16 @@ public interface AgentInventoryPort {
      * @param operatingSystem description lisible, {@code null} si jamais observée
      * @param lastSeenAt    dernier contact connu, {@code null} si jamais connecté
      *                      ou si l'outil renvoie une valeur sentinelle non exploitable
+     * @param connectionStatus état de connexion rapporté par l'outil, {@code null}
+     *                      si l'outil ne fournit pas cette notion ou renvoie une
+     *                      valeur non reconnue (dégradation silencieuse)
      */
     record AgentSnapshot(
             String externalId,
             String hostname,
             String ipAddress,
             String operatingSystem,
-            Instant lastSeenAt) {
+            Instant lastSeenAt,
+            AgentConnectionStatus connectionStatus) {
     }
 }

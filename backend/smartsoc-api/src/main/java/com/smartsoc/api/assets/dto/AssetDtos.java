@@ -1,5 +1,6 @@
 package com.smartsoc.api.assets.dto;
 
+import com.smartsoc.domain.assets.AgentConnectionStatus;
 import com.smartsoc.domain.assets.AssetCriticality;
 import com.smartsoc.domain.assets.AssetExposure;
 import com.smartsoc.domain.assets.AssetStatus;
@@ -52,6 +53,11 @@ public final class AssetDtos {
             String description,
             AssetStatus status,
             Instant registeredAt,
-            Instant decommissionedAt) {
+            Instant decommissionedAt,
+            String operatingSystem,
+            Instant lastSeenAt,
+            String hardwareSummary,
+            String externalSource,
+            AgentConnectionStatus agentConnectionStatus) {
     }
 }

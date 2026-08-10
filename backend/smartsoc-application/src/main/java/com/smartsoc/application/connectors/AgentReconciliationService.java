@@ -55,7 +55,7 @@ public class AgentReconciliationService {
         String hardwareSummary = systemDetails == null ? null : systemDetails.hardwareSummary();
 
         asset.applySyncMetadata(snapshot.externalId(), SOURCE,
-                operatingSystem, snapshot.lastSeenAt(), hardwareSummary);
+                operatingSystem, snapshot.lastSeenAt(), hardwareSummary, snapshot.connectionStatus());
 
         assetRepository.save(asset);
     }
