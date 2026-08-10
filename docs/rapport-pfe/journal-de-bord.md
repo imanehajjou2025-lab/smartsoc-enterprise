@@ -3344,3 +3344,76 @@ motif, issue `SUCCESS`). **Mode live jamais déclenché pour de vrai.**
 **Reste ouvert.** Active-response (exécution de commande, conception à
 part) reportée. Shuffle (2ᵉ connecteur de la phase 5 : déclenchement de
 workflow + callback, 3ᵉ filtre de clé d'API) reste à construire.
+
+---
+
+## 2026-08-10 — Phase 5 (1/2, suite) : active-response Wazuh (blocage d'IP), backend (PR #109)
+
+**Conception validée avant code, pas devinée.** Un seul active-response
+est configuré sur le manager Wazuh réel du labo SOC (confirmé via
+`GET /manager/configuration?section=active-response` puis
+`?section=command`) : `firewall-drop`, qui bloque une IP source sur le
+pare-feu **local** de l'agent visé (jamais un firewall périmétrique).
+Tension architecturale identifiée et soumise à Imane avant d'écrire une
+ligne de code : `Playbook.java` documente le blocage d'IP comme un rôle
+de Shuffle, alors que le plan de phase 5 inclut explicitement
+l'active-response Wazuh — confirmé : les deux coexistent, ce sont deux
+mécanismes distincts (confinement local immédiat vs orchestration
+externe). Schéma de requête `PUT /active-response` obtenu depuis
+l'OpenAPI réel du manager (`GET /openapi.json`), jamais deviné : nom de
+commande SANS le préfixe `!` (réservé aux scripts ad-hoc, pas aux
+commandes enregistrées).
+
+**Mêmes garde-fous que le redémarrage, réutilisés plutôt que
+dupliqués** : `requireActionableAsset` factorise la confirmation de
+cible, le motif et le plafond horaire, partagés entre `restartAgent` et
+le nouveau `blockIp`. Seul ajout propre à cette action : validation
+serveur du format IPv4 (jamais fait confiance au format saisi côté
+client). Le plafond horaire est compté **séparément par type
+d'action** — `AuditLogQuery` déjà filtré par une seule valeur d'énum
+`action`, donc 3 redémarrages au plafond sur un actif ne bloquent pas
+un blocage d'IP sur ce même actif, et inversement (test dédié).
+
+**Bug réel trouvé en vérifiant de bout en bout, pas en test unitaire.**
+`audit_log.action` était `VARCHAR(30)` depuis la création de la table
+(PR #101, phase Audit) ; `WAZUH_AGENT_FIREWALL_DROP_REQUESTED` fait 35
+caractères. Les tests unitaires (mocks) ne l'ont jamais révélé — c'est
+l'appel réel `POST /block-ip` contre le conteneur Docker reconstruit
+qui a échoué en `500`, révélant une troncature SQL
+(`value too long for type character varying(30)`). Migration `V21`
+portant la colonne à `VARCHAR(64)` (marge pour les futurs types
+d'action).
+
+**Deuxième bug réel trouvé en ajoutant les tests d'active-response** :
+le disjoncteur Resilience4j `wazuhAgentControl` et le cache de jeton
+`WazuhActionsTokenCache` sont des beans Spring **partagés entre toutes
+les méthodes de test** de `LiveAgentControlIntegrationTest` (même
+contexte réutilisé). Ajouter 3 nouvelles méthodes a fait basculer
+l'ordre d'exécution des tests (JUnit 5, ordre par défaut basé sur un
+hash de nom de méthode) : un test qui vérifiait auparavant « exactement
+1 appel d'authentification » a commencé à échouer, et les échecs
+provoqués par les nouveaux tests de dégradation ont fait grimper le
+taux d'échec dans la fenêtre glissante du disjoncteur jusqu'à l'ouvrir,
+court-circuitant un test suivant avant même qu'il n'émette une requête
+HTTP. Corrigé en réinitialisant explicitement le disjoncteur avant
+chaque test (`circuitBreakerRegistry.circuitBreaker(...).reset()`) et
+en retirant les assertions sur un nombre exact d'appels
+d'authentification — même doctrine déjà documentée dans
+`LiveAgentInventoryIntegrationTest` (jeton en cache ~13 min, réutilisé
+volontairement d'un test à l'autre, ce n'est pas un bug).
+
+**Vérification réelle, jamais de vrai blocage d'IP déclenché.** 572
+tests backend verts (+12 : 4 unitaires, 3 WireMock live, 5 intégration
+API). Endpoint vérifié de bout en bout contre le conteneur Docker
+reconstruit, **strictement en mode simulation**, sur l'actif Wazuh réel
+`win10-client` : `POST /block-ip` → `204`, log
+« [simulation] Would block IP... via firewall-drop... (no real
+effect) », entrée d'audit confirmée en base PostgreSQL réelle (acteur,
+IP, cible, motif, IP bloquée, issue `SUCCESS`) ; garde-fous IP invalide
+(`422 ACTION_INVALID_IP_ADDRESS`) et hostname non confirmé
+(`422 ACTION_TARGET_NOT_CONFIRMED`) revérifiés en direct. Mode live
+jamais déclenché pour de vrai.
+
+**Reste ouvert.** Bouton frontend pour le blocage d'IP (2ᵉ PR du
+module, même rythme que le redémarrage). Shuffle (2ᵉ connecteur de la
+phase 5) reste à construire.
