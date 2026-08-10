@@ -77,6 +77,8 @@ public class PlaybookController {
                 .name(request.name())
                 .description(request.description())
                 .steps(request.steps().stream().map(mapper::toDomain).toList())
+                .shuffleWorkflowId(request.shuffleWorkflowId())
+                .shuffleWebhookPath(request.shuffleWebhookPath())
                 .build();
     }
 }

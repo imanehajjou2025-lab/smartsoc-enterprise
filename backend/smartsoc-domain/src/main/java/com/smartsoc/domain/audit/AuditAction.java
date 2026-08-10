@@ -30,5 +30,11 @@ public enum AuditAction {
      * confirmée en réel avant tout code. Même doctrine que le redémarrage :
      * un seul type d'audit, succès ET échec, {@code details} porte l'issue.
      */
-    WAZUH_AGENT_FIREWALL_DROP_REQUESTED
+    WAZUH_AGENT_FIREWALL_DROP_REQUESTED,
+    /**
+     * Déclenchement manuel d'un workflow Shuffle par un analyste (ADR-014
+     * phase 5) — même doctrine : un seul type d'audit, succès ET échec,
+     * {@code details} porte l'issue et l'identifiant d'exécution Shuffle.
+     */
+    SHUFFLE_WORKFLOW_TRIGGER_REQUESTED
 }

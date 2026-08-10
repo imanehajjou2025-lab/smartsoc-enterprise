@@ -11,9 +11,11 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param openSearch accès à l'Indexer Wazuh (vulnérabilités, §1.3 — le Hunting live suivra en phase 4)
  * @param misp       accès à l'API REST MISP (threat intelligence, phase 2)
  * @param virusTotal accès à l'API REST VirusTotal (réputation à la demande, phase 3)
+ * @param shuffle    déclenchement de workflow Shuffle et consultation de statut (ADR-014 phase 5, EFFET RÉEL)
  */
 @ConfigurationProperties(prefix = "smartsoc.connectors")
-public record ConnectorProperties(Wazuh wazuh, OpenSearch openSearch, Misp misp, VirusTotal virusTotal) {
+public record ConnectorProperties(Wazuh wazuh, OpenSearch openSearch, Misp misp, VirusTotal virusTotal,
+                                   Shuffle shuffle) {
 
     public static final String MODE_SIMULATION = "simulation";
     public static final String MODE_LIVE = "live";
@@ -77,5 +79,20 @@ public record ConnectorProperties(Wazuh wazuh, OpenSearch openSearch, Misp misp,
      *               seule côté outil : un seul rôle d'accès existe sur ce service)
      */
     public record VirusTotal(String mode, String url, String apiKey) {
+    }
+
+    /**
+     * @param mode   simulation (défaut) | live | disabled
+     * @param url    URL de base de Shuffle (ex. {@code https://10.100.0.4:3443}) — le chemin
+     *               du webhook de déclenchement et l'identifiant du workflow viennent du
+     *               {@code Playbook} lié, jamais fixés ici (un seul connecteur Shuffle,
+     *               plusieurs workflows possibles)
+     * @param apiKey clé d'API globale du compte Shuffle — portée en en-tête
+     *               {@code Authorization: Bearer <apiKey>}, utilisée UNIQUEMENT pour la
+     *               consultation de statut (lecture) ; le déclenchement lui-même
+     *               n'a besoin d'aucune clé, le chemin du webhook porte son propre
+     *               secret — vérifié en réel contre une instance Shuffle le 2026-08-10
+     */
+    public record Shuffle(String mode, String url, String apiKey) {
     }
 }

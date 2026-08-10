@@ -80,4 +80,44 @@ class PlaybookTest {
         assertThatThrownBy(() -> playbook.getSteps().add(new PlaybookStepTemplate(2, "x", null)))
                 .isInstanceOf(UnsupportedOperationException.class);
     }
+
+    // --- lien Shuffle (ADR-014 phase 5) ---
+
+    @Test
+    void isNotLinkedToShuffleByDefault() {
+        Playbook playbook = Playbook.declare(command().build());
+
+        assertThat(playbook.isLinkedToShuffleWorkflow()).isFalse();
+    }
+
+    @Test
+    void isLinkedOnlyWhenBothShuffleIdentifiersArePresent() {
+        Playbook missingWebhook = Playbook.declare(command()
+                .shuffleWorkflowId("fb0e09e3-402f-4d20-9bc1-f7fa845d4314")
+                .build());
+        assertThat(missingWebhook.isLinkedToShuffleWorkflow()).isFalse();
+
+        Playbook linked = Playbook.declare(command()
+                .shuffleWorkflowId("fb0e09e3-402f-4d20-9bc1-f7fa845d4314")
+                .shuffleWebhookPath("webhook_a0fa6c78-fa6c-41a1-ac56-3c7f514ba8f4")
+                .build());
+        assertThat(linked.isLinkedToShuffleWorkflow()).isTrue();
+        assertThat(linked.getShuffleWorkflowId()).isEqualTo("fb0e09e3-402f-4d20-9bc1-f7fa845d4314");
+        assertThat(linked.getShuffleWebhookPath()).isEqualTo("webhook_a0fa6c78-fa6c-41a1-ac56-3c7f514ba8f4");
+    }
+
+    @Test
+    void updateCanChangeTheShuffleLink() {
+        Playbook playbook = Playbook.declare(command()
+                .shuffleWorkflowId("fb0e09e3-402f-4d20-9bc1-f7fa845d4314")
+                .shuffleWebhookPath("webhook_a0fa6c78-fa6c-41a1-ac56-3c7f514ba8f4")
+                .build());
+
+        playbook.update(Playbook.DeclareCommand.builder()
+                .name("Confinement ransomware v2")
+                .steps(List.of(new PlaybookStepTemplate(0, "Étape unique", null)))
+                .build());
+
+        assertThat(playbook.isLinkedToShuffleWorkflow()).isFalse();
+    }
 }

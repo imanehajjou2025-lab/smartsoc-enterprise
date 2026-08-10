@@ -49,7 +49,7 @@ class LiveHuntExecutionAdapterTest {
     private void withProperties(String alertIndexPattern) {
         ConnectorProperties.OpenSearch openSearch = new ConnectorProperties.OpenSearch(
                 "live", "https://10.100.0.1:9200", "smartsoc-reader", "secret", null, alertIndexPattern);
-        ConnectorProperties properties = new ConnectorProperties(null, openSearch, null, null);
+        ConnectorProperties properties = new ConnectorProperties(null, openSearch, null, null, null);
         adapter = new LiveHuntExecutionAdapter(client, mapper, properties);
     }
 

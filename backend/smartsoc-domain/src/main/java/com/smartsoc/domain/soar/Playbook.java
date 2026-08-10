@@ -46,10 +46,22 @@ public class Playbook {
     private int version;
     private List<PlaybookStepTemplate> steps;
     private boolean archived;
+    /**
+     * Identifiant du workflow Shuffle (ADR-014 phase 5) — {@code null} tant
+     * que ce playbook reste purement documentaire (suivi guidé manuel).
+     * Distinct de {@code shuffleWebhookPath} : l'un identifie le workflow
+     * pour la consultation de statut ({@code GET /api/v2/workflows/{id}/executions}),
+     * l'autre le déclencheur webhook pour l'exécuter
+     * ({@code POST /api/v1/hooks/{path}}) — deux ressources Shuffle
+     * distinctes, confirmées en réel, jamais interchangeables.
+     */
+    private String shuffleWorkflowId;
+    private String shuffleWebhookPath;
 
     /** Définition d'un playbook, telle que déclarée ou mise à jour par un analyste. */
     @Builder
-    public record DeclareCommand(String name, String description, List<PlaybookStepTemplate> steps) {
+    public record DeclareCommand(String name, String description, List<PlaybookStepTemplate> steps,
+                                  String shuffleWorkflowId, String shuffleWebhookPath) {
     }
 
     public static Playbook declare(DeclareCommand command) {
@@ -60,6 +72,8 @@ public class Playbook {
                 .version(1)
                 .steps(renumber(command.steps()))
                 .archived(false)
+                .shuffleWorkflowId(TextNormalization.blankToNull(command.shuffleWorkflowId()))
+                .shuffleWebhookPath(TextNormalization.blankToNull(command.shuffleWebhookPath()))
                 .build();
     }
 
@@ -68,7 +82,14 @@ public class Playbook {
         this.name = requireName(command.name());
         this.description = TextNormalization.blankToNull(command.description());
         this.steps = renumber(command.steps());
+        this.shuffleWorkflowId = TextNormalization.blankToNull(command.shuffleWorkflowId());
+        this.shuffleWebhookPath = TextNormalization.blankToNull(command.shuffleWebhookPath());
         this.version = this.version + 1;
+    }
+
+    /** Un déclenchement Shuffle exige les deux identifiants — l'un sans l'autre est une configuration incomplète. */
+    public boolean isLinkedToShuffleWorkflow() {
+        return shuffleWorkflowId != null && shuffleWebhookPath != null;
     }
 
     public void archive() {

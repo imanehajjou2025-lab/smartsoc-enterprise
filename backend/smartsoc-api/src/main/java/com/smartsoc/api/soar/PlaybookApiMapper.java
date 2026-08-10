@@ -29,6 +29,16 @@ public interface PlaybookApiMapper {
         return new PlaybookExecutionResponse(
                 execution.getId(), execution.getPlaybookId(), execution.getPlaybookVersion(),
                 execution.getPlaybookName(), execution.getIncidentId(), execution.getStatus(),
-                execution.getStartedAt(), execution.getCompletedAt(), steps);
+                execution.getStartedAt(), execution.getCompletedAt(), execution.getExternalExecutionId(),
+                execution.getResultSummary(), steps);
+    }
+
+    /** Une exécution déclenchée par Shuffle n'a pas d'étapes propres (voir {@code SocActionService}). */
+    default PlaybookExecutionResponse toResponse(PlaybookExecution execution) {
+        return new PlaybookExecutionResponse(
+                execution.getId(), execution.getPlaybookId(), execution.getPlaybookVersion(),
+                execution.getPlaybookName(), execution.getIncidentId(), execution.getStatus(),
+                execution.getStartedAt(), execution.getCompletedAt(), execution.getExternalExecutionId(),
+                execution.getResultSummary(), List.of());
     }
 }

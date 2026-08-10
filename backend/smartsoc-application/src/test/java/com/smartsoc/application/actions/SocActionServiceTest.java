@@ -12,9 +12,18 @@ import com.smartsoc.domain.audit.AuditAction;
 import com.smartsoc.domain.audit.AuditLogEntry;
 import com.smartsoc.domain.audit.AuditLogQuery;
 import com.smartsoc.domain.audit.AuditLogRepository;
+import com.smartsoc.domain.alerts.Severity;
 import com.smartsoc.domain.common.BusinessRuleViolationException;
 import com.smartsoc.domain.common.PageResult;
 import com.smartsoc.domain.common.ResourceNotFoundException;
+import com.smartsoc.domain.incidents.Incident;
+import com.smartsoc.domain.incidents.IncidentRepository;
+import com.smartsoc.domain.soar.ExecutionStatus;
+import com.smartsoc.domain.soar.Playbook;
+import com.smartsoc.domain.soar.PlaybookExecution;
+import com.smartsoc.domain.soar.PlaybookExecutionRepository;
+import com.smartsoc.domain.soar.PlaybookRepository;
+import com.smartsoc.domain.soar.PlaybookStepTemplate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -53,14 +62,46 @@ class SocActionServiceTest {
     @Mock
     private AuditLogRepository auditLogRepository;
 
+    @Mock
+    private PlaybookRepository playbookRepository;
+
+    @Mock
+    private IncidentRepository incidentRepository;
+
+    @Mock
+    private PlaybookExecutionRepository playbookExecutionRepository;
+
+    @Mock
+    private WorkflowTriggerPort workflowTriggerPort;
+
+    @Mock
+    private WorkflowStatusPort workflowStatusPort;
+
     private SocActionService service;
     private final ActorContext actor = new ActorContext("analyst1", UUID.randomUUID(), "10.0.0.5");
 
     @BeforeEach
     void createService() {
-        service = new SocActionService(assetRepository, agentControlPort, auditRecorder, auditLogRepository);
+        service = new SocActionService(assetRepository, agentControlPort, auditRecorder, auditLogRepository,
+                playbookRepository, incidentRepository, playbookExecutionRepository, workflowTriggerPort,
+                workflowStatusPort);
         lenient().when(auditLogRepository.search(any()))
                 .thenReturn(new PageResult<>(java.util.List.of(), 0, 0, 1));
+        lenient().when(playbookExecutionRepository.save(any()))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+    }
+
+    private static Playbook shuffleLinkedPlaybook() {
+        return Playbook.declare(Playbook.DeclareCommand.builder()
+                .name("Confinement ransomware")
+                .steps(java.util.List.of(new PlaybookStepTemplate(0, "Isoler le poste", null)))
+                .shuffleWorkflowId("fb0e09e3-402f-4d20-9bc1-f7fa845d4314")
+                .shuffleWebhookPath("webhook_a0fa6c78-fa6c-41a1-ac56-3c7f514ba8f4")
+                .build());
+    }
+
+    private static Incident anIncident() {
+        return Incident.open("INC-2026-0099", "Multiple Windows Logon Failures", null, Severity.HIGH);
     }
 
     private static Asset wazuhManagedAsset() {
@@ -176,7 +217,7 @@ class SocActionServiceTest {
 
         assertThatThrownBy(() -> service.restartAgent(asset.getId(), "win10-client", "test", actor))
                 .isInstanceOf(BusinessRuleViolationException.class)
-                .hasMessageContaining("Too many attempts of this action on this asset");
+                .hasMessageContaining("Too many attempts of this action on this target");
 
         verify(agentControlPort, never()).restart(anyString());
     }
@@ -258,5 +299,148 @@ class SocActionServiceTest {
         verify(auditRecorder).record(eq(AuditAction.WAZUH_AGENT_FIREWALL_DROP_REQUESTED), any(), any(),
                 any(), any(), details.capture(), any());
         assertThat(details.getValue()).contains("outcome=FAILURE").contains("ip=203.0.113.42");
+    }
+
+    // --- triggerShuffleWorkflow ---
+
+    @Test
+    void triggersTheWorkflowWhenPlaybookNameIsConfirmedAndRecordsSuccess() {
+        Playbook playbook = shuffleLinkedPlaybook();
+        Incident incident = anIncident();
+        when(playbookRepository.findById(playbook.getId())).thenReturn(Optional.of(playbook));
+        when(incidentRepository.findById(incident.getId())).thenReturn(Optional.of(incident));
+        when(workflowTriggerPort.trigger(eq("webhook_a0fa6c78-fa6c-41a1-ac56-3c7f514ba8f4"), any()))
+                .thenReturn("4855cf04-842b-4a86-9eef-05f2c796eef2");
+
+        PlaybookExecution execution = service.triggerShuffleWorkflow(playbook.getId(), incident.getId(),
+                "Confinement ransomware", "Alerte critique en cours", actor);
+
+        assertThat(execution.getStatus()).isEqualTo(ExecutionStatus.IN_PROGRESS);
+        assertThat(execution.getExternalExecutionId()).isEqualTo("4855cf04-842b-4a86-9eef-05f2c796eef2");
+        ArgumentCaptor<String> details = ArgumentCaptor.forClass(String.class);
+        verify(auditRecorder).record(eq(AuditAction.SHUFFLE_WORKFLOW_TRIGGER_REQUESTED), eq("analyst1"),
+                eq(actor.userId()), eq("INCIDENT"), eq(incident.getId().toString()), details.capture(), eq("10.0.0.5"));
+        assertThat(details.getValue()).contains("outcome=SUCCESS")
+                .contains("executionId=4855cf04-842b-4a86-9eef-05f2c796eef2");
+    }
+
+    @Test
+    void playbookNameConfirmationIsCaseInsensitiveButMustMatch() {
+        Playbook playbook = shuffleLinkedPlaybook();
+        Incident incident = anIncident();
+        when(playbookRepository.findById(playbook.getId())).thenReturn(Optional.of(playbook));
+        when(incidentRepository.findById(incident.getId())).thenReturn(Optional.of(incident));
+
+        assertThatThrownBy(() -> service.triggerShuffleWorkflow(playbook.getId(), incident.getId(),
+                "un autre nom", "test", actor))
+                .isInstanceOf(BusinessRuleViolationException.class)
+                .hasMessageContaining("does not match");
+
+        verify(workflowTriggerPort, never()).trigger(anyString(), any());
+    }
+
+    @Test
+    void rejectsAPlaybookNotLinkedToAShuffleWorkflow() {
+        Playbook playbook = Playbook.declare(Playbook.DeclareCommand.builder()
+                .name("Procedure documentaire seule")
+                .steps(java.util.List.of(new PlaybookStepTemplate(0, "Consigner", null)))
+                .build());
+        Incident incident = anIncident();
+        when(playbookRepository.findById(playbook.getId())).thenReturn(Optional.of(playbook));
+        when(incidentRepository.findById(incident.getId())).thenReturn(Optional.of(incident));
+
+        assertThatThrownBy(() -> service.triggerShuffleWorkflow(playbook.getId(), incident.getId(),
+                "Procedure documentaire seule", "test", actor))
+                .isInstanceOf(BusinessRuleViolationException.class)
+                .hasMessageContaining("not linked to a Shuffle workflow");
+
+        verify(workflowTriggerPort, never()).trigger(anyString(), any());
+    }
+
+    @Test
+    void recordsStartFailedAndDoesNotThrowWhenShuffleRefusesTheTrigger() {
+        Playbook playbook = shuffleLinkedPlaybook();
+        Incident incident = anIncident();
+        when(playbookRepository.findById(playbook.getId())).thenReturn(Optional.of(playbook));
+        when(incidentRepository.findById(incident.getId())).thenReturn(Optional.of(incident));
+        when(workflowTriggerPort.trigger(anyString(), any()))
+                .thenThrow(new SocConnectorException("Shuffle unavailable"));
+
+        PlaybookExecution execution = service.triggerShuffleWorkflow(playbook.getId(), incident.getId(),
+                "Confinement ransomware", "test", actor);
+
+        assertThat(execution.getStatus()).isEqualTo(ExecutionStatus.START_FAILED);
+        assertThat(execution.getExternalExecutionId()).isNull();
+        ArgumentCaptor<String> details = ArgumentCaptor.forClass(String.class);
+        verify(auditRecorder).record(eq(AuditAction.SHUFFLE_WORKFLOW_TRIGGER_REQUESTED), any(), any(),
+                any(), any(), details.capture(), any());
+        assertThat(details.getValue()).contains("outcome=FAILURE").contains("Shuffle unavailable");
+    }
+
+    @Test
+    void triggerRateCapIsScopedToTheIncidentAndThisActionOnly() {
+        Playbook playbook = shuffleLinkedPlaybook();
+        Incident incident = anIncident();
+        when(playbookRepository.findById(playbook.getId())).thenReturn(Optional.of(playbook));
+        when(incidentRepository.findById(incident.getId())).thenReturn(Optional.of(incident));
+        when(workflowTriggerPort.trigger(anyString(), any())).thenReturn("exec-1");
+
+        service.triggerShuffleWorkflow(playbook.getId(), incident.getId(), "Confinement ransomware", "test", actor);
+
+        ArgumentCaptor<AuditLogQuery> queryCaptor = ArgumentCaptor.forClass(AuditLogQuery.class);
+        verify(auditLogRepository).search(queryCaptor.capture());
+        assertThat(queryCaptor.getValue().action()).isEqualTo(AuditAction.SHUFFLE_WORKFLOW_TRIGGER_REQUESTED);
+        assertThat(queryCaptor.getValue().targetType()).isEqualTo("INCIDENT");
+        assertThat(queryCaptor.getValue().targetId()).isEqualTo(incident.getId().toString());
+    }
+
+    // --- refreshShuffleWorkflowStatus (reconciliation en lecture) ---
+
+    private static PlaybookExecution inProgressExternalExecution() {
+        return PlaybookExecution.startExternal(UUID.randomUUID(), 1, "Confinement ransomware",
+                UUID.randomUUID(), "4855cf04-842b-4a86-9eef-05f2c796eef2");
+    }
+
+    @Test
+    void refreshCompletesTheExecutionWhenShuffleReportsSuccess() {
+        PlaybookExecution execution = inProgressExternalExecution();
+        Playbook playbook = shuffleLinkedPlaybook().toBuilder().id(execution.getPlaybookId()).build();
+        when(playbookExecutionRepository.findById(execution.getId())).thenReturn(Optional.of(execution));
+        when(playbookRepository.findById(execution.getPlaybookId())).thenReturn(Optional.of(playbook));
+        when(workflowStatusPort.statusOf(playbook.getShuffleWorkflowId(), execution.getExternalExecutionId()))
+                .thenReturn(new WorkflowExecutionStatus(WorkflowExecutionStatus.Outcome.SUCCEEDED, "FINISHED"));
+
+        PlaybookExecution refreshed = service.refreshShuffleWorkflowStatus(execution.getId());
+
+        assertThat(refreshed.getStatus()).isEqualTo(ExecutionStatus.COMPLETED);
+        assertThat(refreshed.getResultSummary()).isEqualTo("FINISHED");
+        verify(auditRecorder, never()).record(any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void refreshMarksTheExecutionOrphanedWhenShuffleNoLongerKnowsIt() {
+        PlaybookExecution execution = inProgressExternalExecution();
+        Playbook playbook = shuffleLinkedPlaybook().toBuilder().id(execution.getPlaybookId()).build();
+        when(playbookExecutionRepository.findById(execution.getId())).thenReturn(Optional.of(execution));
+        when(playbookRepository.findById(execution.getPlaybookId())).thenReturn(Optional.of(playbook));
+        when(workflowStatusPort.statusOf(any(), any()))
+                .thenReturn(new WorkflowExecutionStatus(WorkflowExecutionStatus.Outcome.NOT_FOUND, null));
+
+        PlaybookExecution refreshed = service.refreshShuffleWorkflowStatus(execution.getId());
+
+        assertThat(refreshed.getStatus()).isEqualTo(ExecutionStatus.ORPHANED);
+    }
+
+    @Test
+    void refreshIsANoOpOnAnAlreadyTerminalExecution() {
+        PlaybookExecution execution = inProgressExternalExecution();
+        execution.completeExternally("deja termine");
+        when(playbookExecutionRepository.findById(execution.getId())).thenReturn(Optional.of(execution));
+
+        PlaybookExecution refreshed = service.refreshShuffleWorkflowStatus(execution.getId());
+
+        assertThat(refreshed.getStatus()).isEqualTo(ExecutionStatus.COMPLETED);
+        verify(workflowStatusPort, never()).statusOf(any(), any());
+        verify(playbookExecutionRepository, never()).save(any());
     }
 }

@@ -46,4 +46,10 @@ public class PlaybookExecutionJpaEntity extends AbstractAuditableEntity {
 
     @Column(name = "completed_at")
     private Instant completedAt;
+
+    @Column(name = "external_execution_id", length = 100)
+    private String externalExecutionId;
+
+    @Column(name = "result_summary", length = 2000)
+    private String resultSummary;
 }
