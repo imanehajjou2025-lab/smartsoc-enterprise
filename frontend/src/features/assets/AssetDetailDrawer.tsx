@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
+import BlockIcon from '@mui/icons-material/Block';
 import EditIcon from '@mui/icons-material/Edit';
 import LockIcon from '@mui/icons-material/Lock';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
@@ -24,6 +25,7 @@ import {
   ExposureChip,
   ASSET_TYPE_LABELS,
 } from './assetChips';
+import BlockIpDialog from './BlockIpDialog';
 import EditAssetDialog from './EditAssetDialog';
 import RestartAgentDialog from './RestartAgentDialog';
 import { decommissionAsset, getAsset, listCorrelatedAlerts, reactivateAsset } from './assetsApi';
@@ -62,6 +64,7 @@ function AssetDetailDrawer({ assetId, onClose }: Props) {
   const canWrite = role === 'ADMIN' || role === 'SOC_MANAGER' || role === 'SOC_ANALYST';
   const [editOpen, setEditOpen] = useState(false);
   const [restartOpen, setRestartOpen] = useState(false);
+  const [blockIpOpen, setBlockIpOpen] = useState(false);
   const [alertsPage, setAlertsPage] = useState(0);
   const [vulnsPage, setVulnsPage] = useState(0);
 
@@ -189,6 +192,17 @@ function AssetDetailDrawer({ assetId, onClose }: Props) {
                         onClick={() => setRestartOpen(true)}
                       >
                         Redémarrer l'agent
+                      </Button>
+                    )}
+                    {asset.externalSource === 'wazuh' && (
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        color="warning"
+                        startIcon={<BlockIcon />}
+                        onClick={() => setBlockIpOpen(true)}
+                      >
+                        Bloquer une IP
                       </Button>
                     )}
                   </>
@@ -343,6 +357,14 @@ function AssetDetailDrawer({ assetId, onClose }: Props) {
                 asset={asset}
                 open={restartOpen}
                 onClose={() => setRestartOpen(false)}
+              />
+            )}
+            {canWrite && !isDecommissioned && asset.externalSource === 'wazuh' && (
+              <BlockIpDialog
+                key={`block-ip-${asset.id}`}
+                asset={asset}
+                open={blockIpOpen}
+                onClose={() => setBlockIpOpen(false)}
               />
             )}
           </>
