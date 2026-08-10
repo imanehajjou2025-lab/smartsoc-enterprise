@@ -12,6 +12,6 @@ import org.springframework.context.annotation.Configuration;
  */
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnProperty(name = "smartsoc.connectors.open-search.mode", havingValue = ConnectorProperties.MODE_LIVE)
-@EnableFeignClients(clients = {OpenSearchVulnerabilityClient.class})
+@EnableFeignClients(clients = {OpenSearchVulnerabilityClient.class, OpenSearchAlertClient.class})
 class OpenSearchFeignEnablerConfig {
 }

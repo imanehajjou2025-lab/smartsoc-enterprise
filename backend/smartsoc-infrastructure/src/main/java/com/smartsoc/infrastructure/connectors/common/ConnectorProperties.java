@@ -42,7 +42,7 @@ public record ConnectorProperties(Wazuh wazuh, OpenSearch openSearch, Misp misp,
      *                       2026-08-09 (voir {@code docs/architecture/soc-integration-plan.md} §1.3)
      */
     public record OpenSearch(String mode, String url, String username, String password,
-                              String vulnerabilityIndexPattern) {
+                              String vulnerabilityIndexPattern, String alertIndexPattern) {
 
         public String modeOrDefault() {
             return (mode == null || mode.isBlank()) ? MODE_SIMULATION : mode;

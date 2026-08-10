@@ -12,6 +12,7 @@ import com.smartsoc.domain.hunting.HuntExecutionSummary;
 import com.smartsoc.domain.hunting.HuntGroup;
 import com.smartsoc.domain.hunting.HuntNode;
 import com.smartsoc.domain.hunting.HuntStatistics;
+import com.smartsoc.infrastructure.connectors.common.ConnectorProperties;
 import com.smartsoc.infrastructure.persistence.alerts.AlertJpaEntity;
 import com.smartsoc.infrastructure.persistence.alerts.AlertJpaMapper;
 import com.smartsoc.infrastructure.persistence.alerts.SpringDataAlertRepository;
@@ -23,6 +24,7 @@ import jakarta.persistence.criteria.Path;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -40,9 +42,10 @@ import java.util.Map;
  * ingérées, réutilisant {@code SpringDataAlertRepository} tel quel (aucune
  * table ni entité propre au module hunting pour les résultats).
  *
- * <p>Seul adaptateur livré en V1 (voir ADR-011) : le mode {@code live}
- * (OpenSearch via les connecteurs, chemin déjà décidé par ADR-004) est
- * différé jusqu'à disposer d'un schéma d'index réel plutôt que deviné.
+ * <p>Mode {@code live} (OpenSearch via les connecteurs, {@code LiveHuntExecutionAdapter})
+ * livré en phase 4 (ADR-014) : le schéma réel de l'index d'alertes,
+ * indisponible jusque-là, est désormais confirmé (voir {@code docs/
+ * integration/fixtures/opensearch/alerts-*-sample.json}).
  *
  * <p>La forme V1 des critères, imposée côté domaine par {@code HuntQuery},
  * garantit que la racine est un {@code AND} de {@link HuntCondition}
@@ -50,6 +53,8 @@ import java.util.Map;
  */
 @Component
 @RequiredArgsConstructor
+@ConditionalOnProperty(name = "smartsoc.connectors.open-search.mode",
+        havingValue = ConnectorProperties.MODE_SIMULATION, matchIfMissing = true)
 public class SimulatedHuntExecutionAdapter implements HuntExecutionPort {
 
     private final SpringDataAlertRepository alertRepository;

@@ -1,0 +1,330 @@
+{
+  "took": 46,
+  "timed_out": false,
+  "_shards": {
+    "total": 36,
+    "successful": 36,
+    "skipped": 0,
+    "failed": 0
+  },
+  "hits": {
+    "total": {
+      "value": 3572,
+      "relation": "eq"
+    },
+    "max_score": null,
+    "hits": [
+      {
+        "_index": "wazuh-alerts-4.x-2026.08.09",
+        "_id": "hmnR558BM_N4EglehR9p",
+        "_score": null,
+        "_source": {
+          "agent": {
+            "ip": "10.100.0.9",
+            "name": "WIN10-CLIENT",
+            "id": "004"
+          },
+          "manager": {
+            "name": "vm-siem"
+          },
+          "rule": {
+            "mail": false,
+            "level": 3,
+            "pci_dss": [
+              "10.6.1",
+              "10.2.6"
+            ],
+            "hipaa": [
+              "164.312.b"
+            ],
+            "tsc": [
+              "CC7.2",
+              "CC7.3",
+              "CC6.8"
+            ],
+            "description": "Wazuh agent disconnected.",
+            "groups": [
+              "ossec"
+            ],
+            "nist_800_53": [
+              "AU.6",
+              "AU.14",
+              "AU.5"
+            ],
+            "gdpr": [
+              "IV_35.7.d"
+            ],
+            "firedtimes": 1,
+            "mitre": {
+              "technique": [
+                "Disable or Modify Tools"
+              ],
+              "id": [
+                "T1562.001"
+              ],
+              "tactic": [
+                "Defense Evasion"
+              ]
+            },
+            "id": "504",
+            "gpg13": [
+              "10.1"
+            ]
+          },
+          "decoder": {
+            "name": "ossec"
+          },
+          "full_log": "ossec: Agent disconnected: 'WIN10-CLIENT-any'.",
+          "input": {
+            "type": "log"
+          },
+          "@timestamp": "2026-08-09T18:38:08.542Z",
+          "location": "wazuh-monitord",
+          "id": "1786300688.52150666",
+          "timestamp": "2026-08-09T18:38:08.542+0000"
+        },
+        "sort": [
+          1786300688542
+        ]
+      },
+      {
+        "_index": "wazuh-alerts-4.x-2026.08.09",
+        "_id": "22m5558BM_N4EgleLh6g",
+        "_score": null,
+        "_source": {
+          "agent": {
+            "ip": "10.100.0.9",
+            "name": "WIN10-CLIENT",
+            "id": "004"
+          },
+          "manager": {
+            "name": "vm-siem"
+          },
+          "data": {
+            "win": {
+              "eventdata": {
+                "subjectLogonId": "0x3e7",
+                "subjectDomainName": "WORKGROUP",
+                "targetLinkedLogonId": "0x0",
+                "impersonationLevel": "%%1833",
+                "authenticationPackageName": "Negotiate",
+                "targetLogonId": "0x3e7",
+                "logonProcessName": "Advapi",
+                "logonGuid": "{00000000-0000-0000-0000-000000000000}",
+                "targetUserName": "SYSTEM",
+                "keyLength": "0",
+                "elevatedToken": "%%1842",
+                "subjectUserSid": "S-1-5-18",
+                "processId": "0x350",
+                "processName": "C:\\\\Windows\\\\System32\\\\services.exe",
+                "targetDomainName": "NT AUTHORITY",
+                "targetUserSid": "S-1-5-18",
+                "virtualAccount": "%%1843",
+                "logonType": "5",
+                "subjectUserName": "WIN10-CLIENT$"
+              },
+              "system": {
+                "eventID": "4624",
+                "keywords": "0x8020000000000000",
+                "providerGuid": "{54849625-5478-4994-a5ba-3e3b0328c30d}",
+                "level": "0",
+                "channel": "Security",
+                "opcode": "0",
+                "message": "\"An account was successfully logged on.\r\n\r\nSubject:\r\n\tSecurity ID:\t\tS-1-5-18\r\n\tAccount Name:\t\tWIN10-CLIENT$\r\n\tAccount Domain:\t\tWORKGROUP\r\n\tLogon ID:\t\t0x3E7\r\n\r\nLogon Information:\r\n\tLogon Type:\t\t5\r\n\tRestricted Admin Mode:\t-\r\n\tVirtual Account:\t\tNo\r\n\tElevated Token:\t\tYes\r\n\r\nImpersonation Level:\t\tImpersonation\r\n\r\nNew Logon:\r\n\tSecurity ID:\t\tS-1-5-18\r\n\tAccount Name:\t\tSYSTEM\r\n\tAccount Domain:\t\tNT AUTHORITY\r\n\tLogon ID:\t\t0x3E7\r\n\tLinked Logon ID:\t\t0x0\r\n\tNetwork Account Name:\t-\r\n\tNetwork Account Domain:\t-\r\n\tLogon GUID:\t\t{00000000-0000-0000-0000-000000000000}\r\n\r\nProcess Information:\r\n\tProcess ID:\t\t0x350\r\n\tProcess Name:\t\tC:\\Windows\\System32\\services.exe\r\n\r\nNetwork Information:\r\n\tWorkstation Name:\t-\r\n\tSource Network Address:\t-\r\n\tSource Port:\t\t-\r\n\r\nDetailed Authentication Information:\r\n\tLogon Process:\t\tAdvapi  \r\n\tAuthentication Package:\tNegotiate\r\n\tTransited Services:\t-\r\n\tPackage Name (NTLM only):\t-\r\n\tKey Length:\t\t0\r\n\r\nThis event is generated when a logon session is created. It is generated on the computer that was accessed.\r\n\r\nThe subject fields indicate the account on the local system which requested the logon. This is most commonly a service such as the Server service, or a local process such as Winlogon.exe or Services.exe.\r\n\r\nThe logon type field indicates the kind of logon that occurred. The most common types are 2 (interactive) and 3 (network).\r\n\r\nThe New Logon fields indicate the account for whom the new logon was created, i.e. the account that was logged on.\r\n\r\nThe network fields indicate where a remote logon request originated. Workstation name is not always available and may be left blank in some cases.\r\n\r\nThe impersonation level field indicates the extent to which a process in the logon session can impersonate.\r\n\r\nThe authentication information fields provide detailed information about this specific logon request.\r\n\t- Logon GUID is a unique identifier that can be used to correlate this event with a KDC event.\r\n\t- Transited services indicate which intermediate services have participated in this logon request.\r\n\t- Package name indicates which sub-protocol was used among the NTLM protocols.\r\n\t- Key length indicates the length of the generated session key. This will be 0 if no session key was requested.\"",
+                "version": "2",
+                "systemTime": "2026-08-09T18:11:30.3766745Z",
+                "eventRecordID": "35947",
+                "threadID": "2504",
+                "computer": "WIN10-CLIENT",
+                "task": "12544",
+                "processID": "856",
+                "severityValue": "AUDIT_SUCCESS",
+                "providerName": "Microsoft-Windows-Security-Auditing"
+              }
+            }
+          },
+          "rule": {
+            "mail": false,
+            "level": 3,
+            "pci_dss": [
+              "10.2.5"
+            ],
+            "hipaa": [
+              "164.312.b"
+            ],
+            "tsc": [
+              "CC6.8",
+              "CC7.2",
+              "CC7.3"
+            ],
+            "description": "Windows Logon Success",
+            "groups": [
+              "windows",
+              "windows_security",
+              "authentication_success"
+            ],
+            "nist_800_53": [
+              "AU.14",
+              "AC.9"
+            ],
+            "gdpr": [
+              "IV_32.2"
+            ],
+            "firedtimes": 3,
+            "mitre": {
+              "technique": [
+                "Valid Accounts"
+              ],
+              "id": [
+                "T1078"
+              ],
+              "tactic": [
+                "Defense Evasion",
+                "Persistence",
+                "Privilege Escalation",
+                "Initial Access"
+              ]
+            },
+            "id": "60106",
+            "gpg13": [
+              "7.1",
+              "7.2"
+            ]
+          },
+          "decoder": {
+            "name": "windows_eventchannel"
+          },
+          "input": {
+            "type": "log"
+          },
+          "@timestamp": "2026-08-09T18:11:32.243Z",
+          "location": "EventChannel",
+          "id": "1786299092.48204743",
+          "timestamp": "2026-08-09T18:11:32.243+0000"
+        },
+        "sort": [
+          1786299092243
+        ]
+      },
+      {
+        "_index": "wazuh-alerts-4.x-2026.08.09",
+        "_id": "n2mu558BM_N4Eglezh46",
+        "_score": null,
+        "_source": {
+          "agent": {
+            "ip": "10.100.0.9",
+            "name": "WIN10-CLIENT",
+            "id": "004"
+          },
+          "manager": {
+            "name": "vm-siem"
+          },
+          "data": {
+            "win": {
+              "eventdata": {
+                "image": "C:\\\\Windows\\\\System32\\\\mousocoreworker.exe",
+                "processGuid": "{7b224ec7-83c6-6a78-7000-000000001000}",
+                "processId": "5272",
+                "utcTime": "2026-08-09 18:00:15.198",
+                "targetFilename": "C:\\\\Windows\\\\SoftwareDistribution\\\\Download\\\\0e81198876b8eb725cd93d1816536732\\\\Metadata\\\\fvereseal.dll",
+                "ruleName": "DLL",
+                "creationUtcTime": "2025-11-05 17:00:44.000",
+                "user": "NT AUTHORITY\\\\SYSTEM"
+              },
+              "system": {
+                "eventID": "11",
+                "keywords": "0x8000000000000000",
+                "providerGuid": "{5770385f-c22a-43e0-bf4c-06f5698ffbd9}",
+                "level": "4",
+                "channel": "Microsoft-Windows-Sysmon/Operational",
+                "opcode": "0",
+                "message": "\"File created:\r\nRuleName: DLL\r\nUtcTime: 2026-08-09 18:00:15.198\r\nProcessGuid: {7b224ec7-83c6-6a78-7000-000000001000}\r\nProcessId: 5272\r\nImage: C:\\Windows\\System32\\mousocoreworker.exe\r\nTargetFilename: C:\\Windows\\SoftwareDistribution\\Download\\0e81198876b8eb725cd93d1816536732\\Metadata\\fvereseal.dll\r\nCreationUtcTime: 2025-11-05 17:00:44.000\r\nUser: NT AUTHORITY\\SYSTEM\"",
+                "version": "2",
+                "systemTime": "2026-08-09T18:00:15.2187115Z",
+                "eventRecordID": "20593",
+                "threadID": "4928",
+                "computer": "WIN10-CLIENT",
+                "task": "11",
+                "processID": "2308",
+                "severityValue": "INFORMATION",
+                "providerName": "Microsoft-Windows-Sysmon"
+              }
+            }
+          },
+          "rule": {
+            "firedtimes": 9,
+            "mail": false,
+            "level": 6,
+            "description": "Executable dropped in Windows root folder",
+            "groups": [
+              "sysmon",
+              "sysmon_eid11_detections",
+              "windows"
+            ],
+            "mitre": {
+              "technique": [
+                "Lateral Tool Transfer"
+              ],
+              "id": [
+                "T1570"
+              ],
+              "tactic": [
+                "Lateral Movement"
+              ]
+            },
+            "id": "92217"
+          },
+          "decoder": {
+            "name": "windows_eventchannel"
+          },
+          "input": {
+            "type": "log"
+          },
+          "@timestamp": "2026-08-09T18:00:17.058Z",
+          "location": "EventChannel",
+          "id": "1786298417.47055481",
+          "timestamp": "2026-08-09T18:00:17.058+0000"
+        },
+        "sort": [
+          1786298417058
+        ]
+      }
+    ]
+  },
+  "aggregations": {
+    "by_severity": {
+      "buckets": [
+        {
+          "key": "INFO",
+          "from": 0,
+          "to": 4,
+          "doc_count": 2105
+        },
+        {
+          "key": "LOW",
+          "from": 4,
+          "to": 7,
+          "doc_count": 997
+        },
+        {
+          "key": "MEDIUM",
+          "from": 7,
+          "to": 10,
+          "doc_count": 316
+        },
+        {
+          "key": "HIGH",
+          "from": 10,
+          "to": 14,
+          "doc_count": 19
+        },
+        {
+          "key": "CRITICAL",
+          "from": 14,
+          "to": 16,
+          "doc_count": 135
+        }
+      ]
+    }
+  }
+}

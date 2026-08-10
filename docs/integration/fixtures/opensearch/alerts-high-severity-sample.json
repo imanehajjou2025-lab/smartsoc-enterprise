@@ -1,0 +1,185 @@
+{
+  "took": 25,
+  "timed_out": false,
+  "_shards": {
+    "total": 36,
+    "successful": 36,
+    "skipped": 0,
+    "failed": 0
+  },
+  "hits": {
+    "total": {
+      "value": 1644,
+      "relation": "eq"
+    },
+    "max_score": null,
+    "hits": [
+      {
+        "_index": "wazuh-alerts-4.x-2026.08.09",
+        "_id": "3GlB558BM_N4EgleJhpJ",
+        "_score": null,
+        "_source": {
+          "agent": {
+            "ip": "10.100.0.9",
+            "name": "WIN10-CLIENT",
+            "id": "004"
+          },
+          "manager": {
+            "name": "vm-siem"
+          },
+          "data": {
+            "win": {
+              "eventdata": {
+                "image": "C:\\\\Windows\\\\system32\\\\cleanmgr.exe",
+                "processGuid": "{7b224ec7-a40f-6a78-2a02-000000001000}",
+                "processId": "2956",
+                "utcTime": "2026-08-09 16:00:30.535",
+                "targetFilename": "C:\\\\Users\\\\ssalm\\\\AppData\\\\Local\\\\Temp\\\\F35E44BC-6E59-4263-9637-1999E47D7DAA\\\\WimProvider.dll",
+                "ruleName": "DLL",
+                "creationUtcTime": "2026-08-09 16:00:30.535",
+                "user": "WIN10-CLIENT\\\\ssalm"
+              },
+              "system": {
+                "eventID": "11",
+                "keywords": "0x8000000000000000",
+                "providerGuid": "{5770385f-c22a-43e0-bf4c-06f5698ffbd9}",
+                "level": "4",
+                "channel": "Microsoft-Windows-Sysmon/Operational",
+                "opcode": "0",
+                "message": "\"File created:\r\nRuleName: DLL\r\nUtcTime: 2026-08-09 16:00:30.535\r\nProcessGuid: {7b224ec7-a40f-6a78-2a02-000000001000}\r\nProcessId: 2956\r\nImage: C:\\Windows\\system32\\cleanmgr.exe\r\nTargetFilename: C:\\Users\\ssalm\\AppData\\Local\\Temp\\F35E44BC-6E59-4263-9637-1999E47D7DAA\\WimProvider.dll\r\nCreationUtcTime: 2026-08-09 16:00:30.535\r\nUser: WIN10-CLIENT\\ssalm\"",
+                "version": "2",
+                "systemTime": "2026-08-09T16:00:30.5380764Z",
+                "eventRecordID": "20395",
+                "threadID": "4928",
+                "computer": "WIN10-CLIENT",
+                "task": "11",
+                "processID": "2308",
+                "severityValue": "INFORMATION",
+                "providerName": "Microsoft-Windows-Sysmon"
+              }
+            }
+          },
+          "rule": {
+            "firedtimes": 26,
+            "mail": true,
+            "level": 15,
+            "description": "Executable file dropped in folder commonly used by malware",
+            "groups": [
+              "sysmon",
+              "sysmon_eid11_detections",
+              "windows"
+            ],
+            "mitre": {
+              "technique": [
+                "Ingress Tool Transfer"
+              ],
+              "id": [
+                "T1105"
+              ],
+              "tactic": [
+                "Command and Control"
+              ]
+            },
+            "id": "92213"
+          },
+          "decoder": {
+            "name": "windows_eventchannel"
+          },
+          "input": {
+            "type": "log"
+          },
+          "@timestamp": "2026-08-09T16:00:31.668Z",
+          "location": "EventChannel",
+          "id": "1786291231.30350102",
+          "timestamp": "2026-08-09T16:00:31.668+0000"
+        },
+        "sort": [
+          1786291231668
+        ]
+      },
+      {
+        "_index": "wazuh-alerts-4.x-2026.08.09",
+        "_id": "22lB558BM_N4EgleJhpJ",
+        "_score": null,
+        "_source": {
+          "agent": {
+            "ip": "10.100.0.9",
+            "name": "WIN10-CLIENT",
+            "id": "004"
+          },
+          "manager": {
+            "name": "vm-siem"
+          },
+          "data": {
+            "win": {
+              "eventdata": {
+                "image": "C:\\\\Windows\\\\system32\\\\cleanmgr.exe",
+                "processGuid": "{7b224ec7-a40f-6a78-2a02-000000001000}",
+                "processId": "2956",
+                "utcTime": "2026-08-09 16:00:30.465",
+                "targetFilename": "C:\\\\Users\\\\ssalm\\\\AppData\\\\Local\\\\Temp\\\\F35E44BC-6E59-4263-9637-1999E47D7DAA\\\\VhdProvider.dll",
+                "ruleName": "DLL",
+                "creationUtcTime": "2026-08-09 16:00:30.465",
+                "user": "WIN10-CLIENT\\\\ssalm"
+              },
+              "system": {
+                "eventID": "11",
+                "keywords": "0x8000000000000000",
+                "providerGuid": "{5770385f-c22a-43e0-bf4c-06f5698ffbd9}",
+                "level": "4",
+                "channel": "Microsoft-Windows-Sysmon/Operational",
+                "opcode": "0",
+                "message": "\"File created:\r\nRuleName: DLL\r\nUtcTime: 2026-08-09 16:00:30.465\r\nProcessGuid: {7b224ec7-a40f-6a78-2a02-000000001000}\r\nProcessId: 2956\r\nImage: C:\\Windows\\system32\\cleanmgr.exe\r\nTargetFilename: C:\\Users\\ssalm\\AppData\\Local\\Temp\\F35E44BC-6E59-4263-9637-1999E47D7DAA\\VhdProvider.dll\r\nCreationUtcTime: 2026-08-09 16:00:30.465\r\nUser: WIN10-CLIENT\\ssalm\"",
+                "version": "2",
+                "systemTime": "2026-08-09T16:00:30.4735016Z",
+                "eventRecordID": "20394",
+                "threadID": "4928",
+                "computer": "WIN10-CLIENT",
+                "task": "11",
+                "processID": "2308",
+                "severityValue": "INFORMATION",
+                "providerName": "Microsoft-Windows-Sysmon"
+              }
+            }
+          },
+          "rule": {
+            "firedtimes": 25,
+            "mail": true,
+            "level": 15,
+            "description": "Executable file dropped in folder commonly used by malware",
+            "groups": [
+              "sysmon",
+              "sysmon_eid11_detections",
+              "windows"
+            ],
+            "mitre": {
+              "technique": [
+                "Ingress Tool Transfer"
+              ],
+              "id": [
+                "T1105"
+              ],
+              "tactic": [
+                "Command and Control"
+              ]
+            },
+            "id": "92213"
+          },
+          "decoder": {
+            "name": "windows_eventchannel"
+          },
+          "input": {
+            "type": "log"
+          },
+          "@timestamp": "2026-08-09T16:00:31.613Z",
+          "location": "EventChannel",
+          "id": "1786291231.30347330",
+          "timestamp": "2026-08-09T16:00:31.613+0000"
+        },
+        "sort": [
+          1786291231613
+        ]
+      }
+    ]
+  }
+}
