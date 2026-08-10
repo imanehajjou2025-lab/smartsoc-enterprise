@@ -3306,6 +3306,41 @@ temps réel — cohérent avec la doctrine du plan d'architecture
 (« accorder un pouvoir d'action exige que toute la chaîne soit
 éprouvée »).
 
-**Reste ouvert.** Bouton frontend (déclencheur + confirmation nommant
-la cible) pas encore construit — backend seul pour ce lot. Active-response
-reportée. Shuffle (2ᵉ connecteur de la phase 5) reste à construire.
+---
+
+## 2026-08-10 — Phase 5 (1/2, suite) : bouton de redémarrage d'agent (PR #107)
+
+**Déclencheur ajouté dans le tiroir Actif**, visible uniquement pour un
+actif Wazuh-managé (`externalSource === 'wazuh'`), en écriture
+(ANALYST+), non décommissionné. Confirmation par **saisie exacte du
+hostname** (pas un simple clic) — même garde-fou que le serveur
+applique de toute façon (`SocActionService` revalide tout), ce contrôle
+côté client évite juste d'attendre un refus serveur pour une erreur
+évidente. Motif obligatoire.
+
+**Bug réel trouvé en écrivant le test, pas en production —
+heureusement.** `EditAssetDialog` et le nouveau `RestartAgentDialog`
+partageaient la MÊME clé React au premier rendu (`${asset.id}-false`,
+puisque leurs deux états `open` initiaux valent tous les deux `false`)
+— React avertit sur les clés dupliquées entre frères, comportement non
+garanti. Corrigé en préfixant chaque clé par le nom du composant. Un
+faux départ de diagnostic instructif au passage : la piste d'abord
+suivie (clé dépendante de l'état `open`, forçant un remount à chaque
+ouverture) n'était PAS la cause réelle — la vraie cause, révélée
+seulement en dumpant les labels réellement rendus dans un fichier
+plutôt que de deviner, était un problème d'assertion de test (MUI
+ajoute un astérisque au texte du label pour un champ `required` :
+`getByLabelText('Motif')` en correspondance exacte ne matche jamais
+`"Motif *"`, `getByLabelText(/Motif/)` si).
+
+**Vérification réelle complète.** 48 tests frontend verts (+3). Backend
+Docker reconstruit, vérifié de bout en bout au navigateur en **mode
+simulation uniquement** : bouton désactivé tant que le hostname ne
+correspond pas exactement, activé une fois exact, soumission réelle →
+`204`, dialogue fermé, log `[simulation] Would restart... (no real
+effect)`, audit nominatif confirmé en base (acteur `admin`, cible,
+motif, issue `SUCCESS`). **Mode live jamais déclenché pour de vrai.**
+
+**Reste ouvert.** Active-response (exécution de commande, conception à
+part) reportée. Shuffle (2ᵉ connecteur de la phase 5 : déclenchement de
+workflow + callback, 3ᵉ filtre de clé d'API) reste à construire.
