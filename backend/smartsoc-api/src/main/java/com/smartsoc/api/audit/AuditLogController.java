@@ -38,6 +38,6 @@ public class AuditLogController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "25") int size) {
         return PageResponse.of(queryService.search(new AuditLogQuery(
-                action, actorUsername, from, to, PageQuery.of(page, size))), mapper::toResponse);
+                action, actorUsername, from, to, null, null, PageQuery.of(page, size))), mapper::toResponse);
     }
 }

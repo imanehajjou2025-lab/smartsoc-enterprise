@@ -24,11 +24,18 @@ public record ConnectorProperties(Wazuh wazuh, OpenSearch openSearch, Misp misp,
      * @param url      URL de base de l'API Wazuh (le chemin /agents, /security/... vient du contrat Wazuh)
      * @param username compte API dédié en LECTURE SEULE — jamais le compte admin (voir ADR-015)
      * @param password mot de passe du compte ci-dessus
+     * @param actions  sous-contexte EFFET RÉEL (ADR-014 phase 5) — identifiants et mode
+     *                 INDÉPENDANTS de la lecture ci-dessus (compte dédié `smartsoc-actuator`,
+     *                 jamais `smartsoc-reader` élargi)
      */
-    public record Wazuh(String mode, String url, String username, String password) {
+    public record Wazuh(String mode, String url, String username, String password, Actions actions) {
 
-        public String modeOrDefault() {
-            return (mode == null || mode.isBlank()) ? MODE_SIMULATION : mode;
+        /**
+         * @param mode simulation (défaut) | live | disabled — séparé du mode de LECTURE :
+         *             la lecture peut être live pendant que les actions restent en
+         *             simulation (ou l'inverse), jamais lié.
+         */
+        public record Actions(String mode, String username, String password) {
         }
     }
 
