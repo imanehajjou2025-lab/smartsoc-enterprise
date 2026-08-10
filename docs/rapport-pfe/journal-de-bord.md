@@ -3448,3 +3448,85 @@ déclenché pour de vrai.**
 redémarrage et active-response, backend et frontend). Reste pour la
 phase 5 : Shuffle (déclenchement de workflow + callback, 2ᵉ connecteur
 de la phase, 3ᵉ filtre de clé d'API).
+
+---
+
+## 2026-08-10/11 — Phase 5 (2/2) : déclenchement de workflow Shuffle — phase achevée (PR #109→#115 sur ce module)
+
+**Schéma d'API découvert en réel avec Imane, pas deviné.** Contrairement
+aux autres connecteurs, Shuffle n'avait ni compte dédié ni schéma
+documenté : la session complète s'est faite en direct, captures d'écran
+à l'appui — connexion au tableau de bord Shuffle réel, identification
+du workflow existant (`SOAR`, déclenché par un nœud Webhook, enrichit
+une alerte via VirusTotal/MISP puis notifie Discord), puis découverte
+pas à pas via les outils de développement du navigateur : la vraie
+réponse synchrone du webhook de déclenchement
+(`{"success": true, "execution_id": "..."}`), et surtout la découverte
+qu'il n'existe **aucun endpoint dédié à une exécution** — seul
+`GET /api/v2/workflows/{id}/executions` (une LISTE, filtrée côté ACL)
+répond ; `.../executions/{id}` renvoie 404 sur cette version de
+Shuffle. Deviner ce chemin aurait été exactement l'erreur que l'ADR-012
+avait explicitement mise en garde.
+
+**Décision de conception validée avec Imane avant le code : réconciliation
+en lecture à la demande, pas de callback entrant en V1.** Conforme au
+diagramme d'états déjà documenté dans `SOAR-ARCHITECTURE.md` (une
+exécution sans callback bascule vers la réconciliation — c'est le
+chemin normal, pas un cas d'erreur). Un `Playbook` peut désormais être
+lié à un workflow Shuffle réel via deux identifiants distincts
+(`shuffleWorkflowId` pour la consultation de statut,
+`shuffleWebhookPath` pour le déclenchement — deux ressources Shuffle
+différentes, confirmées séparément).
+
+**Mêmes garde-fous que le contrôle d'agents Wazuh, réutilisés via
+`SocActionService`** : confirmation par saisie exacte du nom du
+playbook, motif obligatoire, plafond de 3 déclenchements/heure **scopé
+à l'incident** (pas au playbook), audit nominatif, aucun retry. Un
+échec de déclenchement (Shuffle indisponible ou refuse) ne lève pas
+d'exception HTTP : il se persiste comme une exécution `START_FAILED`
+consultable, au même titre qu'un succès — trois nouveaux états
+(`START_FAILED`, `ORPHANED`, `PARTIAL_FAILURE`) ajoutés additivement à
+`ExecutionStatus`, le suivi guidé manuel existant restant inchangé.
+
+**Deux bugs réels trouvés en vérifiant, pas en test unitaire.**
+D'abord SonarCloud a signalé 53,8 % de duplication sur le code neuf :
+les blocs d'enregistrement du statut connecteur, copiés-collés dans
+les deux adaptateurs live, extraits dans un
+`ShuffleConnectorStatusRecorder` partagé. Ensuite, en poussant jusqu'au
+mode live réel : le certificat TLS de Shuffle, bien régénéré côté SOC
+(même `SmartSOC Root CA` que Wazuh/MISP) mais jamais capturé côté
+plateforme — `docker/truststore/` n'avait que 3 fichiers sur les 4
+attendus. Capturé en réel (`openssl s_client` depuis le conteneur) et
+ajouté.
+
+**Statut de connecteur honnête pour un connecteur sans planificateur.**
+Shuffle n'a pas de connecteur en lecture périodique comme Wazuh : les
+adaptateurs de déclenchement et de consultation SONT le seul signal de
+connectivité. Enregistré directement dans les adaptateurs
+infrastructure (jamais dans `SocActionService`, qui reste isolé des
+connecteurs en lecture par doctrine) — même patron que
+`ObservableReputationService` (VirusTotal), seul autre précédent de
+connecteur « à la demande » sans planificateur.
+
+**Vérification réelle exceptionnellement poussée jusqu'au mode live,
+toujours sans déclenchement réel.** 605 tests backend (+33) et 55
+tests frontend (+4) verts. Bout en bout confirmé en Docker reconstruit :
+déclenchement en simulation sur un incident réel (`INC-2026-0004`) →
+`201`/`IN_PROGRESS` → rafraîchissement → `COMPLETED`, audit nominatif
+en base. Puis, une fois le certificat ajouté et la vraie clé d'API
+collée dans `.env` par Imane : **mode live activé pour de vrai**, une
+ligne d'exécution factice pointée vers une exécution Shuffle réelle
+déjà terminée insérée directement en base pour vérifier sans risque la
+confiance TLS JVM et l'authentification bout en bout — succès
+confirmé, connecteur passé à `CONNECTED` avec un vrai horodatage,
+ligne de test nettoyée ensuite. Le bouton frontend vérifié au
+navigateur contre ce même backend live : sélecteur filtrant
+correctement sur le seul playbook réellement lié, confirmation
+activée/désactivée selon le nom retapé — **jamais cliqué pour de
+vrai**, vérifié par l'absence de requête réseau vers
+`/trigger-shuffle`.
+
+**Phase 5 (« Actions réelles ») achevée : les deux connecteurs prévus
+(contrôle d'agents Wazuh, déclenchement Shuffle) sont en production
+locale, backend et frontend, avec leurs garde-fous non négociables
+tenus de bout en bout.**
