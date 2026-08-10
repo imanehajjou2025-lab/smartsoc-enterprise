@@ -3,7 +3,13 @@ import { useTheme } from '@mui/material/styles';
 import PublicIcon from '@mui/icons-material/Public';
 import { severityColors } from '../../app/theme';
 import { softChipSx } from '../../shared/components/chipStyles';
-import type { AssetCriticality, AssetExposure, AssetStatus, AssetType } from './assetsApi';
+import type {
+  AgentConnectionStatus,
+  AssetCriticality,
+  AssetExposure,
+  AssetStatus,
+  AssetType,
+} from './assetsApi';
 
 export const ASSET_TYPE_LABELS: Record<AssetType, string> = {
   SERVER: 'Serveur',
@@ -60,4 +66,32 @@ export function AssetStatusChip({ status }: { status: AssetStatus }) {
   const theme = useTheme();
   const color = status === 'ACTIVE' ? theme.palette.success.main : theme.palette.text.secondary;
   return <Chip label={ASSET_STATUS_LABELS[status]} size="small" sx={softChipSx(color)} />;
+}
+
+export const AGENT_CONNECTION_STATUS_LABELS: Record<AgentConnectionStatus, string> = {
+  ACTIVE: 'Connecté',
+  DISCONNECTED: 'Déconnecté',
+  NEVER_CONNECTED: 'Jamais connecté',
+};
+
+/**
+ * État de connexion RAPPORTÉ par le connecteur d'agents (Wazuh) — jamais
+ * recalculé ici. Distinct d'{@link AssetStatusChip} : un actif peut rester
+ * "Actif" dans l'inventaire tout en étant "Déconnecté" côté agent. Absent
+ * pour un actif enregistré à la main (aucun connecteur ne le rapporte).
+ */
+export function AgentConnectionStatusChip({ status }: { status: AgentConnectionStatus | null }) {
+  const theme = useTheme();
+  if (!status) {
+    return null;
+  }
+  const color =
+    status === 'ACTIVE'
+      ? theme.palette.success.main
+      : status === 'DISCONNECTED'
+        ? theme.palette.error.main
+        : theme.palette.text.secondary;
+  return (
+    <Chip label={AGENT_CONNECTION_STATUS_LABELS[status]} size="small" sx={softChipSx(color)} />
+  );
 }
