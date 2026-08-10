@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import axios from 'axios';
 import EditIcon from '@mui/icons-material/Edit';
 import LockIcon from '@mui/icons-material/Lock';
+import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -24,6 +25,7 @@ import {
   ASSET_TYPE_LABELS,
 } from './assetChips';
 import EditAssetDialog from './EditAssetDialog';
+import RestartAgentDialog from './RestartAgentDialog';
 import { decommissionAsset, getAsset, listCorrelatedAlerts, reactivateAsset } from './assetsApi';
 import { VulnerabilitySeverityChip } from '../vulnerabilities/vulnerabilityChips';
 import { listVulnerabilities } from '../vulnerabilities/vulnerabilitiesApi';
@@ -59,6 +61,7 @@ function AssetDetailDrawer({ assetId, onClose }: Props) {
   const role = useAppSelector((state) => state.auth.user?.role);
   const canWrite = role === 'ADMIN' || role === 'SOC_MANAGER' || role === 'SOC_ANALYST';
   const [editOpen, setEditOpen] = useState(false);
+  const [restartOpen, setRestartOpen] = useState(false);
   const [alertsPage, setAlertsPage] = useState(0);
   const [vulnsPage, setVulnsPage] = useState(0);
 
@@ -177,6 +180,17 @@ function AssetDetailDrawer({ assetId, onClose }: Props) {
                     >
                       Décommissionner
                     </Button>
+                    {asset.externalSource === 'wazuh' && (
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        color="warning"
+                        startIcon={<RestartAltIcon />}
+                        onClick={() => setRestartOpen(true)}
+                      >
+                        Redémarrer l'agent
+                      </Button>
+                    )}
                   </>
                 )}
                 {isDecommissioned && (
@@ -317,10 +331,18 @@ function AssetDetailDrawer({ assetId, onClose }: Props) {
 
             {canWrite && !isDecommissioned && (
               <EditAssetDialog
-                key={`${asset.id}-${editOpen}`}
+                key={`edit-${asset.id}-${editOpen}`}
                 asset={asset}
                 open={editOpen}
                 onClose={() => setEditOpen(false)}
+              />
+            )}
+            {canWrite && !isDecommissioned && asset.externalSource === 'wazuh' && (
+              <RestartAgentDialog
+                key={`restart-${asset.id}`}
+                asset={asset}
+                open={restartOpen}
+                onClose={() => setRestartOpen(false)}
               />
             )}
           </>

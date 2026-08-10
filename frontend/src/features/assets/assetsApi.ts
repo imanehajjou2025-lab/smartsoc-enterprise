@@ -115,6 +115,20 @@ export async function reactivateAsset(id: string): Promise<Asset> {
   return data;
 }
 
+/**
+ * Redémarrage RÉEL de l'agent Wazuh (ADR-014 phase 5) — effet réel sur
+ * une vraie machine, jamais une simple lecture. `confirmHostname` doit
+ * correspondre EXACTEMENT au hostname de l'actif (le serveur revérifie,
+ * cet appel n'est qu'un relais) ; le motif est obligatoire.
+ */
+export async function restartAgent(
+  id: string,
+  confirmHostname: string,
+  reason: string,
+): Promise<void> {
+  await api.post(`/assets/${id}/restart-agent`, { confirmHostname, reason });
+}
+
 /** Alertes corrélées : totalElements = LE compteur de corrélation. */
 export async function listCorrelatedAlerts(
   id: string,
