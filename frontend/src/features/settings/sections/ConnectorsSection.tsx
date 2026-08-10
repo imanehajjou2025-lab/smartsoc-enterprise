@@ -78,7 +78,7 @@ const CONNECTORS: ConnectorMeta[] = [
     label: 'Shuffle',
     description: 'Orchestration SOAR — déclenchement et suivi de workflows.',
     icon: <AccountTreeOutlinedIcon />,
-    implemented: false,
+    implemented: true,
     plannedPhase: 'Phase 5',
   },
 ];
@@ -195,9 +195,10 @@ function PlannedConnectorCard({ meta }: { meta: ConnectorMeta }) {
 }
 
 /**
- * État réel des connecteurs SOC (ADR-014). Seul Wazuh a un adaptateur
- * backend aujourd'hui — les quatre autres restent des cartes honnêtes
- * "à venir" plutôt que des lignes NOT_CONFIGURED trompeuses.
+ * État réel des connecteurs SOC (ADR-014). Les cinq connecteurs ont
+ * désormais un adaptateur backend — `PlannedConnectorCard` reste en
+ * réserve pour un futur connecteur sans adaptateur, plutôt qu'une
+ * ligne NOT_CONFIGURED trompeuse.
  */
 function ConnectorsSection() {
   const { data, isLoading, error } = useQuery({

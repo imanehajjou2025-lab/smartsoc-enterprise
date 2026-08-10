@@ -18,6 +18,8 @@ const execution: PlaybookExecution = {
   status: 'IN_PROGRESS',
   startedAt: '2026-07-26T10:00:00Z',
   completedAt: null,
+  externalExecutionId: null,
+  resultSummary: null,
   steps: [
     {
       id: 'step-1',

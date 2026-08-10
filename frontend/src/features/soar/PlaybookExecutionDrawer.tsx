@@ -6,6 +6,7 @@ import Button from '@mui/material/Button';
 import CircularProgress from '@mui/material/CircularProgress';
 import Drawer from '@mui/material/Drawer';
 import MenuItem from '@mui/material/MenuItem';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
@@ -17,6 +18,7 @@ import {
   cancelExecution,
   completeExecution,
   getExecution,
+  refreshShuffleStatus,
   updateExecutionStep,
   type PlaybookExecutionStep,
   type StepStatus,
@@ -82,9 +84,17 @@ function PlaybookExecutionDrawer({ executionId, onClose }: Props) {
     mutationFn: () => cancelExecution(executionId!),
     onSuccess: invalidate,
   });
+  const refreshMutation = useMutation({
+    mutationFn: () => refreshShuffleStatus(executionId!),
+    onSuccess: invalidate,
+  });
 
-  const mutationError = stepMutation.error ?? completeMutation.error ?? cancelMutation.error;
+  const mutationError =
+    stepMutation.error ?? completeMutation.error ?? cancelMutation.error ?? refreshMutation.error;
   const inProgress = execution?.status === 'IN_PROGRESS';
+  const reconcilable =
+    Boolean(execution?.externalExecutionId) &&
+    (execution?.status === 'IN_PROGRESS' || execution?.status === 'ORPHANED');
 
   return (
     <Drawer anchor="right" open={Boolean(executionId)} onClose={onClose}>
@@ -109,10 +119,38 @@ function PlaybookExecutionDrawer({ executionId, onClose }: Props) {
             <Typography variant="h6" sx={{ mb: 0.5 }}>
               {execution.playbookName}
             </Typography>
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
               Démarrée {formatDate(execution.startedAt)}
               {execution.completedAt ? ` · terminée ${formatDate(execution.completedAt)}` : ''}
             </Typography>
+
+            {execution.externalExecutionId && (
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                  Déclenchée via Shuffle · exécution {execution.externalExecutionId}
+                </Typography>
+                {execution.resultSummary && (
+                  <Typography
+                    variant="body2"
+                    sx={{ mt: 0.5, fontFamily: 'monospace', whiteSpace: 'pre-wrap' }}
+                  >
+                    {execution.resultSummary}
+                  </Typography>
+                )}
+                {canWrite && reconcilable && (
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    startIcon={<RefreshIcon />}
+                    disabled={refreshMutation.isPending}
+                    onClick={() => refreshMutation.mutate()}
+                    sx={{ mt: 1 }}
+                  >
+                    {refreshMutation.isPending ? 'Actualisation…' : 'Actualiser le statut'}
+                  </Button>
+                )}
+              </Box>
+            )}
 
             {mutationError && (
               <Alert severity="error" sx={{ mb: 2 }}>
