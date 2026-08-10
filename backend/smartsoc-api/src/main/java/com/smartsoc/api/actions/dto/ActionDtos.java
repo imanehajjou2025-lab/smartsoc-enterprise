@@ -19,4 +19,15 @@ public final class ActionDtos {
             @NotBlank @Size(max = 255) String confirmHostname,
             @NotBlank @Size(max = 1000) String reason) {
     }
+
+    /**
+     * @param ipAddress adresse à bloquer via active-response {@code firewall-drop}
+     *                   — revalidée côté serveur (jamais fait confiance au format
+     *                   client seul)
+     */
+    public record BlockIpRequest(
+            @NotBlank @Size(max = 255) String confirmHostname,
+            @NotBlank @Size(max = 45) String ipAddress,
+            @NotBlank @Size(max = 1000) String reason) {
+    }
 }

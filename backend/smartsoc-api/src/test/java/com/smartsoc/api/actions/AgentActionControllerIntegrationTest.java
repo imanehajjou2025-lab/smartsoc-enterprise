@@ -133,6 +133,84 @@ class AgentActionControllerIntegrationTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
     }
 
+    // --- block-ip (active-response firewall-drop) ---
+
+    @Test
+    void blocksTheIpInSimulationModeAndRecordsANominativeAuditEntry() {
+        String admin = adminToken();
+        Asset asset = seedWazuhManagedAsset(suffix());
+
+        ResponseEntity<Void> response = blockIp(asset.getId(), asset.getHostname(), "203.0.113.42",
+                "IP malveillante", admin);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+
+        var entries = auditLogRepository.search(new AuditLogQuery(
+                AuditAction.WAZUH_AGENT_FIREWALL_DROP_REQUESTED, null, null, null,
+                "ASSET", asset.getId().toString(), PageQuery.of(0, 10)));
+        assertThat(entries.totalElements()).isEqualTo(1);
+        assertThat(entries.items().getFirst().getActorUsername()).isEqualTo("admin");
+        assertThat(entries.items().getFirst().getDetails())
+                .contains("outcome=SUCCESS").contains("ip=203.0.113.42");
+    }
+
+    @Test
+    void rejectsBlockIpWhenConfirmedHostnameDoesNotMatchTheRealTarget() {
+        String admin = adminToken();
+        Asset asset = seedWazuhManagedAsset(suffix());
+
+        ResponseEntity<String> response = blockIp(asset.getId(), "wrong-hostname", "203.0.113.42",
+                "test", admin, String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(response.getBody()).contains("ACTION_TARGET_NOT_CONFIRMED");
+    }
+
+    @Test
+    void rejectsAnInvalidIpAddress() {
+        String admin = adminToken();
+        Asset asset = seedWazuhManagedAsset(suffix());
+
+        ResponseEntity<String> response = blockIp(asset.getId(), asset.getHostname(), "not-an-ip",
+                "test", admin, String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(response.getBody()).contains("ACTION_INVALID_IP_ADDRESS");
+    }
+
+    @Test
+    void enforcesTheHourlyCapOnTheSameAssetForBlockIp() {
+        String admin = adminToken();
+        Asset asset = seedWazuhManagedAsset(suffix());
+
+        for (int i = 0; i < 3; i++) {
+            ResponseEntity<Void> ok = blockIp(asset.getId(), asset.getHostname(), "203.0.113.42",
+                    "attempt " + i, admin);
+            assertThat(ok.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+        }
+
+        ResponseEntity<String> fourth = blockIp(asset.getId(), asset.getHostname(), "203.0.113.42",
+                "attempt 4", admin, String.class);
+        assertThat(fourth.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(fourth.getBody()).contains("ACTION_RATE_LIMIT_EXCEEDED");
+    }
+
+    @Test
+    void viewerIsForbiddenFromBlockingAnIp() {
+        String admin = adminToken();
+        Asset asset = seedWazuhManagedAsset(suffix());
+        String viewerUsername = "viewer." + suffix();
+        exchange(HttpMethod.POST, "/api/v1/users", admin, Map.of(
+                "username", viewerUsername, "email", viewerUsername + "@smartsoc.io", "password", STRONG_PWD,
+                "fullName", "Read Only", "role", "VIEWER"), String.class);
+        String viewerToken = login(viewerUsername, STRONG_PWD);
+
+        ResponseEntity<String> response = blockIp(asset.getId(), asset.getHostname(), "203.0.113.42",
+                "test", viewerToken, String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
     // --- helpers ---
 
     private ResponseEntity<Void> restart(UUID assetId, String confirmHostname, String reason, String token) {
@@ -144,6 +222,18 @@ class AgentActionControllerIntegrationTest {
                                           Class<T> type) {
         return exchange(HttpMethod.POST, "/api/v1/assets/" + assetId + "/restart-agent", token,
                 Map.of("confirmHostname", confirmHostname, "reason", reason), type);
+    }
+
+    private ResponseEntity<Void> blockIp(UUID assetId, String confirmHostname, String ipAddress, String reason,
+                                         String token) {
+        return exchange(HttpMethod.POST, "/api/v1/assets/" + assetId + "/block-ip", token,
+                Map.of("confirmHostname", confirmHostname, "ipAddress", ipAddress, "reason", reason), Void.class);
+    }
+
+    private <T> ResponseEntity<T> blockIp(UUID assetId, String confirmHostname, String ipAddress, String reason,
+                                          String token, Class<T> type) {
+        return exchange(HttpMethod.POST, "/api/v1/assets/" + assetId + "/block-ip", token,
+                Map.of("confirmHostname", confirmHostname, "ipAddress", ipAddress, "reason", reason), type);
     }
 
     private static String suffix() {

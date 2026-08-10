@@ -2,6 +2,7 @@ package com.smartsoc.infrastructure.connectors.wazuh;
 
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 
 /**
@@ -18,5 +19,10 @@ public interface WazuhAgentControlClient {
 
     /** Un seul agent à la fois — {@code SocActionService} n'agit jamais en masse. */
     @PutMapping("/agents/restart")
-    WazuhAgentRestartResponse restart(@RequestParam("agents_list") String agentId);
+    WazuhAgentCommandResponse restart(@RequestParam("agents_list") String agentId);
+
+    /** {@code command} confirmé contre la spec OpenAPI réelle — voir {@link WazuhActiveResponseRequest}. */
+    @PutMapping("/active-response")
+    WazuhAgentCommandResponse activeResponse(@RequestParam("agents_list") String agentId,
+                                             @RequestBody WazuhActiveResponseRequest body);
 }

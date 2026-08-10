@@ -5,6 +5,7 @@ import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
 import com.smartsoc.TestcontainersConfiguration;
 import com.smartsoc.application.actions.AgentControlPort;
 import com.smartsoc.application.connectors.SocConnectorException;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -15,9 +16,9 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
+import static com.github.tomakehurst.wiremock.client.WireMock.containing;
 import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
-import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.put;
 import static com.github.tomakehurst.wiremock.client.WireMock.putRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
@@ -58,6 +59,9 @@ class LiveAgentControlIntegrationTest {
     @Autowired
     private AgentControlPort agentControlPort;
 
+    @Autowired
+    private CircuitBreakerRegistry circuitBreakerRegistry;
+
     @BeforeEach
     void resetStubs() {
         WAZUH.resetAll();
@@ -67,6 +71,12 @@ class LiveAgentControlIntegrationTest {
                 .withBody("""
                         {"data": {"token": "fake-actions-token-for-test"}}
                         """)));
+        // Le disjoncteur "wazuhAgentControl" est un bean Spring partage entre
+        // toutes les methodes de cette classe (meme contexte reutilise) :
+        // sans reinitialisation explicite, les echecs provoques par les tests
+        // de degradation s'accumulent dans sa fenetre glissante et peuvent
+        // l'ouvrir avant qu'un test suivant n'ait meme emis sa requete HTTP.
+        circuitBreakerRegistry.circuitBreaker("wazuhAgentControl").reset();
     }
 
     @Test
@@ -82,12 +92,16 @@ class LiveAgentControlIntegrationTest {
 
         agentControlPort.restart("004");
 
+        // Le jeton porte par la requete prouve deja qu'il vient du client
+        // d'authentification DEDIE aux actions (distinct de la lecture). On
+        // ne verifie PAS un nombre exact d'appels POST /authenticate : le
+        // jeton est mis en cache (~13 min) dans un bean Spring partage entre
+        // toutes les methodes de cette classe -- si un autre test s'est
+        // execute avant et a deja obtenu un jeton valide, il est reutilise
+        // sans nouvel appel, ce qui est le comportement voulu.
         WAZUH.verify(putRequestedFor(urlPathEqualTo("/agents/restart"))
                 .withQueryParam("agents_list", equalTo("004"))
                 .withHeader("Authorization", equalTo("Bearer fake-actions-token-for-test")));
-        // Le jeton vient bien du client d'authentification DEDIE aux actions,
-        // distinct de celui de la lecture (jamais appele ici).
-        WAZUH.verify(1, postRequestedFor(urlEqualTo("/security/user/authenticate")));
     }
 
     @Test
@@ -118,5 +132,57 @@ class LiveAgentControlIntegrationTest {
 
         // Un seul appel HTTP : aucun retry automatique, meme apres l'echec.
         WAZUH.verify(1, putRequestedFor(urlPathEqualTo("/agents/restart")));
+    }
+
+    @Test
+    void authenticatesWithTheDedicatedActionsAccountAndBlocksTheIpViaActiveResponse() {
+        WAZUH.stubFor(put(urlPathEqualTo("/active-response")).willReturn(aResponse()
+                .withStatus(200)
+                .withHeader("Content-Type", "application/json")
+                .withBody("""
+                        {"data": {"affected_items": ["004"], "total_affected_items": 1,
+                          "failed_items": [], "total_failed_items": 0},
+                         "message": "Command sent", "error": 0}
+                        """)));
+
+        agentControlPort.blockIp("004", "203.0.113.42");
+
+        // Voir le commentaire equivalent dans le test de restart : le jeton
+        // en cache est partage entre les methodes de cette classe, on ne
+        // verifie donc pas un nombre exact d'appels d'authentification.
+        WAZUH.verify(putRequestedFor(urlPathEqualTo("/active-response"))
+                .withQueryParam("agents_list", equalTo("004"))
+                .withHeader("Authorization", equalTo("Bearer fake-actions-token-for-test"))
+                .withRequestBody(containing("firewall-drop"))
+                .withRequestBody(containing("203.0.113.42")));
+    }
+
+    @Test
+    void aPartialFailureOnActiveResponseIsNeverTreatedAsSuccess() {
+        // Meme piege que pour restart : HTTP 200 global mais la cible visee
+        // est dans failed_items.
+        WAZUH.stubFor(put(urlPathEqualTo("/active-response")).willReturn(aResponse()
+                .withStatus(200)
+                .withHeader("Content-Type", "application/json")
+                .withBody("""
+                        {"data": {"affected_items": [], "total_affected_items": 0,
+                          "failed_items": [{"error": {"code": 1701, "message": "Agent not found"}, "id": ["004"]}],
+                          "total_failed_items": 1},
+                         "message": "Some agents were not processed", "error": 1}
+                        """)));
+
+        assertThatThrownBy(() -> agentControlPort.blockIp("004", "203.0.113.42"))
+                .isInstanceOf(SocConnectorException.class);
+    }
+
+    @Test
+    void degradesGracefullyAndNeverRetriesActiveResponseWhenWazuhIsDown() {
+        WAZUH.stubFor(put(urlPathEqualTo("/active-response")).willReturn(aResponse().withStatus(503)));
+
+        assertThatThrownBy(() -> agentControlPort.blockIp("004", "203.0.113.42"))
+                .isInstanceOf(SocConnectorException.class);
+
+        // Un seul appel HTTP : aucun retry automatique, meme apres l'echec.
+        WAZUH.verify(1, putRequestedFor(urlPathEqualTo("/active-response")));
     }
 }

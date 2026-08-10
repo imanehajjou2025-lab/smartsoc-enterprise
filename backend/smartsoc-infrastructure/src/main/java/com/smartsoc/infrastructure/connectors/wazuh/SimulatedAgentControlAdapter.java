@@ -21,4 +21,10 @@ public class SimulatedAgentControlAdapter implements AgentControlPort {
     public void restart(String wazuhAgentId) {
         log.info("[simulation] Would restart Wazuh agent {} (no real effect)", wazuhAgentId);
     }
+
+    @Override
+    public void blockIp(String wazuhAgentId, String ipAddress) {
+        log.info("[simulation] Would block IP {} via firewall-drop on Wazuh agent {} (no real effect)",
+                ipAddress, wazuhAgentId);
+    }
 }

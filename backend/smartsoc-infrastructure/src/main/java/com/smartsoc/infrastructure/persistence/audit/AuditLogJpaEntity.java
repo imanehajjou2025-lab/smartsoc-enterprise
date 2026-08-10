@@ -33,7 +33,7 @@ public class AuditLogJpaEntity {
     private Instant occurredAt;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 30)
+    @Column(nullable = false, length = 64)
     private AuditAction action;
 
     @Column(name = "actor_username", nullable = false, length = 50)

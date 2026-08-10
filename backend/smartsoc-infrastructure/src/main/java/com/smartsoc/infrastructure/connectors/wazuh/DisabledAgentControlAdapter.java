@@ -16,4 +16,10 @@ class DisabledAgentControlAdapter implements AgentControlPort {
         throw new SocConnectorException(
                 "Wazuh agent control is disabled (smartsoc.connectors.wazuh.actions.mode=disabled)");
     }
+
+    @Override
+    public void blockIp(String wazuhAgentId, String ipAddress) {
+        throw new SocConnectorException(
+                "Wazuh agent control is disabled (smartsoc.connectors.wazuh.actions.mode=disabled)");
+    }
 }
