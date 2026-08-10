@@ -3044,4 +3044,189 @@ bout en bout au navigateur connecté en Admin : clic sur un IOC IPv4 réel
 compteurs réels affichés, aucune erreur console ; écran Connecteurs
 revérifié après le correctif.
 
-Phase 4 (OpenSearch/Hunting live) reste à planifier.
+---
+
+## 2026-08-10 — Passage en mode live des 4 connecteurs SOC (PR #97, #98, #101)
+
+**Contexte : une question simple d'Imane a révélé que rien n'était
+réellement branché.** Après la Phase 3, la question posée était directe
+— « pourquoi mes actifs Wazuh, Ubuntu, Windows Server n'apparaissent
+jamais dans la plateforme ? ». Vérification en base : les seuls actifs
+Wazuh présents étaient `sim-*`, des données de simulation. Diagnostic en
+trois couches, chacune un vrai bug distinct.
+
+**Bug 1 — `docker-compose.yml` ne transmettait aucune variable
+`SMARTSOC_CONNECTORS_*`.** Même un `.env` bien rempli n'aurait eu aucun
+effet : les 4 connecteurs restaient forcés en simulation. `.env.example`
+listait par ailleurs une section « Intégrations SOC » obsolète
+(`WAZUH_API_URL`, `MISP_API_KEY`…) datant d'avant l'implémentation
+réelle des connecteurs. Corrigé (PR #97) : variables correctes câblées
+avec défaut `simulation` (comportement inchangé tant que `.env` ne les
+renseigne pas).
+
+**Vérification des identifiants, un par un, sans jamais afficher de
+secret en clair.** Imane a rempli son `.env`, mais avec des URLs encore
+sur `localhost` et le compte `admin` Wazuh (dashboard, pas API) au lieu
+de `smartsoc-reader`. Diagnostiqué par tests directs depuis le conteneur
+(`wget` + `base64` pour l'en-tête `Authorization`, jamais les valeurs
+elles-mêmes affichées) contre les vraies adresses `10.100.0.x` :
+- MISP et VirusTotal : valides du premier coup (`200 OK`).
+- Wazuh : `401`, `admin` étant le compte du Dashboard web — retrouvé et
+  réinitialisé le mot de passe de `smartsoc-reader` (compte API dédié,
+  créé en phase 1.2) dans **Server Management → Security** du Dashboard
+  Wazuh. Revalidé : jeton JWT obtenu, `sub: smartsoc-reader`.
+- OpenSearch (Indexer) : troisième système de comptes, distinct de
+  Wazuh et MISP. Compte `smartsoc-reader` créé sous **Indexer
+  management → Security → Internal users**, rôle `readall` (lecture
+  seule sur tous les index, déjà disponible, jamais un compte de
+  service partagé). `403` sur les endpoints cluster-level (`_cat/indices`,
+  attendu — `readall` ne les couvre pas), `200` sur une vraie recherche
+  (`wazuh-states-vulnerabilities-*`, 1994 vulnérabilités réelles lues) :
+  ce qui compte pour la plateforme fonctionne.
+
+**Bug 2 — truststore Java jamais construit (ADR-015, prévu comme
+livrable de la phase 1.2, oublié).** Passage effectif en mode `live` →
+`PKIX path building failed` sur les 3 connecteurs internes (Wazuh,
+OpenSearch, MISP) : la JVM ne fait pas confiance à leurs certificats
+(deux autorités internes distinctes — `SmartSOC Root CA` pour Wazuh API
+et MISP, autorité propre pour l'Indexer). Certificats **publics**
+(aucune clé privée) extraits des vrais serveurs, versés dans
+`docker/truststore/` (exception dédiée ajoutée au `.gitignore`, sinon
+`*.pem` est bloqué globalement). `Dockerfile` : construit un magasin
+PKCS12 à partir du `cacerts` par défaut de la JVM (conserve la confiance
+publique, ex. VirusTotal) plutôt que de le remplacer (PR #98).
+
+**Résultat, vérifié en réel après reconstruction complète de l'image.**
+MISP a synchronisé 1000 indicateurs réels ; Wazuh 5 agents réels (0
+rejeté) ; OpenSearch 659 vulnérabilités réelles. L'écran Actifs affiche
+désormais **de vraies machines** : `win10-client` (Windows 10 Home
+22H2), `windows-endpoin` (Windows Server 2025 Datacenter Azure Edition),
+`ubuntu-sensor` (Ubuntu 24.04.4 LTS) — IP réelle, description
+« Découvert automatiquement via le connecteur Wazuh », 73 alertes
+corrélées et 659 vulnérabilités réelles sur `win10-client` à elle
+seule. Nettoyage des données `sim-*` devenues obsolètes (2 assets, leurs
+vulnérabilités liées) après confirmation explicite d'Imane — un premier
+nettoyage accidentel de deux actifs légitimement décommissionnés par
+Imane elle-même a été détecté et corrigé immédiatement (`post-1`,
+`srv-web-01` remis en `DECOMMISSIONED`), leçon retenue : ne jamais
+modifier un état sans confirmer d'abord à qui appartient le changement
+observé.
+
+**Bug 3, trouvé en répondant à une question sur l'écran Connecteurs.**
+Même défaut que MISP et VirusTotal avant leur intégration : les cartes
+OpenSearch et VirusTotal affichaient un état figé. OpenSearch restait
+sur « Phase 4 » alors que son flux vulnérabilités tournait déjà en
+réel — `implemented: false` jamais mis à jour (PR #101). VirusTotal
+affichait « Déconnecté » à cause d'un disjoncteur ouvert par le quota
+dépassé pendant les tests (`wait-duration-in-open-state: 30s` — pas un
+bug, la protection prévue ; confirmé par Imane : le prochain vrai appel
+« l'allume » de nouveau).
+
+---
+
+## 2026-08-10 — Statut de connexion Wazuh exposé sur les Actifs (PR #99, #100)
+
+**Trouvé en répondant à une observation d'Imane** (« ces 3 réel 004,
+005, 007 il faut afficher aussi leur état réel si il sont disconnected
+ou connected ») : la console affichait « Actif » pour tous les actifs
+synchronisés, y compris un agent Wazuh réellement déconnecté (`WIN10-CLIENT`,
+capture d'écran du Dashboard Wazuh à l'appui). Cause : `WazuhAgentMapper`
+ignorait silencieusement le champ `status` de l'API Wazuh depuis le
+tout début (jamais capturé, donc jamais visible nulle part) —
+confusion involontaire entre le cycle de vie de l'inventaire
+(`AssetStatus`) et l'état de connexion rapporté par l'agent.
+
+**Exposition complète, jamais partielle.** En creusant, `AssetResponse`
+n'exposait non plus **aucun** des champs déjà captés par les connecteurs
+(`operatingSystem`, `lastSeenAt`, `hardwareSummary`) — silencieusement
+absents de l'API depuis leur introduction, corrigés dans le même lot.
+
+- Domaine : `AgentConnectionStatus` (`ACTIVE`/`DISCONNECTED`/`NEVER_CONNECTED`,
+  valeurs réelles observées), champ additif sur `Asset`, threadé dans
+  `applySyncMetadata` — reflète l'état COURANT rapporté par la source
+  (contrairement à `hardwareSummary`, qui ne s'efface jamais sur une
+  absence ponctuelle).
+- ACL Wazuh : traduit `dto.status()`, dégradation silencieuse sur une
+  valeur non reconnue.
+- Frontend : colonne « Connexion » dans la liste Actifs + chip dans le
+  tiroir (vert Connecté/rouge Déconnecté/gris Jamais connecté), absente
+  pour un actif enregistré à la main.
+
+**Vérification réelle.** 528 tests backend verts (+4), 47 tests
+frontend (3 échecs observés lors d'un run en pleine charge machine —
+confirmés comme flakiness pure en isolant chaque suite, aucune
+régression). Vérifié au navigateur contre le labo SOC réel : `win10-client`
+→ Déconnecté, `windows-endpoin`/`ubuntu-sensor` → Connecté, identique
+au Dashboard Wazuh réel.
+
+---
+
+## 2026-08-10 — Phase 4 : Threat Hunting live sur l'Indexer OpenSearch (PR #102)
+
+**Le blocage documenté depuis le début, enfin levé.** Le javadoc de
+`HuntExecutionPort` était explicite depuis sa création : le mode `live`
+était différé « jusqu'à disposer d'un schéma d'index réel plutôt que
+deviné ». Avec les 4 connecteurs désormais en live, deux échantillons
+réels ont été capturés contre `wazuh-alerts-*` (10 000+ documents
+réels) avant d'écrire une ligne de code — même discipline que chaque
+connecteur précédent : une recherche filtrée (`agent.name = WIN10-CLIENT`,
+3572 correspondances réelles) et une agrégation par bandes de niveau
+(`rule.level`, répartition réelle INFO 2105 / LOW 997 / MEDIUM 316 /
+HIGH 19 / CRITICAL 135), forme de réponse confirmée avant toute
+implémentation.
+
+**Décision de conception validée avec Imane avant tout code : la bande
+de sévérité.** Contrairement aux vulnérabilités (champ `severity`
+textuel natif côté Wazuh), une alerte brute ne porte que `rule.level`
+(numérique, 0-15) — aucune correspondance documentée nulle part dans ce
+dépôt puisque la classification réelle se fait hors dépôt (script SOC,
+ADR-005). Bandes standard Wazuh retenues sur confirmation explicite :
+0-3 INFO, 4-6 LOW, 7-9 MEDIUM, 10-13 HIGH, 14-15 CRITICAL — partagées
+entre l'agrégation OpenSearch et la traduction du domaine, une seule
+source de vérité.
+
+**`STATUS`/`SOURCE` : une notion qui n'existe simplement pas côté
+document brut.** Une alerte OpenSearch n'a jamais de statut de triage
+(jamais persistée) ni d'autre source que « wazuh » (seul index
+interrogé). Plutôt que d'inventer un filtre OpenSearch inexistant, une
+condition qui exige une autre valeur est court-circuitée en résultat
+vide côté Java — décision explicite, documentée en javadoc.
+
+**Mapping fidèle, jamais partiel.** `OpenSearchAlertMapper` traduit
+chaque hit en `Alert` du domaine via `Alert.ingest()` (jamais persisté
+— lecture seule) ; le document **complet** (pas la vue typée partielle
+`OpenSearchAlertDocument`) est préservé dans `rawPayload` via le
+`JsonNode` brut, pour ne jamais perdre de champ à l'investigation. Un
+document individuellement mal formé est dégradé silencieusement (loggué,
+écarté) plutôt que d'échouer toute la page de résultats — même doctrine
+que `AgentSnapshot`.
+
+**Zéro changement du port, du service, de l'API ou de l'écran** — le
+critère de fin de la phase 4 tenu par construction : `LiveHuntExecutionAdapter`
+implémente exactement le même `HuntExecutionPort` que la simulation,
+`HuntApiMapper` reste générique. Seul changement structurel :
+`SimulatedHuntExecutionAdapter`, jusque-là le seul adaptateur sans
+garde, a reçu son `@ConditionalOnProperty` (sinon bean ambigu avec le
+nouvel adaptateur live) ; `DisabledHuntExecutionAdapter` ajouté pour
+compléter le trio (ADR-014 amendement v1.1).
+
+**Vérification réelle.** 543 tests backend verts (+15) : mapper ACL sur
+échantillons réels (bande de sévérité, dégradation silencieuse, document
+complet préservé), traduction de requête (chaque champ/opérateur,
+court-circuit STATUS/SOURCE, pagination, troncature `track_total_hits`).
+Aucun test WireMock pour ce connecteur précisément (constat : OpenSearch
+n'en a jamais eu, même pour le flux vulnérabilités de la phase 1.3 —
+écart pré-existant, pas introduit ici) ; compensé par une vérification
+manuelle réelle poussée (requêtes brutes contre l'Indexer avant tout
+code) et un test unitaire complet sur le client Feign mocké. Chasse
+`SEVERITY = CRITICAL` exécutée au navigateur (par Imane elle-même,
+capture d'écran à l'appui) contre le labo SOC réel : **136
+correspondances réelles en 1456 ms**, mêmes alertes que celles capturées
+en fixture (`WIN10-CLIENT`, « Executable file dropped in folder
+commonly used by malware », niveau 15).
+
+**Reste ouvert.** Écart pré-existant signalé, pas introduit ici :
+absence de test WireMock live pour OpenSearch (vulnérabilités ET
+hunting). Phase 5 (Actions réelles — Shuffle, contrôle d'agents) reste
+à planifier ; hors chemin critique déjà franchi (0 → 1.1 → 1.2 → 1.3 →
+4 sont maintenant tous terminés et vérifiés en réel).
