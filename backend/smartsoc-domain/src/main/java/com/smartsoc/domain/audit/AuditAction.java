@@ -15,5 +15,13 @@ public enum AuditAction {
     USER_ENABLED,
     USER_DISABLED,
     USER_DELETED,
-    BACKUP_EXPORTED
+    BACKUP_EXPORTED,
+    /**
+     * Action réelle sur un agent Wazuh (ADR-014 phase 5) — toujours
+     * enregistrée, succès ou échec, l'issue étant portée par {@code details}
+     * (jamais deux valeurs d'enum pour un même acte, pour que le plafond
+     * horaire de {@code SocActionService} compte tout appel réel en un
+     * seul filtre).
+     */
+    WAZUH_AGENT_RESTART_REQUESTED
 }

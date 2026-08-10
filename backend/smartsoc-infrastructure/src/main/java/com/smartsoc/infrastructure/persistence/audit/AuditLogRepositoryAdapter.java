@@ -39,6 +39,12 @@ public class AuditLogRepositoryAdapter implements AuditLogRepository {
         if (query.to() != null) {
             spec = spec.and((root, q, cb) -> cb.lessThanOrEqualTo(root.get("occurredAt"), query.to()));
         }
+        if (query.targetType() != null && !query.targetType().isBlank()) {
+            spec = spec.and((root, q, cb) -> cb.equal(root.get("targetType"), query.targetType()));
+        }
+        if (query.targetId() != null && !query.targetId().isBlank()) {
+            spec = spec.and((root, q, cb) -> cb.equal(root.get("targetId"), query.targetId()));
+        }
 
         PageRequest pageRequest = PageRequest.of(query.page().page(), query.page().size(),
                 Sort.by(Sort.Direction.DESC, "occurredAt"));
