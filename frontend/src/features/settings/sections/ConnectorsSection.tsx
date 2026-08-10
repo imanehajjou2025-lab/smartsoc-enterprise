@@ -51,9 +51,9 @@ const CONNECTORS: ConnectorMeta[] = [
   {
     type: 'OPENSEARCH',
     label: 'OpenSearch',
-    description: 'Recherche d’événements pour le module Threat Hunting.',
+    description: 'Vulnérabilités (Indexer Wazuh) — recherche d’événements (Threat Hunting) à venir.',
     icon: <ManageSearchOutlinedIcon />,
-    implemented: false,
+    implemented: true,
     plannedPhase: 'Phase 4',
   },
   {
