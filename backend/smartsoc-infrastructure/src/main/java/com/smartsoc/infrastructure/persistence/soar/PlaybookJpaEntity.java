@@ -46,4 +46,10 @@ public class PlaybookJpaEntity extends AbstractAuditableEntity {
 
     @Column(nullable = false)
     private boolean archived;
+
+    @Column(name = "shuffle_workflow_id", length = 100)
+    private String shuffleWorkflowId;
+
+    @Column(name = "shuffle_webhook_path", length = 200)
+    private String shuffleWebhookPath;
 }

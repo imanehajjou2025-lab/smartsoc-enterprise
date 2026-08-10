@@ -3,16 +3,22 @@ package com.smartsoc.api.soar;
 import com.smartsoc.api.common.dto.PageResponse;
 import com.smartsoc.api.soar.dto.SoarDtos.PlaybookExecutionResponse;
 import com.smartsoc.api.soar.dto.SoarDtos.StartExecutionRequest;
+import com.smartsoc.api.soar.dto.SoarDtos.TriggerShuffleWorkflowRequest;
 import com.smartsoc.api.soar.dto.SoarDtos.UpdateStepRequest;
+import com.smartsoc.application.actions.SocActionService;
+import com.smartsoc.application.audit.ActorContext;
 import com.smartsoc.application.soar.PlaybookExecutionService;
 import com.smartsoc.domain.common.PageQuery;
 import com.smartsoc.domain.common.PageResult;
 import com.smartsoc.domain.soar.PlaybookExecution;
 import com.smartsoc.domain.soar.PlaybookExecutionQuery;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -39,6 +45,7 @@ public class PlaybookExecutionController {
     private static final String WRITE_ROLES = "hasAnyRole('ADMIN','SOC_MANAGER','SOC_ANALYST')";
 
     private final PlaybookExecutionService executionService;
+    private final SocActionService actionService;
     private final PlaybookApiMapper mapper;
 
     @PostMapping("/api/v1/incidents/{incidentId}/playbook-executions")
@@ -47,6 +54,39 @@ public class PlaybookExecutionController {
     public PlaybookExecutionResponse start(@PathVariable UUID incidentId,
                                            @Valid @RequestBody StartExecutionRequest request) {
         return mapper.toResponse(executionService.start(request.playbookId(), incidentId));
+    }
+
+    /**
+     * Déclenchement RÉEL d'un workflow Shuffle (ADR-014 phase 5) — sous-
+     * contexte actions ISOLÉ, tout passe par {@link SocActionService}
+     * (confirmation de cible, motif, plafond, audit systématique).
+     */
+    @PostMapping("/api/v1/incidents/{incidentId}/playbook-executions/trigger-shuffle")
+    @PreAuthorize(WRITE_ROLES)
+    @ResponseStatus(HttpStatus.CREATED)
+    public PlaybookExecutionResponse triggerShuffle(@PathVariable UUID incidentId,
+                                                     @Valid @RequestBody TriggerShuffleWorkflowRequest request,
+                                                     @AuthenticationPrincipal Jwt jwt, HttpServletRequest httpRequest) {
+        ActorContext actor = actorFrom(jwt, httpRequest);
+        PlaybookExecution execution = actionService.triggerShuffleWorkflow(
+                request.playbookId(), incidentId, request.confirmPlaybookName(), request.reason(), actor);
+        return mapper.toResponse(execution);
+    }
+
+    /**
+     * Réconciliation à la demande (ADR-014 phase 5, lecture) : interroge
+     * Shuffle et aligne le statut sur la réalité — jamais d'automatisme
+     * en V1, l'analyste déclenche explicitement le rafraîchissement.
+     */
+    @PostMapping("/api/v1/playbook-executions/{id}/refresh-shuffle-status")
+    @PreAuthorize(WRITE_ROLES)
+    public PlaybookExecutionResponse refreshShuffleStatus(@PathVariable UUID id) {
+        return mapper.toResponse(actionService.refreshShuffleWorkflowStatus(id));
+    }
+
+    private static ActorContext actorFrom(Jwt jwt, HttpServletRequest httpRequest) {
+        return new ActorContext(jwt.getSubject(),
+                UUID.fromString(jwt.getClaimAsString("userId")), httpRequest.getRemoteAddr());
     }
 
     @GetMapping("/api/v1/incidents/{incidentId}/playbook-executions")

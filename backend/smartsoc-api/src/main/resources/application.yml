@@ -184,6 +184,14 @@ smartsoc:
       # Duree de fraicheur du cache -- protege le quota strict (4 req/min,
       # 500/jour en offre gratuite), pas une simple optimisation de latence.
       cache-ttl-hours: ${SMARTSOC_CONNECTORS_VIRUSTOTAL_CACHE_TTL_HOURS:24}
+    # Declenchement de workflow Shuffle + reconciliation (ADR-014 phase 5,
+    # EFFET REEL). Le webhook de declenchement porte son propre secret
+    # (aucune cle requise) ; la cle d'API globale ne sert qu'a la
+    # consultation de statut -- verifie en reel le 2026-08-10.
+    shuffle:
+      mode: ${SMARTSOC_CONNECTORS_SHUFFLE_MODE:simulation}
+      url: ${SMARTSOC_CONNECTORS_SHUFFLE_URL:https://localhost:3443}
+      api-key: ${SMARTSOC_CONNECTORS_SHUFFLE_API_KEY:}
 
 resilience4j:
   circuitbreaker:
@@ -257,6 +265,23 @@ resilience4j:
         permitted-number-of-calls-in-half-open-state: 2
       # Reputation VirusTotal : meme doctrine, ADR-014 phase 3.
       virusTotalReputation:
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 2
+      # Declenchement de workflow Shuffle (EFFET REEL, ADR-014 phase 5) :
+      # meme doctrine que wazuhAgentControl, aucun retry automatique.
+      shuffleWorkflowTrigger:
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 2
+      # Reconciliation Shuffle (lecture, ADR-014 phase 5) : instance
+      # distincte du declenchement -- un Shuffle degrade pour la lecture
+      # ne doit pas ouvrir le circuit du declenchement, et inversement.
+      shuffleWorkflowStatus:
         sliding-window-size: 10
         minimum-number-of-calls: 5
         failure-rate-threshold: 50

@@ -3,6 +3,7 @@ package com.smartsoc.application.actions;
 import com.smartsoc.application.audit.ActorContext;
 import com.smartsoc.application.audit.AuditRecorder;
 import com.smartsoc.application.connectors.SocConnectorException;
+import com.smartsoc.domain.alerts.Severity;
 import com.smartsoc.domain.assets.Asset;
 import com.smartsoc.domain.assets.AssetRepository;
 import com.smartsoc.domain.audit.AuditAction;
@@ -12,11 +13,19 @@ import com.smartsoc.domain.common.BusinessRuleViolationException;
 import com.smartsoc.domain.common.PageQuery;
 import com.smartsoc.domain.common.ResourceNotFoundException;
 import com.smartsoc.domain.common.TextNormalization;
+import com.smartsoc.domain.incidents.Incident;
+import com.smartsoc.domain.incidents.IncidentRepository;
+import com.smartsoc.domain.soar.ExecutionStatus;
+import com.smartsoc.domain.soar.Playbook;
+import com.smartsoc.domain.soar.PlaybookExecution;
+import com.smartsoc.domain.soar.PlaybookExecutionRepository;
+import com.smartsoc.domain.soar.PlaybookRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
@@ -54,8 +63,13 @@ import java.util.regex.Pattern;
 public class SocActionService {
 
     private static final String TARGET_TYPE_ASSET = "ASSET";
+    private static final String TARGET_TYPE_INCIDENT = "INCIDENT";
     private static final int MAX_ACTIONS_PER_HOUR = 3;
     private static final Duration RATE_WINDOW = Duration.ofHours(1);
+
+    /** ADR-014 phase 5 : projection simple, jamais fait passer pour la sévérité Wazuh d'origine. */
+    private static final Map<Severity, Integer> SEVERITY_TO_SHUFFLE = Map.of(
+            Severity.CRITICAL, 4, Severity.HIGH, 3, Severity.MEDIUM, 2, Severity.LOW, 1, Severity.INFO, 0);
 
     /** Même expression que {@code IndicatorType.IPV4} (domaine CTI) — dupliquée
      * plutôt que référencée : {@code actions} ne dépend jamais de {@code intelligence},
@@ -67,6 +81,11 @@ public class SocActionService {
     private final AgentControlPort agentControlPort;
     private final AuditRecorder auditRecorder;
     private final AuditLogRepository auditLogRepository;
+    private final PlaybookRepository playbookRepository;
+    private final IncidentRepository incidentRepository;
+    private final PlaybookExecutionRepository playbookExecutionRepository;
+    private final WorkflowTriggerPort workflowTriggerPort;
+    private final WorkflowStatusPort workflowStatusPort;
 
     public void restartAgent(UUID assetId, String confirmHostname, String reason, ActorContext actor) {
         Asset asset = requireActionableAsset(assetId, confirmHostname, reason,
@@ -103,6 +122,96 @@ public class SocActionService {
         }
     }
 
+    /**
+     * Déclenchement manuel d'un workflow Shuffle (ADR-014 phase 5) — mêmes
+     * garde-fous que le contrôle d'agents : motif obligatoire, cible
+     * confirmée EXPLICITEMENT (le nom du playbook, pas seulement un
+     * UUID d'URL), plafond horaire, audit systématique, aucun retry. La
+     * cible du plafond est l'INCIDENT, pas le playbook : deux analystes
+     * ne doivent pas pouvoir contourner le plafond en visant le même
+     * incident via deux playbooks différents... et inversement, deux
+     * incidents distincts ne se partagent jamais leur quota.
+     */
+    public PlaybookExecution triggerShuffleWorkflow(UUID playbookId, UUID incidentId, String confirmPlaybookName,
+                                                     String reason, ActorContext actor) {
+        Playbook playbook = playbookRepository.findById(playbookId)
+                .orElseThrow(() -> new ResourceNotFoundException("Playbook", playbookId.toString()));
+        Incident incident = incidentRepository.findById(incidentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Incident", incidentId.toString()));
+
+        requireReason(reason);
+        requirePlaybookNameConfirmation(playbook, confirmPlaybookName);
+        requireLinkedToShuffle(playbook);
+        requireUnderRateCap(TARGET_TYPE_INCIDENT, incidentId.toString(), AuditAction.SHUFFLE_WORKFLOW_TRIGGER_REQUESTED);
+
+        WorkflowTriggerPayload payload = new WorkflowTriggerPayload(
+                SEVERITY_TO_SHUFFLE.getOrDefault(incident.getSeverity(), 0),
+                incident.getTitle(), incident.getReference(), incident.getOpenedAt().toString(),
+                incident.getId().toString());
+
+        try {
+            String externalExecutionId = workflowTriggerPort.trigger(playbook.getShuffleWebhookPath(), payload);
+            PlaybookExecution execution = playbookExecutionRepository.save(PlaybookExecution.startExternal(
+                    playbook.getId(), playbook.getVersion(), playbook.getName(), incidentId, externalExecutionId));
+            recordAttempt(AuditAction.SHUFFLE_WORKFLOW_TRIGGER_REQUESTED, TARGET_TYPE_INCIDENT, incidentId.toString(),
+                    actor, reason + "; executionId=" + externalExecutionId, true, null);
+            return execution;
+        } catch (SocConnectorException e) {
+            PlaybookExecution execution = playbookExecutionRepository.save(PlaybookExecution.startExternalFailed(
+                    playbook.getId(), playbook.getVersion(), playbook.getName(), incidentId, e.getMessage()));
+            recordAttempt(AuditAction.SHUFFLE_WORKFLOW_TRIGGER_REQUESTED, TARGET_TYPE_INCIDENT, incidentId.toString(),
+                    actor, reason, false, e.getMessage());
+            return execution;
+        }
+    }
+
+    /**
+     * Réconciliation en lecture (ADR-014 phase 5) : contrairement au
+     * déclenchement, une consultation est idempotente — rejouable sans
+     * risque, aucun garde-fou de plafond ni d'audit ici. Un no-op sur une
+     * exécution déjà terminale ou non externe (jamais d'exception : cette
+     * consultation peut être appelée à tout moment par l'écran de suivi).
+     */
+    public PlaybookExecution refreshShuffleWorkflowStatus(UUID executionId) {
+        PlaybookExecution execution = playbookExecutionRepository.findById(executionId)
+                .orElseThrow(() -> new ResourceNotFoundException("PlaybookExecution", executionId.toString()));
+        if (execution.getExternalExecutionId() == null
+                || !isReconcilable(execution.getStatus())) {
+            return execution;
+        }
+        Playbook playbook = playbookRepository.findById(execution.getPlaybookId())
+                .orElseThrow(() -> new ResourceNotFoundException("Playbook", execution.getPlaybookId().toString()));
+
+        WorkflowExecutionStatus status = workflowStatusPort.statusOf(
+                playbook.getShuffleWorkflowId(), execution.getExternalExecutionId());
+        switch (status.outcome()) {
+            case SUCCEEDED -> execution.completeExternally(status.resultSummary());
+            case FAILED -> execution.partialFailure(status.resultSummary());
+            case NOT_FOUND -> execution.markOrphaned();
+            case STILL_RUNNING -> { /* aucun changement : reste IN_PROGRESS */ }
+        }
+        return playbookExecutionRepository.save(execution);
+    }
+
+    private static boolean isReconcilable(ExecutionStatus status) {
+        return status == ExecutionStatus.IN_PROGRESS || status == ExecutionStatus.ORPHANED;
+    }
+
+    private static void requirePlaybookNameConfirmation(Playbook playbook, String confirmPlaybookName) {
+        String normalized = TextNormalization.blankToNull(confirmPlaybookName);
+        if (normalized == null || !playbook.getName().trim().equalsIgnoreCase(normalized.trim())) {
+            throw new BusinessRuleViolationException("ACTION_TARGET_NOT_CONFIRMED",
+                    "The confirmed playbook name does not match — action refused");
+        }
+    }
+
+    private static void requireLinkedToShuffle(Playbook playbook) {
+        if (!playbook.isLinkedToShuffleWorkflow()) {
+            throw new BusinessRuleViolationException("PLAYBOOK_NOT_LINKED_TO_SHUFFLE",
+                    "This playbook is not linked to a Shuffle workflow");
+        }
+    }
+
     private Asset requireActionableAsset(UUID assetId, String confirmHostname, String reason, AuditAction action) {
         Asset asset = assetRepository.findById(assetId)
                 .orElseThrow(() -> new ResourceNotFoundException("Asset", assetId.toString()));
@@ -110,7 +219,7 @@ public class SocActionService {
         requireReason(reason);
         requireHostnameConfirmation(asset, confirmHostname);
         requireWazuhManaged(asset);
-        requireUnderRateCap(assetId, action);
+        requireUnderRateCap(TARGET_TYPE_ASSET, assetId.toString(), action);
         return asset;
     }
 
@@ -148,24 +257,29 @@ public class SocActionService {
         }
     }
 
-    private void requireUnderRateCap(UUID assetId, AuditAction action) {
+    private void requireUnderRateCap(String targetType, String targetId, AuditAction action) {
         Instant now = Instant.now();
         long recentAttempts = auditLogRepository.search(new AuditLogQuery(
                         action, null, now.minus(RATE_WINDOW), now,
-                        TARGET_TYPE_ASSET, assetId.toString(), PageQuery.of(0, 1)))
+                        targetType, targetId, PageQuery.of(0, 1)))
                 .totalElements();
         if (recentAttempts >= MAX_ACTIONS_PER_HOUR) {
             throw new BusinessRuleViolationException("ACTION_RATE_LIMIT_EXCEEDED",
-                    "Too many attempts of this action on this asset in the last hour (max %d)"
+                    "Too many attempts of this action on this target in the last hour (max %d)"
                             .formatted(MAX_ACTIONS_PER_HOUR));
         }
     }
 
     private void recordAttempt(AuditAction action, Asset asset, ActorContext actor, String reason,
                                boolean succeeded, String error) {
+        recordAttempt(action, TARGET_TYPE_ASSET, asset.getId().toString(), actor, reason, succeeded, error);
+    }
+
+    private void recordAttempt(AuditAction action, String targetType, String targetId, ActorContext actor,
+                               String reason, boolean succeeded, String error) {
         String details = "reason=%s; outcome=%s%s".formatted(
                 reason, succeeded ? "SUCCESS" : "FAILURE", error == null ? "" : "; error=" + error);
         auditRecorder.record(action, actor.username(), actor.userId(),
-                TARGET_TYPE_ASSET, asset.getId().toString(), details, actor.ipAddress());
+                targetType, targetId, details, actor.ipAddress());
     }
 }

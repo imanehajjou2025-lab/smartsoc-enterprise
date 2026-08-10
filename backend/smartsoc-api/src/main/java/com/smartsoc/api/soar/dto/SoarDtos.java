@@ -29,7 +29,9 @@ public final class SoarDtos {
     public record DeclarePlaybookRequest(
             @NotBlank @Size(max = 200) String name,
             String description,
-            @NotEmpty List<@Valid @NotNull PlaybookStepDto> steps) {
+            @NotEmpty List<@Valid @NotNull PlaybookStepDto> steps,
+            @Size(max = 100) String shuffleWorkflowId,
+            @Size(max = 200) String shuffleWebhookPath) {
     }
 
     public record PlaybookResponse(
@@ -38,13 +40,29 @@ public final class SoarDtos {
             String description,
             int version,
             List<PlaybookStepDto> steps,
-            boolean archived) {
+            boolean archived,
+            String shuffleWorkflowId,
+            String shuffleWebhookPath) {
     }
 
     public record StartExecutionRequest(@NotNull UUID playbookId) {
     }
 
     public record UpdateStepRequest(@NotNull StepStatus status, String note) {
+    }
+
+    /**
+     * @param playbookId           playbook lié au workflow Shuffle à déclencher
+     * @param confirmPlaybookName doit correspondre EXACTEMENT au nom du
+     *                             playbook ciblé (ADR-014 phase 5) — le
+     *                             serveur revérifie, jamais fait confiance
+     *                             au format client seul
+     * @param reason               motif obligatoire, conservé dans le journal d'audit
+     */
+    public record TriggerShuffleWorkflowRequest(
+            @NotNull UUID playbookId,
+            @NotBlank @Size(max = 200) String confirmPlaybookName,
+            @NotBlank @Size(max = 1000) String reason) {
     }
 
     public record PlaybookExecutionStepResponse(
@@ -60,6 +78,8 @@ public final class SoarDtos {
             ExecutionStatus status,
             Instant startedAt,
             Instant completedAt,
+            String externalExecutionId,
+            String resultSummary,
             List<PlaybookExecutionStepResponse> steps) {
     }
 }
