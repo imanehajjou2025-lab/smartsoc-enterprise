@@ -3,17 +3,12 @@ package com.smartsoc.infrastructure.connectors.shuffle;
 import com.smartsoc.application.actions.WorkflowTriggerPayload;
 import com.smartsoc.application.actions.WorkflowTriggerPort;
 import com.smartsoc.application.connectors.SocConnectorException;
-import com.smartsoc.domain.connectors.ConnectorType;
-import com.smartsoc.domain.connectors.SocConnector;
-import com.smartsoc.domain.connectors.SocConnectorRepository;
 import com.smartsoc.infrastructure.connectors.common.ConnectorProperties;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
-
-import java.time.Instant;
 
 /**
  * Adaptateur live du déclenchement Shuffle (ADR-014 phase 5, EFFET
@@ -38,7 +33,7 @@ public class LiveWorkflowTriggerAdapter implements WorkflowTriggerPort {
     static final String CIRCUIT_BREAKER = "shuffleWorkflowTrigger";
 
     private final ShuffleClient client;
-    private final SocConnectorRepository connectorRepository;
+    private final ShuffleConnectorStatusRecorder connectorStatus;
 
     @Override
     @CircuitBreaker(name = CIRCUIT_BREAKER, fallbackMethod = "triggerUnavailable")
@@ -46,31 +41,17 @@ public class LiveWorkflowTriggerAdapter implements WorkflowTriggerPort {
         ShuffleTriggerResponse response = client.trigger(webhookPath, new ShuffleTriggerRequest(
                 payload.severity(), payload.title(), payload.ruleId(), payload.timestamp(), payload.id()));
         if (!response.success() || response.executionId() == null) {
-            recordFailure("Shuffle refused the workflow trigger");
+            connectorStatus.recordFailure("Shuffle refused the workflow trigger");
             throw new SocConnectorException("Shuffle refused the workflow trigger");
         }
-        recordSuccess();
+        connectorStatus.recordSuccess();
         return response.executionId();
     }
 
     @SuppressWarnings("unused") // invoqué par Resilience4j (fallbackMethod)
     private String triggerUnavailable(String webhookPath, WorkflowTriggerPayload payload, Throwable cause) {
-        recordFailure(cause.getMessage());
+        connectorStatus.recordFailure(cause.getMessage());
         log.warn("Shuffle workflow trigger unavailable: {}", cause.getMessage());
         throw new SocConnectorException("Shuffle workflow trigger unavailable: " + cause.getMessage(), cause);
-    }
-
-    private void recordSuccess() {
-        SocConnector connector = connectorRepository.findByType(ConnectorType.SHUFFLE)
-                .orElseGet(() -> SocConnector.notConfigured(ConnectorType.SHUFFLE));
-        connector.recordSuccess(Instant.now(), connector.getDescriptor());
-        connectorRepository.save(connector);
-    }
-
-    private void recordFailure(String error) {
-        SocConnector connector = connectorRepository.findByType(ConnectorType.SHUFFLE)
-                .orElseGet(() -> SocConnector.notConfigured(ConnectorType.SHUFFLE));
-        connector.recordFailure(Instant.now(), error);
-        connectorRepository.save(connector);
     }
 }

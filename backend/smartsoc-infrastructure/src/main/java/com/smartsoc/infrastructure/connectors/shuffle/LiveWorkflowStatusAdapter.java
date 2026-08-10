@@ -6,9 +6,6 @@ import com.smartsoc.application.actions.WorkflowExecutionStatus;
 import com.smartsoc.application.actions.WorkflowExecutionStatus.Outcome;
 import com.smartsoc.application.actions.WorkflowStatusPort;
 import com.smartsoc.application.connectors.SocConnectorException;
-import com.smartsoc.domain.connectors.ConnectorType;
-import com.smartsoc.domain.connectors.SocConnector;
-import com.smartsoc.domain.connectors.SocConnectorRepository;
 import com.smartsoc.infrastructure.connectors.common.ConnectorProperties;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import lombok.RequiredArgsConstructor;
@@ -16,7 +13,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
-import java.time.Instant;
 import java.util.Optional;
 
 /**
@@ -44,13 +40,13 @@ public class LiveWorkflowStatusAdapter implements WorkflowStatusPort {
 
     private final ShuffleClient client;
     private final ObjectMapper objectMapper;
-    private final SocConnectorRepository connectorRepository;
+    private final ShuffleConnectorStatusRecorder connectorStatus;
 
     @Override
     @CircuitBreaker(name = CIRCUIT_BREAKER, fallbackMethod = "statusUnavailable")
     public WorkflowExecutionStatus statusOf(String workflowId, String externalExecutionId) {
         ShuffleExecutionsResponse response = client.listExecutions(workflowId);
-        recordSuccess();
+        connectorStatus.recordSuccess();
         return response.executions().stream()
                 .filter(execution -> externalExecutionId.equals(execution.executionId()))
                 .findFirst()
@@ -94,22 +90,8 @@ public class LiveWorkflowStatusAdapter implements WorkflowStatusPort {
 
     @SuppressWarnings("unused") // invoqué par Resilience4j (fallbackMethod)
     private WorkflowExecutionStatus statusUnavailable(String workflowId, String externalExecutionId, Throwable cause) {
-        recordFailure(cause.getMessage());
+        connectorStatus.recordFailure(cause.getMessage());
         log.warn("Shuffle workflow status unavailable: {}", cause.getMessage());
         throw new SocConnectorException("Shuffle workflow status unavailable: " + cause.getMessage(), cause);
-    }
-
-    private void recordSuccess() {
-        SocConnector connector = connectorRepository.findByType(ConnectorType.SHUFFLE)
-                .orElseGet(() -> SocConnector.notConfigured(ConnectorType.SHUFFLE));
-        connector.recordSuccess(Instant.now(), connector.getDescriptor());
-        connectorRepository.save(connector);
-    }
-
-    private void recordFailure(String error) {
-        SocConnector connector = connectorRepository.findByType(ConnectorType.SHUFFLE)
-                .orElseGet(() -> SocConnector.notConfigured(ConnectorType.SHUFFLE));
-        connector.recordFailure(Instant.now(), error);
-        connectorRepository.save(connector);
     }
 }
