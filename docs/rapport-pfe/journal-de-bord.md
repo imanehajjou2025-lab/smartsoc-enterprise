@@ -3227,6 +3227,85 @@ commonly used by malware », niveau 15).
 
 **Reste ouvert.** Écart pré-existant signalé, pas introduit ici :
 absence de test WireMock live pour OpenSearch (vulnérabilités ET
-hunting). Phase 5 (Actions réelles — Shuffle, contrôle d'agents) reste
-à planifier ; hors chemin critique déjà franchi (0 → 1.1 → 1.2 → 1.3 →
-4 sont maintenant tous terminés et vérifiés en réel).
+hunting).
+
+---
+
+## 2026-08-10 — Phase 5 (1/2) : contrôle d'agents Wazuh, premier redémarrage réel (PR #105)
+
+**La première fonctionnalité du projet à AGIR sur le monde réel**, pas
+seulement le lire. Portée volontairement réduite à confirmation :
+redémarrage d'agent uniquement pour ce lot, l'active-response (exécution
+de commande arbitraire sur une machine distante) reportée à un prochain
+lot — mérite sa propre conception (liste blanche de commandes), décision
+prise avec Imane avant tout code plutôt que d'élargir le périmètre par
+défaut.
+
+**Compte dédié créé avec Imane, pas à pas, comme pour chaque connecteur
+précédent — mais un cran de rigueur au-dessus.** Avant même de coder,
+vérification que le compte de lecture `smartsoc-reader` n'a AUCUNE
+permission d'écriture (`GET /security/users/me` : rôle `readonly`, zéro
+action au-delà de `*:read`) — confirme qu'un compte séparé est
+obligatoire, pas une simple précaution. Rôle Wazuh personnalisé
+`agent_control` construit avec Imane dans le Dashboard : une politique
+sur mesure `agent_restart` (`agent:restart` sur `agent:id:*`) combinée
+à la politique **réservée** Wazuh `agents_commands_agents`
+(`active-response:command`) plutôt qu'une politique dupliquée à la
+main — Imane a trouvé cette politique existante elle-même, corrigeant
+au passage une erreur de nom d'action de ma part (`active:command` au
+lieu du vrai `active-response:command`). Compte `smartsoc-actuator`
+créé avec ce seul rôle. Authentification revérifiée en réel avant tout
+code : jeton JWT obtenu, permissions confirmées **exactement**
+`agent:restart` + `active-response:command`, rien de plus.
+
+**Identité complètement séparée de la lecture, jusqu'au bout de la
+chaîne.** Pas seulement un compte différent : toute la chaîne
+d'authentification Wazuh (client Basic Auth, cache de jeton JWT, client
+Bearer) dupliquée sous un nom distinct (`WazuhActions*`), avec son
+propre bouton de mode (`wazuh.actions.mode`, indépendant de
+`wazuh.mode`) — la lecture peut rester en live pendant que les actions
+restent en simulation, et inversement. Décision délibérée : jamais un
+compte "lecture" qui se retrouverait silencieusement élargi.
+
+**Garde-fous non négociables du plan d'architecture, tous appliqués
+dans un point de passage unique (`SocActionService`), aucun laissé à
+l'appelant :**
+- Cible confirmée explicitement par son hostname exact (pas seulement
+  un UUID d'URL) — un clic sur la mauvaise ligne échoue plutôt que
+  d'agir sur la mauvaise machine.
+- Motif obligatoire, même doctrine que la révocation d'un IOC.
+- Plafond de 3 tentatives/heure sur le même actif — `AuditLogQuery`
+  étendu d'un filtre `targetType`/`targetId` (additif), le journal
+  d'audit existant réutilisé plutôt qu'une table dédiée au rate-limiting.
+- **Aucun retry**, ni dans le service ni dans l'adaptateur infrastructure
+  (`@CircuitBreaker` seul, jamais `@Retry`) : rejouer une action, c'est
+  agir une seconde fois sur une vraie machine.
+- Audit nominatif systématique (acteur, IP, cible), succès ET échec —
+  un seul type d'événement d'audit (`WAZUH_AGENT_RESTART_REQUESTED`),
+  l'issue portée par `details`, pour que le plafond horaire compte
+  toute tentative réelle en un seul filtre.
+
+**Le cas le plus trompeur pour ce type d'appel, anticipé et testé.**
+L'API Wazuh peut répondre `HTTP 200` globalement tout en signalant
+l'agent VISÉ dans `failed_items` — un succès apparent qui masque un
+échec réel sur la cible précise. `LiveAgentControlAdapter` vérifie
+explicitement cette liste avant de déclarer un succès, couvert par un
+test WireMock dédié à ce scénario précis.
+
+**Vérification réelle, jamais de vrai redémarrage déclenché.** 560
+tests backend verts (+17, dont un test WireMock live couvrant
+l'authentification dédiée, l'échec partiel masqué, et l'absence de
+retry après panne). Identifiants `smartsoc-actuator` authentifiés
+contre l'API Wazuh réelle. Endpoint vérifié de bout en bout en Docker
+reconstruit, **strictement en mode simulation** — log explicite
+« [simulation] Would restart... (no real effect) », audit nominatif
+confirmé en base (acteur, IP, cible, motif, issue). Le mode live n'a
+jamais été déclenché pour de vrai dans cette session : décision
+délibérée, laissée à un prochain test explicite avec confirmation en
+temps réel — cohérent avec la doctrine du plan d'architecture
+(« accorder un pouvoir d'action exige que toute la chaîne soit
+éprouvée »).
+
+**Reste ouvert.** Bouton frontend (déclencheur + confirmation nommant
+la cible) pas encore construit — backend seul pour ce lot. Active-response
+reportée. Shuffle (2ᵉ connecteur de la phase 5) reste à construire.
