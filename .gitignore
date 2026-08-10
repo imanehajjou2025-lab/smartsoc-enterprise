@@ -12,6 +12,9 @@
 *.p12
 *.jks
 secrets/
+# Exception : certificats PUBLICS du truststore SOC (ADR-015) -- aucune clé
+# privée, le Dockerfile en a besoin pour construire le truststore applicatif.
+!docker/truststore/*.pem
 
 # --- Java / Maven (backend) ---
 target/
