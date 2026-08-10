@@ -3417,3 +3417,34 @@ jamais déclenché pour de vrai.
 **Reste ouvert.** Bouton frontend pour le blocage d'IP (2ᵉ PR du
 module, même rythme que le redémarrage). Shuffle (2ᵉ connecteur de la
 phase 5) reste à construire.
+
+---
+
+## 2026-08-10 — Phase 5 (2/2) : bouton de blocage d'IP, frontend (PR #111) — connecteur Wazuh terminé
+
+**Déclencheur ajouté dans le tiroir Actif**, en miroir exact du bouton
+de redémarrage : visible uniquement pour un actif Wazuh-managé, en
+écriture (ANALYST+), non décommissionné. `BlockIpDialog.tsx` ajoute un
+troisième garde-fou côté client par rapport au redémarrage : validation
+du format IPv4 de l'adresse à bloquer (même regex que côté serveur,
+dupliquée volontairement — le serveur revalide de toute façon, ce
+contrôle client n'est qu'un confort, jamais une source de vérité).
+
+**Vérification réelle complète, avec une IP de test volontairement
+« attaquante » plutôt qu'une IP légitime** (plage documentaire RFC 5737,
+`198.51.100.23`, jamais une adresse réelle). 51 tests frontend verts
+(+3). Backend Docker réel (déjà reconstruit pour la PR #109), rejoué de
+bout en bout au navigateur en **mode simulation uniquement** : bouton
+« Bloquer une IP » visible à côté de « Redémarrer l'agent », dialogue
+ouvert avec les 3 champs (hostname, IP, motif), confirmation désactivée
+tant que le hostname ne correspond pas exactement ou que l'IP n'est pas
+une IPv4 valide, soumission réelle → `POST /block-ip` → `204`, dialogue
+fermé, log `[simulation] Would block IP 198.51.100.23 via
+firewall-drop... (no real effect)`, entrée d'audit confirmée en base
+(acteur `admin`, cible, IP, motif, issue `SUCCESS`). **Mode live jamais
+déclenché pour de vrai.**
+
+**Connecteur de contrôle d'agents Wazuh terminé** (les deux capacités,
+redémarrage et active-response, backend et frontend). Reste pour la
+phase 5 : Shuffle (déclenchement de workflow + callback, 2ᵉ connecteur
+de la phase, 3ᵉ filtre de clé d'API).
