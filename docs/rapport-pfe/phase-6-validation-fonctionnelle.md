@@ -362,9 +362,28 @@ reste du socle connecteurs (ADR-014 §1).
 sur échantillons réels), backend reconstruit et redéployé, confirmé en direct sur
 `http://localhost:8080/settings?section=connectors` — Wazuh (`4.12.0`) et MISP
 (`2.5.44`) affichent désormais une version et des capacités réelles au premier cycle
-suivant le redéploiement. Shuffle et VirusTotal restent affichés « Non détectée »
-jusqu'au prochain déclenchement réel par un analyste (connecteurs à la demande, sans
-planificateur) — comportement attendu, pas un écart.
+suivant le redéploiement.
+
+**Complément du 2026-08-11 — Shuffle, VirusTotal et OpenSearch, les 5/5.**
+- **Shuffle et VirusTotal** confirmés en conditions réelles à la demande d'Imane : un
+  vrai déclenchement de workflow Shuffle (`INC-2026-0004`, playbook « Confinement
+  ransomware verif E2E ») → carte mise à jour en `Shuffle (onprem/docker)` avec les
+  capacités Déclenchement/Statut de workflow ; une vraie vérification de réputation
+  VirusTotal (IOC `203.0.113.42`) → carte mise à jour en
+  `Service cloud — pas de version applicable` avec la capacité Réputation
+  d'observables.
+- **OpenSearch** débloqué : Imane a élargi les droits du compte `smartsoc-reader` côté
+  OpenSearch Security (rôle réservé `readall` immuable — création d'un rôle
+  personnalisé `smartsoc_cluster_monitor` avec la permission `cluster:monitor/main`,
+  mappé sur le backend role `readall`, via l'API `_plugins/_security` en s'authentifiant
+  avec le compte `admin` de l'Indexer, trouvé dans `wazuh-install-files.tar` sur la VM
+  `vm-siem`). `GET /` accessible immédiatement après. Sonde implémentée à l'identique
+  des 4 autres (`GET /`, TTL 1 h, repli silencieux) : version réelle détectée `7.10.2`
+  (cluster `wazuh-cluster`), capacités Recherche d'événements + Flux de vulnérabilités.
+  Confirmé en direct après reconstruction/redéploiement du backend.
+
+**Les 5 connecteurs affichent désormais une version et des capacités réelles.**
+`CapabilityProbe` (ADR-014 §6.5) est intégralement implémenté.
 
 ---
 
