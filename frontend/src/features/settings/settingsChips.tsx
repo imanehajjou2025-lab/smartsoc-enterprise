@@ -47,6 +47,9 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   USER_DISABLED: 'Utilisateur désactivé',
   USER_DELETED: 'Utilisateur supprimé',
   BACKUP_EXPORTED: 'Sauvegarde exportée',
+  WAZUH_AGENT_RESTART_REQUESTED: "Redémarrage d'agent demandé",
+  WAZUH_AGENT_FIREWALL_DROP_REQUESTED: 'Blocage IP demandé',
+  SHUFFLE_WORKFLOW_TRIGGER_REQUESTED: 'Déclenchement workflow Shuffle',
 };
 
 const AUDIT_ACTION_COLORS: Record<AuditAction, ChipPaletteColor> = {
@@ -59,6 +62,9 @@ const AUDIT_ACTION_COLORS: Record<AuditAction, ChipPaletteColor> = {
   USER_DISABLED: 'warning',
   USER_DELETED: 'error',
   BACKUP_EXPORTED: 'secondary',
+  WAZUH_AGENT_RESTART_REQUESTED: 'warning',
+  WAZUH_AGENT_FIREWALL_DROP_REQUESTED: 'error',
+  SHUFFLE_WORKFLOW_TRIGGER_REQUESTED: 'info',
 };
 
 export function AuditActionChip({ action }: { action: AuditAction }) {

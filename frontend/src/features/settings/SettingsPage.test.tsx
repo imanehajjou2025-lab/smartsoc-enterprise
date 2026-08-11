@@ -92,8 +92,19 @@ const auditPage: PageResponse<AuditLogEntry> = {
       details: null,
       ipAddress: '172.18.0.1',
     },
+    {
+      id: 'audit-2',
+      occurredAt: '2026-08-10T01:58:00Z',
+      action: 'SHUFFLE_WORKFLOW_TRIGGER_REQUESTED',
+      actorUsername: 'admin',
+      actorId: 'u-1',
+      targetType: 'Incident',
+      targetId: 'inc-4',
+      details: 'success',
+      ipAddress: '172.18.0.1',
+    },
   ],
-  totalElements: 1,
+  totalElements: 2,
   page: 0,
   size: 25,
   totalPages: 1,
@@ -194,5 +205,15 @@ describe('SettingsPage', () => {
     // Deux cartes "Connecté" : Wazuh et Shuffle (phase 5, connecteur d'action sans planificateur).
     expect(await screen.findAllByText('Connecté')).toHaveLength(2);
     expect(screen.getByText('Shuffle')).toBeInTheDocument();
+  });
+
+  it('renders audit log entries for the phase-5 action types without crashing', async () => {
+    renderPage();
+    await screen.findByText('Opérationnelle');
+
+    fireEvent.click(screen.getByText("Journal d'audit"));
+
+    expect(await screen.findByText('Déclenchement workflow Shuffle')).toBeInTheDocument();
+    expect(screen.getByText('Connexion réussie')).toBeInTheDocument();
   });
 });

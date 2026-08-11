@@ -45,7 +45,10 @@ export type AuditAction =
   | 'USER_ENABLED'
   | 'USER_DISABLED'
   | 'USER_DELETED'
-  | 'BACKUP_EXPORTED';
+  | 'BACKUP_EXPORTED'
+  | 'WAZUH_AGENT_RESTART_REQUESTED'
+  | 'WAZUH_AGENT_FIREWALL_DROP_REQUESTED'
+  | 'SHUFFLE_WORKFLOW_TRIGGER_REQUESTED';
 
 export interface AuditLogEntry {
   id: string;
