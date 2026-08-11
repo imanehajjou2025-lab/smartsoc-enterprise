@@ -36,7 +36,12 @@ import { ConfidenceBar, IocTypeChip } from '../intelligence/iocChips';
 import { IncidentStatusChip, INCIDENT_STATUS_LABELS } from '../incidents/incidentChips';
 import type { IncidentStatus } from '../incidents/incidentsApi';
 import { AGENT_CONNECTION_STATUS_LABELS, ASSET_TYPE_LABELS } from '../assets/assetChips';
-import type { AgentConnectionStatus, Asset, AssetCriticality, AssetType } from '../assets/assetsApi';
+import type {
+  AgentConnectionStatus,
+  Asset,
+  AssetCriticality,
+  AssetType,
+} from '../assets/assetsApi';
 import type { AlertStats } from './dashboardApi';
 import { useDashboardData } from './useDashboardData';
 
@@ -241,7 +246,12 @@ function AccentPanel({
       )}
       <Stack
         direction="row"
-        sx={{ alignItems: 'center', justifyContent: 'space-between', mb: 1.5, position: 'relative' }}
+        sx={{
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          mb: 1.5,
+          position: 'relative',
+        }}
       >
         <Stack direction="row" spacing={1} sx={{ alignItems: 'center', minWidth: 0 }}>
           <Box
@@ -431,7 +441,8 @@ function DashboardPage() {
     const criticalExposed = assets.filter(isExposedCritical);
     const internetFacingCount = assets.filter((a) => a.exposure === 'INTERNET_FACING').length;
     const internalCount = assets.filter((a) => a.exposure !== 'INTERNET_FACING').length;
-    const exposedPct = assets.length > 0 ? Math.round((internetFacingCount / assets.length) * 100) : 0;
+    const exposedPct =
+      assets.length > 0 ? Math.round((internetFacingCount / assets.length) * 100) : 0;
 
     const exposureByCriticality = CRITICALITY_ORDER.map((criticality) => ({
       criticality,
@@ -1005,7 +1016,9 @@ function DashboardPage() {
                           justifyContent: 'center',
                           bgcolor: alpha(
                             severityColors.critical,
-                            row.internet === 0 ? 0.06 : (row.internet / derived.exposureMatrixMax) * 0.7 + 0.1,
+                            row.internet === 0
+                              ? 0.06
+                              : (row.internet / derived.exposureMatrixMax) * 0.7 + 0.1,
                           ),
                         }}
                       >
@@ -1022,7 +1035,9 @@ function DashboardPage() {
                           justifyContent: 'center',
                           bgcolor: alpha(
                             theme.palette.text.secondary,
-                            row.internal === 0 ? 0.06 : (row.internal / derived.exposureMatrixMax) * 0.35 + 0.06,
+                            row.internal === 0
+                              ? 0.06
+                              : (row.internal / derived.exposureMatrixMax) * 0.35 + 0.06,
                           ),
                         }}
                       >
@@ -1112,7 +1127,12 @@ function DashboardPage() {
                       <b style={{ fontFamily: 'monospace' }}>{incident.reference}</b>{' '}
                       {incident.title}
                     </Typography>
-                    <Typography variant="caption" color="text.secondary" noWrap sx={{ opacity: 0.65 }}>
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      noWrap
+                      sx={{ opacity: 0.65 }}
+                    >
                       {incident.assigneeUsername ?? 'Non assigné'}
                     </Typography>
                   </Stack>
@@ -1249,7 +1269,11 @@ function DashboardPage() {
                   >
                     <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
                       <IocTypeChip type={ioc.type} />
-                      <Typography variant="caption" noWrap sx={{ flexGrow: 1, fontFamily: 'monospace' }}>
+                      <Typography
+                        variant="caption"
+                        noWrap
+                        sx={{ flexGrow: 1, fontFamily: 'monospace' }}
+                      >
                         {ioc.value}
                       </Typography>
                     </Stack>
