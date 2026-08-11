@@ -17,10 +17,13 @@ import DnsIcon from '@mui/icons-material/Dns';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutlineOutlined';
 import GppGoodIcon from '@mui/icons-material/GppGood';
 import GppMaybeIcon from '@mui/icons-material/GppMaybe';
+import HubIcon from '@mui/icons-material/Hub';
 import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
 import MonitorHeartIcon from '@mui/icons-material/MonitorHeart';
 import PublicIcon from '@mui/icons-material/Public';
 import ShieldIcon from '@mui/icons-material/Shield';
+import TravelExploreIcon from '@mui/icons-material/TravelExplore';
+import * as echarts from 'echarts';
 import type { EChartsOption } from 'echarts';
 import { useAppSelector } from '../../app/hooks';
 import { severityColors } from '../../app/theme';
@@ -29,9 +32,16 @@ import EChart from '../../shared/components/EChart';
 import { softChipSx } from '../../shared/components/chipStyles';
 import { SeverityChip } from '../alerts/chips';
 import { useAlertsRealtime } from '../alerts/useAlertsRealtime';
+import { ConfidenceBar, IocTypeChip } from '../intelligence/iocChips';
 import { IncidentStatusChip, INCIDENT_STATUS_LABELS } from '../incidents/incidentChips';
 import type { IncidentStatus } from '../incidents/incidentsApi';
-import type { Asset, AssetCriticality } from '../assets/assetsApi';
+import { AGENT_CONNECTION_STATUS_LABELS, ASSET_TYPE_LABELS } from '../assets/assetChips';
+import type {
+  AgentConnectionStatus,
+  Asset,
+  AssetCriticality,
+  AssetType,
+} from '../assets/assetsApi';
 import type { AlertStats } from './dashboardApi';
 import { useDashboardData } from './useDashboardData';
 
@@ -71,9 +81,6 @@ const ACTIVITY_KIND_COLOR: Record<'alert' | 'incident' | 'report', string> = {
   incident: severityColors.high,
   report: severityColors.info,
 };
-
-/** Anneaux purement décoratifs (dégradé cyan → violet, dans l'esprit de la marque ISIX) — aucune donnée n'y est encodée. */
-const ATTACK_SURFACE_RING_COLORS = ['#39c5cf', '#2f81f7', '#6e7bfa', '#8957e5', '#a371f7'];
 
 function KpiTile({
   label,
@@ -175,6 +182,130 @@ function Panel({
 }
 
 /**
+ * Variante accentuée de {@link Panel} : icône + dégradé teinté par
+ * couleur (même patron que {@link KpiTile}, donc déjà theme-aware — le
+ * dégradé se recalcule seul en clair/sombre via `t.palette.mode`, aucune
+ * image bitmap à gérer séparément par thème). Réservée aux panneaux
+ * secondaires denses (lignes 4 et 5) pour réduire le vide visuel des
+ * cartes les plus courtes tout en gardant une identité par module.
+ */
+function AccentPanel({
+  title,
+  icon,
+  color,
+  action,
+  watermark,
+  children,
+}: {
+  title: string;
+  icon: React.ReactNode;
+  color: string;
+  action?: { label: string; onClick: () => void };
+  /** Grande icône décorative en fond de carte — jamais une donnée, un pur
+   * repère visuel par module (opacité/teinte theme-aware, pas de bitmap). */
+  watermark?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <Paper
+      variant="outlined"
+      sx={{
+        p: 2,
+        position: 'relative',
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+        minWidth: 0,
+        borderRadius: 3,
+        borderColor: alpha(color, 0.22),
+        background: (t) =>
+          `linear-gradient(160deg, ${alpha(color, t.palette.mode === 'dark' ? 0.14 : 0.07)} 0%, ${t.palette.background.paper} 60%)`,
+      }}
+    >
+      {watermark && (
+        <Box
+          aria-hidden
+          sx={{
+            position: 'absolute',
+            right: -28,
+            bottom: -28,
+            width: 148,
+            height: 148,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color,
+            opacity: (t) => (t.palette.mode === 'dark' ? 0.14 : 0.08),
+            transform: 'rotate(-12deg)',
+            pointerEvents: 'none',
+            '& svg': { fontSize: 148 },
+          }}
+        >
+          {watermark}
+        </Box>
+      )}
+      <Stack
+        direction="row"
+        sx={{
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          mb: 1.5,
+          position: 'relative',
+        }}
+      >
+        <Stack direction="row" spacing={1} sx={{ alignItems: 'center', minWidth: 0 }}>
+          <Box
+            sx={{
+              width: 30,
+              height: 30,
+              borderRadius: '50%',
+              flexShrink: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color,
+              bgcolor: alpha(color, 0.16),
+              boxShadow: `0 0 10px 2px ${alpha(color, 0.35)}`,
+            }}
+          >
+            {icon}
+          </Box>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700 }} noWrap>
+            {title}
+          </Typography>
+        </Stack>
+        {action && (
+          <Button size="small" onClick={action.onClick} sx={{ flexShrink: 0 }}>
+            {action.label}
+          </Button>
+        )}
+      </Stack>
+      <Box sx={{ position: 'relative' }}>{children}</Box>
+    </Paper>
+  );
+}
+
+/**
+ * Sous-titre de section à l'intérieur d'une {@link AccentPanel} — barre
+ * colorée + majuscules teintées par la couleur d'accent de la carte,
+ * pour se distinguer sans ambiguïté du contenu (texte gris + gras seul
+ * se confondait trop avec les libellés de données).
+ */
+function SectionLabel({ children, color }: { children: React.ReactNode; color: string }) {
+  return (
+    <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center', mb: 0.75 }}>
+      <Box sx={{ width: 3, height: 12, borderRadius: 999, bgcolor: color, flexShrink: 0 }} />
+      <Typography
+        variant="caption"
+        sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.6, color }}
+      >
+        {children}
+      </Typography>
+    </Stack>
+  );
+}
+
+/**
  * Anneau de couverture MITRE (observées vs catalogue). Le pourcentage et
  * le total ne sont PAS le titre ECharts (son centrage interne dépend de
  * la largeur du texte et dérive facilement) — ils sont affichés par une
@@ -187,15 +318,27 @@ function mitreCoverageOption(observed: number, total: number): EChartsOption {
     series: [
       {
         type: 'pie',
-        radius: ['62%', '86%'],
+        radius: ['64%', '88%'],
         label: { show: false },
         silent: true,
+        itemStyle: { borderColor: 'transparent', borderWidth: 3, borderRadius: 12 },
         data: [
-          { name: 'Observées', value: observed, itemStyle: { color: severityColors.low } },
+          {
+            name: 'Observées',
+            value: observed,
+            itemStyle: {
+              color: new echarts.graphic.LinearGradient(0, 0, 1, 1, [
+                { offset: 0, color: '#39c5cf' },
+                { offset: 1, color: severityColors.low },
+              ]),
+              shadowColor: 'rgba(63,185,80,0.5)',
+              shadowBlur: 14,
+            },
+          },
           {
             name: 'Non observées',
             value: Math.max(0, total - observed),
-            itemStyle: { color: 'rgba(139,148,158,0.3)' },
+            itemStyle: { color: 'rgba(139,148,158,0.22)' },
           },
         ],
       },
@@ -227,7 +370,10 @@ function timelineOption(stats: AlertStats): EChartsOption {
 }
 
 function sourcesBarOption(stats: AlertStats): EChartsOption {
-  const entries = Object.entries(stats.bySource).slice(0, 5).reverse();
+  const entries = Object.entries(stats.bySource)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 8)
+    .reverse();
   return {
     tooltip: { trigger: 'axis' },
     grid: { left: 80, right: 24, top: 16, bottom: 24 },
@@ -291,8 +437,35 @@ function DashboardPage() {
     const incidentsOpen = incidents.filter((i) => i.status !== 'CLOSED').length;
 
     const assetsByCriticality = countBy(assets, (a) => a.criticality);
+    const assetsByType = countBy(assets, (a) => a.type);
     const criticalExposed = assets.filter(isExposedCritical);
     const internetFacingCount = assets.filter((a) => a.exposure === 'INTERNET_FACING').length;
+    const internalCount = assets.filter((a) => a.exposure !== 'INTERNET_FACING').length;
+    const exposedPct =
+      assets.length > 0 ? Math.round((internetFacingCount / assets.length) * 100) : 0;
+
+    const exposureByCriticality = CRITICALITY_ORDER.map((criticality) => ({
+      criticality,
+      internet: assets.filter(
+        (a) => a.criticality === criticality && a.exposure === 'INTERNET_FACING',
+      ).length,
+      internal: assets.filter(
+        (a) => a.criticality === criticality && a.exposure !== 'INTERNET_FACING',
+      ).length,
+    })).filter((row) => row.internet + row.internal > 0);
+    const exposureMatrixMax = Math.max(
+      1,
+      ...exposureByCriticality.flatMap((row) => [row.internet, row.internal]),
+    );
+
+    const agentStatusCounts = countBy(
+      assets.filter((a) => a.agentConnectionStatus !== null),
+      (a) => a.agentConnectionStatus as string,
+    );
+
+    const openIncidents = incidents.filter((i) => i.status !== 'CLOSED').slice(0, 4);
+
+    const sourcesTotal = Object.keys(alertStats.bySource).length;
 
     const fpRate =
       alertStats.total > 0
@@ -342,14 +515,22 @@ function DashboardPage() {
     return {
       incidentsByStatus,
       incidentsOpen,
+      openIncidents,
       assetsByCriticality,
+      assetsByType,
       criticalExposed,
       internetFacingCount,
+      internalCount,
+      exposedPct,
+      exposureByCriticality,
+      exposureMatrixMax,
+      agentStatusCounts,
       fpRate,
       coveragePct,
       observedCount: observed.length,
       topTechniques,
       huntsExecutedRecently,
+      sourcesTotal,
       activity,
     };
   }, [data, navigate]);
@@ -579,26 +760,33 @@ function DashboardPage() {
             />
           </Box>
 
-          {/* Zone B — Activité */}
+          {/* Zone B — Activité, seule sur sa ligne (élargie sur demande) */}
+          <Panel
+            title="Activité — 7 derniers jours"
+            action={{ label: 'Voir les alertes', onClick: () => navigate('/alerts') }}
+          >
+            {timeline && <EChart option={timeline} height={300} />}
+          </Panel>
+          <Box sx={{ mb: 3 }} />
+
+          {/* Zone C1 — Alertes récentes, MITRE ATT&CK, Sources SOC */}
           <Box
             sx={{
               display: 'grid',
-              gridTemplateColumns: { xs: '1fr', lg: '2fr 1fr' },
+              gridTemplateColumns: { xs: '1fr', md: '1fr 1fr', lg: 'repeat(3, 1fr)' },
               gap: 2,
               mb: 3,
+              alignItems: 'stretch',
             }}
           >
-            <Panel
-              title="Activité — 7 derniers jours"
-              action={{ label: 'Voir les alertes', onClick: () => navigate('/alerts') }}
-            >
-              {timeline && <EChart option={timeline} height={240} />}
-            </Panel>
-            <Panel
+            <AccentPanel
               title="Alertes récentes"
+              icon={<BugReportIcon sx={{ fontSize: 18 }} />}
+              color={severityColors.critical}
+              watermark={<BugReportIcon />}
               action={{ label: 'Tout voir', onClick: () => navigate('/alerts') }}
             >
-              <Stack spacing={1} sx={{ maxHeight: 260, overflowY: 'auto' }}>
+              <Stack spacing={1.25} sx={{ maxHeight: 320, overflowY: 'auto' }}>
                 {data.recentAlerts.length === 0 && (
                   <Typography variant="body2" color="text.secondary">
                     Aucune alerte récente.
@@ -620,14 +808,14 @@ function DashboardPage() {
                       variant="caption"
                       color="text.secondary"
                       noWrap
-                      sx={{ minWidth: 64 }}
+                      sx={{ minWidth: 64, opacity: 0.65 }}
                     >
                       {a.source}
                     </Typography>
                     <Typography
                       variant="caption"
                       color="text.secondary"
-                      sx={{ whiteSpace: 'nowrap' }}
+                      sx={{ whiteSpace: 'nowrap', opacity: 0.65 }}
                     >
                       {timeAgo(a.detectedAt)}
                     </Typography>
@@ -644,25 +832,26 @@ function DashboardPage() {
                   </Stack>
                 ))}
               </Stack>
-            </Panel>
-          </Box>
+            </AccentPanel>
 
-          {/* Zone C — Détection & Réponse */}
-          <Box
-            sx={{
-              display: 'grid',
-              gridTemplateColumns: { xs: '1fr', md: '1fr 1fr', lg: 'repeat(3, 1fr)' },
-              gap: 2,
-              mb: 3,
-            }}
-          >
-            <Panel
+            <AccentPanel
               title="MITRE ATT&CK"
+              icon={<PublicIcon sx={{ fontSize: 18 }} />}
+              color={severityColors.info}
+              watermark={<PublicIcon />}
               action={{ label: 'Explorer', onClick: () => navigate('/mitre') }}
             >
               {mitreDonut && (
                 <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-                  <Box sx={{ position: 'relative', width: 180, height: 160 }}>
+                  <Box
+                    sx={{
+                      position: 'relative',
+                      width: 180,
+                      height: 160,
+                      borderRadius: '50%',
+                      filter: `drop-shadow(0 0 14px ${alpha(severityColors.low, 0.35)})`,
+                    }}
+                  >
                     <EChart option={mitreDonut} height={160} />
                     <Box
                       sx={{
@@ -685,9 +874,24 @@ function DashboardPage() {
                   </Box>
                 </Box>
               )}
-              <Stack spacing={0.75} sx={{ mt: 1 }}>
+              <Typography
+                variant="caption"
+                sx={{
+                  display: 'block',
+                  textAlign: 'center',
+                  fontWeight: 800,
+                  textTransform: 'uppercase',
+                  letterSpacing: 0.6,
+                  color: severityColors.info,
+                  mt: 1,
+                  mb: 0.75,
+                }}
+              >
+                Techniques les plus citées
+              </Typography>
+              <Stack spacing={1.25}>
                 {derived.topTechniques.length === 0 && (
-                  <Typography variant="caption" color="text.secondary">
+                  <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center' }}>
                     Aucune technique observée.
                   </Typography>
                 )}
@@ -708,77 +912,152 @@ function DashboardPage() {
                   </Stack>
                 ))}
               </Stack>
-            </Panel>
+            </AccentPanel>
 
-            <Panel
+            <AccentPanel
+              title="Sources SOC"
+              icon={<HubIcon sx={{ fontSize: 18 }} />}
+              color="#39c5cf"
+              watermark={<HubIcon />}
+              action={{ label: 'Voir les alertes', onClick: () => navigate('/alerts') }}
+            >
+              {sources && <EChart option={sources} height={280} />}
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ display: 'block', mt: 1, opacity: 0.65 }}
+              >
+                {derived.sourcesTotal} source{derived.sourcesTotal > 1 ? 's' : ''} active
+                {derived.sourcesTotal > 1 ? 's' : ''} · {data.alertStats.total} alerte
+                {data.alertStats.total > 1 ? 's' : ''} au total
+              </Typography>
+            </AccentPanel>
+          </Box>
+
+          {/* Zone C2 — Surface d'attaque, Incidents & Réponse, Posture des actifs, Threat Intelligence */}
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', lg: 'repeat(4, 1fr)' },
+              gap: 2,
+              mb: 3,
+              alignItems: 'stretch',
+            }}
+          >
+            <AccentPanel
               title="Surface d'attaque"
+              icon={<ShieldIcon sx={{ fontSize: 18 }} />}
+              color="#8ecfff"
+              watermark={<PublicIcon />}
               action={{ label: 'Voir les actifs', onClick: () => navigate('/assets') }}
             >
-              <Stack direction="row" spacing={2} sx={{ alignItems: 'center', mb: 1.5 }}>
-                <Box sx={{ position: 'relative', width: 92, height: 92, flexShrink: 0 }}>
-                  {ATTACK_SURFACE_RING_COLORS.map((c, i) => (
-                    <Box
-                      key={c}
-                      sx={{
-                        position: 'absolute',
-                        inset: i * 9,
-                        borderRadius: '50%',
-                        background: `conic-gradient(from ${180 + i * 18}deg, ${c}, transparent 55%)`,
-                        WebkitMask:
-                          'radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px))',
-                        mask: 'radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px))',
-                      }}
-                    />
-                  ))}
-                  <Box
-                    sx={{
-                      position: 'absolute',
-                      inset: 27,
-                      borderRadius: '50%',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      background: 'radial-gradient(circle at 35% 30%, #1f3b73, #0b1626 75%)',
-                      boxShadow: '0 0 14px 2px rgba(57,197,207,0.35)',
-                    }}
-                  >
-                    <ShieldIcon sx={{ color: '#8ecfff', fontSize: 22 }} />
-                  </Box>
+              <Stack spacing={1} sx={{ mb: 2 }}>
+                <Box>
+                  <Chip
+                    label={`${derived.exposedPct}% exposés Internet`}
+                    size="small"
+                    sx={softChipSx(severityColors.critical)}
+                  />
                 </Box>
-                <Stack spacing={0.75} sx={{ flexGrow: 1, minWidth: 0 }}>
-                  <Stack direction="row" sx={{ justifyContent: 'space-between' }}>
-                    <Typography variant="caption" color="text.secondary">
-                      Critiques exposés Internet
-                    </Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                      {derived.criticalExposed.length}
-                    </Typography>
-                  </Stack>
-                  <Stack direction="row" sx={{ justifyContent: 'space-between' }}>
-                    <Typography variant="caption" color="text.secondary">
-                      Actifs exposés Internet
-                    </Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                      {derived.internetFacingCount}
-                    </Typography>
-                  </Stack>
-                  <Stack direction="row" sx={{ justifyContent: 'space-between' }}>
-                    <Typography variant="caption" color="text.secondary">
-                      Actifs au total
-                    </Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                      {data.assetsTotal}
-                    </Typography>
-                  </Stack>
-                </Stack>
+                <Typography variant="caption" color="text.secondary" sx={{ opacity: 0.65 }}>
+                  {derived.internetFacingCount} exposé{derived.internetFacingCount > 1 ? 's' : ''} ·{' '}
+                  {derived.internalCount} interne{derived.internalCount > 1 ? 's' : ''} ·{' '}
+                  {data.assetsTotal} au total
+                </Typography>
               </Stack>
-              <Stack spacing={0.75}>
+
+              <SectionLabel color="#8ecfff">Exposition par criticité</SectionLabel>
+              {derived.exposureByCriticality.length === 0 ? (
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                  Aucun actif enregistré.
+                </Typography>
+              ) : (
+                <Box
+                  sx={{
+                    display: 'grid',
+                    gridTemplateColumns: '1fr 56px 56px',
+                    gap: 0.5,
+                    alignItems: 'center',
+                    mb: 1.5,
+                  }}
+                >
+                  <Box />
+                  <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center' }}>
+                    Internet
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center' }}>
+                    Interne
+                  </Typography>
+                  {derived.exposureByCriticality.map((row) => (
+                    <Box key={row.criticality} sx={{ display: 'contents' }}>
+                      <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
+                        <Box
+                          sx={{
+                            width: 8,
+                            height: 8,
+                            borderRadius: '50%',
+                            flexShrink: 0,
+                            bgcolor:
+                              severityColors[
+                                row.criticality.toLowerCase() as keyof typeof severityColors
+                              ],
+                          }}
+                        />
+                        <Typography variant="body2" noWrap>
+                          {row.criticality}
+                        </Typography>
+                      </Stack>
+                      <Box
+                        sx={{
+                          height: 28,
+                          borderRadius: 1.5,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          bgcolor: alpha(
+                            severityColors.critical,
+                            row.internet === 0
+                              ? 0.06
+                              : (row.internet / derived.exposureMatrixMax) * 0.7 + 0.1,
+                          ),
+                        }}
+                      >
+                        <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                          {row.internet}
+                        </Typography>
+                      </Box>
+                      <Box
+                        sx={{
+                          height: 28,
+                          borderRadius: 1.5,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          bgcolor: alpha(
+                            theme.palette.text.secondary,
+                            row.internal === 0
+                              ? 0.06
+                              : (row.internal / derived.exposureMatrixMax) * 0.35 + 0.06,
+                          ),
+                        }}
+                      >
+                        <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                          {row.internal}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  ))}
+                </Box>
+              )}
+
+              <SectionLabel color="#8ecfff">Détail des actifs critiques exposés</SectionLabel>
+              <Stack spacing={1.25}>
                 {derived.criticalExposed.length === 0 && (
                   <Typography variant="body2" color="text.secondary">
                     Aucun actif critique exposé.
                   </Typography>
                 )}
-                {derived.criticalExposed.slice(0, 4).map((asset) => (
+                {derived.criticalExposed.slice(0, 6).map((asset) => (
                   <Stack
                     key={asset.id}
                     direction="row"
@@ -797,20 +1076,16 @@ function DashboardPage() {
                   </Stack>
                 ))}
               </Stack>
-            </Panel>
+            </AccentPanel>
 
-            <Panel
-              title="Sources SOC"
-              action={{ label: 'Voir les alertes', onClick: () => navigate('/alerts') }}
-            >
-              {sources && <EChart option={sources} height={200} />}
-            </Panel>
-
-            <Panel
+            <AccentPanel
               title="Incidents & Réponse"
+              icon={<LocalFireDepartmentIcon sx={{ fontSize: 18 }} />}
+              color={severityColors.high}
+              watermark={<LocalFireDepartmentIcon />}
               action={{ label: 'Voir', onClick: () => navigate('/incidents') }}
             >
-              <Stack spacing={0.75} sx={{ mb: 1.5 }}>
+              <Stack spacing={1.25} sx={{ mb: 1.5 }}>
                 {INCIDENT_STATUS_ORDER.filter((s) => derived.incidentsByStatus[s]).map((s) => (
                   <Stack key={s} direction="row" spacing={1} sx={{ alignItems: 'center' }}>
                     <IncidentStatusChip status={s} />
@@ -826,20 +1101,67 @@ function DashboardPage() {
               <Typography
                 variant="caption"
                 color="text.secondary"
-                sx={{ display: 'block', cursor: 'pointer' }}
+                sx={{ display: 'block', cursor: 'pointer', mb: 1.5, opacity: 0.65 }}
                 onClick={() => navigate('/soar')}
               >
                 {data.playbooksActiveTotal} playbook{data.playbooksActiveTotal > 1 ? 's' : ''} actif
                 {data.playbooksActiveTotal > 1 ? 's' : ''} · {derived.huntsExecutedRecently} requête
                 {derived.huntsExecutedRecently > 1 ? 's' : ''} de chasse (7j, approx.)
               </Typography>
-            </Panel>
+              <SectionLabel color={severityColors.high}>À traiter</SectionLabel>
+              <Stack spacing={1.25}>
+                {derived.openIncidents.length === 0 && (
+                  <Typography variant="body2" color="text.secondary">
+                    Aucun incident ouvert.
+                  </Typography>
+                )}
+                {derived.openIncidents.map((incident) => (
+                  <Stack
+                    key={incident.id}
+                    direction="row"
+                    spacing={1}
+                    sx={{ alignItems: 'center', cursor: 'pointer' }}
+                    onClick={() => navigate(`/incidents?selected=${incident.id}`)}
+                  >
+                    <Typography variant="caption" noWrap sx={{ flexGrow: 1 }}>
+                      <b style={{ fontFamily: 'monospace' }}>{incident.reference}</b>{' '}
+                      {incident.title}
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      noWrap
+                      sx={{ opacity: 0.65 }}
+                    >
+                      {incident.assigneeUsername ?? 'Non assigné'}
+                    </Typography>
+                  </Stack>
+                ))}
+              </Stack>
+            </AccentPanel>
 
-            <Panel
+            <AccentPanel
               title="Posture des actifs"
+              icon={<DnsIcon sx={{ fontSize: 18 }} />}
+              color={severityColors.medium}
+              watermark={<DnsIcon />}
               action={{ label: 'Voir les actifs', onClick: () => navigate('/assets') }}
             >
-              <Stack spacing={0.75}>
+              <Stack
+                direction="row"
+                sx={{ height: 10, borderRadius: 999, overflow: 'hidden', mb: 1 }}
+              >
+                {CRITICALITY_ORDER.filter((c) => derived.assetsByCriticality[c]).map((c) => (
+                  <Box
+                    key={c}
+                    sx={{
+                      flex: derived.assetsByCriticality[c],
+                      bgcolor: severityColors[c.toLowerCase() as keyof typeof severityColors],
+                    }}
+                  />
+                ))}
+              </Stack>
+              <Stack spacing={1.25}>
                 {CRITICALITY_ORDER.filter((c) => derived.assetsByCriticality[c]).map((c) => (
                   <Stack key={c} direction="row" spacing={1} sx={{ alignItems: 'center' }}>
                     <Box
@@ -859,40 +1181,107 @@ function DashboardPage() {
                   </Stack>
                 ))}
               </Stack>
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
-                {data.assetsTotal} actif{data.assetsTotal > 1 ? 's' : ''} actif
-                {data.assetsTotal > 1 ? 's' : ''} au total
-              </Typography>
-            </Panel>
-
-            <Panel
-              title="Threat Intelligence"
-              action={{ label: 'Explorer', onClick: () => navigate('/intelligence') }}
-            >
-              <Typography variant="h4" sx={{ fontWeight: 800, mb: 0.5 }}>
-                {data.iocsActiveTotal}
-              </Typography>
               <Typography
                 variant="caption"
                 color="text.secondary"
-                sx={{ display: 'block', mb: 1.5 }}
+                sx={{ display: 'block', mt: 1, mb: 1.5, opacity: 0.65 }}
               >
-                indicateurs actifs
+                {data.assetsTotal} actif{data.assetsTotal > 1 ? 's' : ''} au total
               </Typography>
-              <Stack spacing={0.75}>
+              <SectionLabel color={severityColors.medium}>Par type</SectionLabel>
+              <Stack spacing={1.25} sx={{ mb: 1.5 }}>
+                {(Object.entries(derived.assetsByType) as [AssetType, number][])
+                  .sort(([, a], [, b]) => b - a)
+                  .map(([type, count]) => (
+                    <Stack key={type} direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                      <Typography variant="body2" sx={{ flexGrow: 1 }}>
+                        {ASSET_TYPE_LABELS[type]}
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                        {count}
+                      </Typography>
+                    </Stack>
+                  ))}
+              </Stack>
+              <SectionLabel color={severityColors.medium}>Connexion agent</SectionLabel>
+              <Stack spacing={1.25}>
+                {Object.keys(derived.agentStatusCounts).length === 0 && (
+                  <Typography variant="caption" color="text.secondary">
+                    Aucun actif rapporté par un connecteur d'agents.
+                  </Typography>
+                )}
+                {(Object.entries(derived.agentStatusCounts) as [AgentConnectionStatus, number][])
+                  .sort(([, a], [, b]) => b - a)
+                  .map(([status, count]) => (
+                    <Stack key={status} direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                      <Box
+                        sx={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: '50%',
+                          bgcolor:
+                            status === 'ACTIVE'
+                              ? severityColors.low
+                              : status === 'DISCONNECTED'
+                                ? severityColors.critical
+                                : theme.palette.text.secondary,
+                        }}
+                      />
+                      <Typography variant="body2" sx={{ flexGrow: 1 }}>
+                        {AGENT_CONNECTION_STATUS_LABELS[status]}
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                        {count}
+                      </Typography>
+                    </Stack>
+                  ))}
+              </Stack>
+            </AccentPanel>
+
+            <AccentPanel
+              title="Threat Intelligence"
+              icon={<TravelExploreIcon sx={{ fontSize: 18 }} />}
+              color={severityColors.low}
+              watermark={<TravelExploreIcon />}
+              action={{ label: 'Explorer', onClick: () => navigate('/intelligence') }}
+            >
+              <Stack direction="row" spacing={2} sx={{ alignItems: 'center', mb: 1.5 }}>
+                <Typography variant="h4" sx={{ fontWeight: 800, lineHeight: 1 }}>
+                  {data.iocsActiveTotal}
+                </Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ opacity: 0.65 }}>
+                  indicateur{data.iocsActiveTotal > 1 ? 's' : ''} actif
+                  {data.iocsActiveTotal > 1 ? 's' : ''}
+                </Typography>
+              </Stack>
+              <Stack spacing={1.5}>
+                {data.iocs.length === 0 && (
+                  <Typography variant="caption" color="text.secondary">
+                    Aucun indicateur actif.
+                  </Typography>
+                )}
                 {data.iocs.slice(0, 4).map((ioc) => (
-                  <Typography
+                  <Stack
                     key={ioc.id}
-                    variant="caption"
-                    noWrap
+                    spacing={0.5}
                     sx={{ cursor: 'pointer' }}
                     onClick={() => navigate('/intelligence')}
                   >
-                    <b>{ioc.type}</b> {ioc.value}
-                  </Typography>
+                    <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                      <IocTypeChip type={ioc.type} />
+                      <Typography
+                        variant="caption"
+                        noWrap
+                        sx={{ flexGrow: 1, fontFamily: 'monospace' }}
+                      >
+                        {ioc.value}
+                      </Typography>
+                    </Stack>
+                    <ConfidenceBar confidence={ioc.confidence} />
+                  </Stack>
                 ))}
               </Stack>
-            </Panel>
+            </AccentPanel>
           </Box>
 
           {/* Zone D — Activité récente */}
