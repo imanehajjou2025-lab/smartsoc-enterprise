@@ -21,11 +21,12 @@ import java.time.Instant;
 class ShuffleConnectorStatusRecorder {
 
     private final SocConnectorRepository connectorRepository;
+    private final ShuffleCapabilityProbe capabilityProbe;
 
     void recordSuccess() {
         SocConnector connector = connectorRepository.findByType(ConnectorType.SHUFFLE)
                 .orElseGet(() -> SocConnector.notConfigured(ConnectorType.SHUFFLE));
-        connector.recordSuccess(Instant.now(), connector.getDescriptor());
+        connector.recordSuccess(Instant.now(), capabilityProbe.detect(connector.getDescriptor()));
         connectorRepository.save(connector);
     }
 

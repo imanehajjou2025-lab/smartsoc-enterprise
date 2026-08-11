@@ -72,6 +72,9 @@ class LiveShuffleWorkflowIntegrationTest {
     @Autowired
     private CircuitBreakerRegistry circuitBreakerRegistry;
 
+    @Autowired
+    private com.smartsoc.domain.connectors.SocConnectorRepository connectorRepository;
+
     @BeforeEach
     void resetStubsAndCircuits() {
         SHUFFLE.resetAll();
@@ -79,6 +82,15 @@ class LiveShuffleWorkflowIntegrationTest {
         // contexte reutilise) -- meme doctrine que LiveAgentControlIntegrationTest.
         circuitBreakerRegistry.circuitBreaker("shuffleWorkflowTrigger").reset();
         circuitBreakerRegistry.circuitBreaker("shuffleWorkflowStatus").reset();
+        // LiveShuffleCapabilityProbe (ADR-014 §6.5) -- forme reprise de
+        // l'echantillon reel capture le 2026-08-10
+        // (docs/integration/fixtures/shuffle/environments-sample.json).
+        SHUFFLE.stubFor(get(urlPathEqualTo("/api/v1/environments")).willReturn(aResponse()
+                .withStatus(200)
+                .withHeader("Content-Type", "application/json")
+                .withBody("""
+                        [{"Name": "Shuffle", "Type": "onprem", "run_type": "docker"}]
+                        """)));
     }
 
     private static WorkflowTriggerPayload aPayload() {
@@ -202,6 +214,25 @@ class LiveShuffleWorkflowIntegrationTest {
                 .isInstanceOf(SocConnectorException.class);
 
         SHUFFLE.verify(1, getRequestedFor(urlPathEqualTo("/api/v2/workflows/" + WORKFLOW_ID + "/executions")));
+    }
+
+    @Test
+    void detectsTheRealEnvironmentAndWorkflowCapabilitiesOnTrigger() {
+        SHUFFLE.stubFor(post(urlPathEqualTo("/api/v1/hooks/" + WEBHOOK_PATH)).willReturn(aResponse()
+                .withStatus(200)
+                .withHeader("Content-Type", "application/json")
+                .withBody("""
+                        {"success": true, "execution_id": "%s"}
+                        """.formatted(EXECUTION_ID))));
+
+        workflowTriggerPort.trigger(WEBHOOK_PATH, aPayload());
+
+        var connector = connectorRepository.findByType(com.smartsoc.domain.connectors.ConnectorType.SHUFFLE)
+                .orElseThrow();
+        assertThat(connector.getDescriptor().detectedVersion()).isEqualTo("Shuffle (onprem/docker)");
+        assertThat(connector.getDescriptor().capabilities()).containsExactlyInAnyOrder(
+                com.smartsoc.domain.connectors.ConnectorCapability.WORKFLOW_TRIGGER,
+                com.smartsoc.domain.connectors.ConnectorCapability.WORKFLOW_STATUS);
     }
 
     private static void stubExecutionsList(String body) {

@@ -2,6 +2,7 @@ package com.smartsoc.infrastructure.connectors.misp;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
@@ -20,6 +21,10 @@ public interface MispClient {
 
     @PostMapping("/attributes/restSearch")
     MispAttributesSearchResponse restSearch(@RequestBody RestSearchRequest request);
+
+    /** Version réelle de l'instance MISP (ADR-014 §6.5, {@code CapabilityProbe}). */
+    @GetMapping("/servers/getVersion")
+    MispVersionResponse version();
 
     /**
      * @param limit  plafond de sécurité — pagination réelle hors périmètre de la V1

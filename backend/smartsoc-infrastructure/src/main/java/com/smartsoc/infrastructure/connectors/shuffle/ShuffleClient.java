@@ -6,6 +6,8 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
+import java.util.List;
+
 /**
  * Client Feign de l'API Shuffle — deux appels distincts et jamais
  * interchangeables (ADR-014 phase 5, EFFET RÉEL) : le déclenchement
@@ -25,4 +27,12 @@ public interface ShuffleClient {
 
     @GetMapping("/api/v2/workflows/{workflowId}/executions")
     ShuffleExecutionsResponse listExecutions(@PathVariable("workflowId") String workflowId);
+
+    /**
+     * Signal le plus proche d'une « version » exposé par cette instance
+     * self-hosted (ADR-014 §6.5, {@code CapabilityProbe}) — {@code GET
+     * /api/v1/version} renvoie 404, vérifié en réel le 2026-08-10.
+     */
+    @GetMapping("/api/v1/environments")
+    List<ShuffleEnvironmentResponse> environments();
 }

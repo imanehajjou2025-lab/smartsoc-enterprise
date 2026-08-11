@@ -2,6 +2,7 @@ package com.smartsoc.application.reputation;
 
 import com.smartsoc.application.connectors.ObservableReputationPort;
 import com.smartsoc.application.connectors.SocConnectorException;
+import com.smartsoc.application.connectors.VirusTotalCapabilityPort;
 import com.smartsoc.domain.common.BusinessRuleViolationException;
 import com.smartsoc.domain.connectors.ConnectorType;
 import com.smartsoc.domain.connectors.SocConnector;
@@ -42,15 +43,18 @@ public class ObservableReputationService {
     private final ObservableReputationPort port;
     private final ObservableReputationRepository repository;
     private final SocConnectorRepository connectorRepository;
+    private final VirusTotalCapabilityPort capabilityPort;
     private final Duration cacheTtl;
 
     public ObservableReputationService(ObservableReputationPort port,
                                        ObservableReputationRepository repository,
                                        SocConnectorRepository connectorRepository,
+                                       VirusTotalCapabilityPort capabilityPort,
                                        @Value("${smartsoc.connectors.virustotal.cache-ttl-hours:24}") long cacheTtlHours) {
         this.port = port;
         this.repository = repository;
         this.connectorRepository = connectorRepository;
+        this.capabilityPort = capabilityPort;
         this.cacheTtl = Duration.ofHours(cacheTtlHours);
     }
 
@@ -117,7 +121,7 @@ public class ObservableReputationService {
     private void recordSuccess() {
         SocConnector connector = connectorRepository.findByType(ConnectorType.VIRUSTOTAL)
                 .orElseGet(() -> SocConnector.notConfigured(ConnectorType.VIRUSTOTAL));
-        connector.recordSuccess(Instant.now(), connector.getDescriptor());
+        connector.recordSuccess(Instant.now(), capabilityPort.detect(connector.getDescriptor()));
         connectorRepository.save(connector);
     }
 

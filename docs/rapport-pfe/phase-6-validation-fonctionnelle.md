@@ -318,3 +318,53 @@ Autres sous-sections vérifiées, aucun écart :
 
 ---
 
+## 15. Écart complémentaire trouvé et corrigé : `CapabilityProbe` jamais implémenté
+
+En revoyant la carte Connecteurs (Paramètres, hors périmètre strict de la campagne
+module-par-module mais soulevé par un contrôle visuel de l'utilisateur), « Version
+détectée » et « Capacités » affichaient systématiquement « Non détectée » / « Aucune
+capacité confirmée » pour les **5** connecteurs, sans exception. Investigation :
+- `ConnectorDescriptor` (domaine) et toute la vitrine console existent depuis l'origine
+  (ADR-014 §6.5), mais le composant **`CapabilityProbe`** documenté dans
+  `docs/architecture/CONNECTORS-REFERENCE.md` §1/§2 (« détecte la version réelle et en
+  déduit les capacités ») n'avait **jamais été écrit** — chaque adaptateur repassait
+  simplement son propre descripteur `unknown()` à chaque succès.
+- Fonctionnalité documentée mais jamais construite, pas un bug de câblage.
+
+**Implémenté pour 4 des 5 connecteurs**, avec des échantillons réels capturés en amont
+(`docs/integration/fixtures/{wazuh,misp,shuffle}/*.json`) :
+- **Wazuh** : `GET /` → `api_version` réel (`4.12.0`). Capacités confirmées :
+  Inventaire d'agents, Inventaire système, Statistiques du gestionnaire ; Contrôle
+  d'agent annoncé uniquement si `wazuh.actions.mode=live` (indépendant du mode lecture —
+  actuellement en simulation sur ce déploiement, donc honnêtement absent).
+- **MISP** : `GET /servers/getVersion` → `version` réel (`2.5.44`) + capacité Threat
+  Intelligence.
+- **Shuffle** : cette instance self-hosted n'expose **aucun** endpoint de version
+  (`/api/v1/version` → 404, vérifié en réel) — `GET /api/v1/environments` sert de signal
+  le plus proche (type d'environnement auto-déclaré, ex. `Shuffle (onprem/docker)`),
+  explicitement documenté comme tel dans le code, jamais une valeur inventée. Capacités :
+  Déclenchement de workflow, Statut de workflow.
+- **VirusTotal** : aucune sonde réseau possible — service SaaS sans notion de version
+  (décision utilisateur confirmée). Le descripteur le dit explicitement
+  (`« Service cloud — pas de version applicable »`) plutôt que de laisser un champ vide
+  muet. Capacité : Réputation d'observables.
+- **OpenSearch** : reporté — le compte de service dédié n'a que des droits de lecture
+  sur les index (`403` sur `/`, `_cluster/health`, `_nodes/http`). Nécessite l'ajout du
+  rôle `cluster:monitor/main` côté SOC avant de pouvoir sonder une version réelle ; à
+  faire par l'utilisateur (infra SOC), pas par la plateforme.
+
+Chaque sonde respecte une doctrine commune : TTL d'1 h pour éviter de sonder à chaque
+cycle, repli silencieux sur le descripteur précédent en cas d'échec (jamais de valeur
+supposée), et le même triptyque Live/Simulation(marquée « Simulation »)/Désactivé que le
+reste du socle connecteurs (ADR-014 §1).
+
+**Vérifié réellement** : suite backend complète (tests unitaires + intégration WireMock
+sur échantillons réels), backend reconstruit et redéployé, confirmé en direct sur
+`http://localhost:8080/settings?section=connectors` — Wazuh (`4.12.0`) et MISP
+(`2.5.44`) affichent désormais une version et des capacités réelles au premier cycle
+suivant le redéploiement. Shuffle et VirusTotal restent affichés « Non détectée »
+jusqu'au prochain déclenchement réel par un analyste (connecteurs à la demande, sans
+planificateur) — comportement attendu, pas un écart.
+
+---
+

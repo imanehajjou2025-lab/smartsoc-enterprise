@@ -29,6 +29,10 @@ public interface WazuhAgentApiClient {
     @GetMapping("/manager/status")
     WazuhManagerStatusResponse managerStatus();
 
+    /** Racine de l'API — porte {@code api_version}, seule source réelle de version (ADR-014 §6.5). */
+    @GetMapping("/")
+    WazuhVersionResponse version();
+
     @GetMapping("/syscollector/{agentId}/os")
     WazuhSyscollectorOsResponse syscollectorOs(@PathVariable("agentId") String agentId);
 

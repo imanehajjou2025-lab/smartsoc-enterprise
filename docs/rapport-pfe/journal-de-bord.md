@@ -3530,3 +3530,57 @@ vrai**, vérifié par l'absence de requête réseau vers
 (contrôle d'agents Wazuh, déclenchement Shuffle) sont en production
 locale, backend et frontend, avec leurs garde-fous non négociables
 tenus de bout en bout.**
+
+---
+
+## 2026-08-11 — Phase 6 (« Fonctionnel ») : campagne de validation module par module, et un `CapabilityProbe` jamais construit
+
+Démarrage du volet « Fonctionnel » de la phase 6 (validation complète de la
+plateforme, `docs/architecture/soc-integration-plan.md` §4) : chaque module
+parcouru manuellement avec des données réelles contre le backend Docker
+reconstruit, vérifié à la fois sur `:8080` (build de production) et `:5173`
+(dev Vite). Détail intégral module par module dans
+`docs/rapport-pfe/phase-6-validation-fonctionnelle.md`. Les 14 modules
+identifiés depuis la navigation réelle de la plateforme (pas une liste figée
+d'un document possiblement obsolète) ont été parcourus sans écart bloquant,
+avec deux trouvailles réelles :
+
+**Écart 1 — crash du Journal d'audit.** Le type frontend `AuditAction` et
+ses tables de libellés/couleurs n'avaient jamais été mis à jour lors de
+l'ajout des 3 actions d'audit de la phase 5
+(`WAZUH_AGENT_RESTART_REQUESTED`, `WAZUH_AGENT_FIREWALL_DROP_REQUESTED`,
+`SHUFFLE_WORKFLOW_TRIGGER_REQUESTED`) : `theme.palette[undefined].main`
+faisait planter toute la section dès qu'une telle entrée apparaissait dans
+le journal — ce qui était déjà le cas suite aux vérifications live de la
+phase 5. Corrigé, testé (test de non-régression ajouté), vérifié en direct
+sur les deux ports. PR #117, mergée après CI verte.
+
+**Écart 2 — `CapabilityProbe` jamais implémenté.** Signalé par l'utilisateur
+en relisant la carte Connecteurs : « Version détectée » et « Capacités »
+affichaient « Non détectée » pour les 5 connecteurs, sans exception. Le
+composant `CapabilityProbe` documenté dans `CONNECTORS-REFERENCE.md` §1
+depuis l'origine du socle connecteurs (ADR-014) n'avait simplement jamais
+été écrit. Implémenté pour 4 des 5 connecteurs, avec des échantillons réels
+capturés directement depuis le conteneur backend (exploration via
+`docker exec` + `wget`/`openssl`, jamais de valeur devinée) :
+
+- **Wazuh** : `GET /` → version réelle `4.12.0`, capacités gérées y compris
+  le cas où `wazuh.actions.mode` diffère du mode de lecture (contrôle
+  d'agent honnêtement absent tant qu'il reste en simulation).
+- **MISP** : `GET /servers/getVersion` → version réelle `2.5.44`.
+- **Shuffle** : pas d'endpoint de version sur cette instance self-hosted
+  (`/api/v1/version` → 404, vérifié en réel) — `GET /api/v1/environments`
+  sert de signal de substitution honnêtement documenté comme tel.
+- **VirusTotal** : aucune notion de version côté service SaaS — le
+  descripteur le dit explicitement plutôt que de laisser un champ muet.
+- **OpenSearch** : reporté — le compte de service dédié n'a que des droits
+  de lecture sur les index (`403` partout ailleurs). Nécessite l'ajout du
+  rôle `cluster:monitor/main` côté SOC, action laissée à l'utilisateur
+  (infra SOC, hors périmètre de la plateforme).
+
+Suite backend complète verte (unitaire + intégration WireMock sur
+échantillons réels), backend reconstruit et redéployé, Wazuh et MISP
+confirmés en direct avec une version et des capacités réelles dès le
+premier cycle. Shuffle et VirusTotal, connecteurs à la demande sans
+planificateur, n'afficheront leur nouvelle version qu'au prochain
+déclenchement réel par un analyste — comportement attendu.
