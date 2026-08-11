@@ -17,6 +17,7 @@ import { getAlertStats, type AlertStats } from './dashboardApi';
 const ASSET_PAGE_SIZE = 200;
 const INCIDENT_PAGE_SIZE = 200;
 const RECENT_SIZE = 8;
+const ALERTS_RECENT_SIZE = 10;
 
 export interface DashboardOverview {
   alertStats: AlertStats;
@@ -62,7 +63,7 @@ export function useDashboardData() {
         recentReportsPage,
       ] = await Promise.all([
         getAlertStats(),
-        listAlerts({ page: 0, size: RECENT_SIZE }),
+        listAlerts({ page: 0, size: ALERTS_RECENT_SIZE }),
         listIncidents({ page: 0, size: INCIDENT_PAGE_SIZE }),
         listAssets({ status: 'ACTIVE', page: 0, size: ASSET_PAGE_SIZE }),
         listPlaybooks('', false, 0, 1),

@@ -13,6 +13,12 @@ interface Props {
  * qui porte la surface, le thème reste cohérent. Le thème ECharts nommé
  * ('dark' ou aucun = clair par défaut) suit le mode courant de la
  * plateforme.
+ *
+ * <p>`ResizeObserver` sur le conteneur plutôt que l'événement `resize` de
+ * `window` : un repli de la barre latérale (ou tout changement de grille
+ * CSS) redimensionne le conteneur SANS que la fenêtre elle-même change de
+ * taille — `window.resize` ne se déclenche jamais dans ce cas, le
+ * graphique restait figé à son ancienne largeur.
  */
 function EChart({ option, height = 300 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -23,10 +29,10 @@ function EChart({ option, height = 300 }: Props) {
     if (!container) return;
     const chart = echarts.init(container, mode === 'dark' ? 'dark' : undefined);
     chart.setOption({ backgroundColor: 'transparent', ...option });
-    const onResize = () => chart.resize();
-    window.addEventListener('resize', onResize);
+    const resizeObserver = new ResizeObserver(() => chart.resize());
+    resizeObserver.observe(container);
     return () => {
-      window.removeEventListener('resize', onResize);
+      resizeObserver.disconnect();
       chart.dispose();
     };
   }, [option, mode]);
