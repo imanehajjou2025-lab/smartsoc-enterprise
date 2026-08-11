@@ -37,6 +37,7 @@ public class MispSyncService {
     private final IndicatorFeedIngestionService ingestionService;
     private final SyncRunRepository syncRunRepository;
     private final SocConnectorRepository connectorRepository;
+    private final MispCapabilityPort capabilityPort;
 
     public void synchronize() {
         SyncRun run = SyncRun.start(ConnectorType.MISP);
@@ -65,7 +66,7 @@ public class MispSyncService {
     private void recordSuccess() {
         SocConnector connector = connectorRepository.findByType(ConnectorType.MISP)
                 .orElseGet(() -> SocConnector.notConfigured(ConnectorType.MISP));
-        connector.recordSuccess(Instant.now(), connector.getDescriptor());
+        connector.recordSuccess(Instant.now(), capabilityPort.detect(connector.getDescriptor()));
         connectorRepository.save(connector);
     }
 

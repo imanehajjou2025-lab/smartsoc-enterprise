@@ -1,0 +1,12 @@
+[
+  {
+    "Name": "Shuffle",
+    "Type": "onprem",
+    "Registered": false,
+    "default": true,
+    "archived": false,
+    "id": "bd183108-53a1-4da4-a40d-25a5070cad6f",
+    "org_id": "fc27edb5-daf0-4b2b-8391-818352bec382",
+    "run_type": "docker"
+  }
+]

@@ -44,6 +44,9 @@ class MispSyncServiceTest {
     @Mock
     private SocConnectorRepository connectorRepository;
 
+    @Mock
+    private MispCapabilityPort capabilityPort;
+
     private MispSyncService service;
 
     private static FeedObservation observation() {
@@ -54,7 +57,8 @@ class MispSyncServiceTest {
 
     @BeforeEach
     void createService() {
-        service = new MispSyncService(threatIntelPort, ingestionService, syncRunRepository, connectorRepository);
+        service = new MispSyncService(threatIntelPort, ingestionService, syncRunRepository, connectorRepository,
+                capabilityPort);
     }
 
     @Test

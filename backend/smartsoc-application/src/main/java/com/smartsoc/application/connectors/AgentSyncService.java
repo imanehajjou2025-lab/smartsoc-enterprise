@@ -36,6 +36,7 @@ public class AgentSyncService {
     private final SystemInventoryPort systemInventoryPort;
     private final SyncRunRepository syncRunRepository;
     private final SocConnectorRepository connectorRepository;
+    private final WazuhCapabilityPort capabilityPort;
 
     public void synchronize() {
         SyncRun run = SyncRun.start(ConnectorType.WAZUH);
@@ -100,17 +101,17 @@ public class AgentSyncService {
             // echoue. On ne DEGRADE pas sur une supposition — l'etat de
             // sante est simplement inconnu ce cycle-ci, pas mauvais.
             log.warn("Wazuh manager health check failed: {}", e.getMessage());
-            connector.recordSuccess(Instant.now(), connector.getDescriptor());
+            connector.recordSuccess(Instant.now(), capabilityPort.detect(connector.getDescriptor()));
             connectorRepository.save(connector);
             return;
         }
 
         if (health.healthy()) {
-            connector.recordSuccess(Instant.now(), connector.getDescriptor());
+            connector.recordSuccess(Instant.now(), capabilityPort.detect(connector.getDescriptor()));
         } else {
             connector.recordDegraded(Instant.now(),
                     "Daemons critiques arretes : " + String.join(", ", health.stoppedCriticalDaemons()),
-                    connector.getDescriptor());
+                    capabilityPort.detect(connector.getDescriptor()));
         }
         connectorRepository.save(connector);
     }

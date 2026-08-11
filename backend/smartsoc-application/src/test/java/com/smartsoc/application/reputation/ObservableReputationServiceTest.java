@@ -2,7 +2,9 @@ package com.smartsoc.application.reputation;
 
 import com.smartsoc.application.connectors.ObservableReputationPort;
 import com.smartsoc.application.connectors.SocConnectorException;
+import com.smartsoc.application.connectors.VirusTotalCapabilityPort;
 import com.smartsoc.domain.common.BusinessRuleViolationException;
+import com.smartsoc.domain.connectors.ConnectorDescriptor;
 import com.smartsoc.domain.connectors.ConnectorStatus;
 import com.smartsoc.domain.connectors.ConnectorType;
 import com.smartsoc.domain.connectors.SocConnector;
@@ -41,6 +43,9 @@ class ObservableReputationServiceTest {
     @Mock
     private SocConnectorRepository connectorRepository;
 
+    @Mock
+    private VirusTotalCapabilityPort capabilityPort;
+
     private ObservableReputationService service;
 
     private static ObservableReputation cachedReputation(Instant checkedAt) {
@@ -52,7 +57,7 @@ class ObservableReputationServiceTest {
 
     @BeforeEach
     void createService() {
-        service = new ObservableReputationService(port, repository, connectorRepository, 24L);
+        service = new ObservableReputationService(port, repository, connectorRepository, capabilityPort, 24L);
     }
 
     @Test
@@ -148,5 +153,26 @@ class ObservableReputationServiceTest {
 
         assertThat(result).isSameAs(stale);
         verify(repository, never()).save(any());
+    }
+
+    @Test
+    void appliesTheCapabilityDescriptorOnSuccess() {
+        when(repository.findByIdentity("virustotal", IndicatorType.IPV4, "8.8.8.8"))
+                .thenReturn(Optional.empty());
+        when(port.lookup(IndicatorType.IPV4, "8.8.8.8"))
+                .thenReturn(new ObservableReputationPort.Lookup(1, 0, 40, 10));
+        when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        SocConnector connector = SocConnector.notConfigured(ConnectorType.VIRUSTOTAL);
+        when(connectorRepository.findByType(ConnectorType.VIRUSTOTAL)).thenReturn(Optional.of(connector));
+        ConnectorDescriptor descriptor = new ConnectorDescriptor("Service cloud — pas de version applicable",
+                java.util.Set.of(com.smartsoc.domain.connectors.ConnectorCapability.OBSERVABLE_REPUTATION),
+                Instant.now());
+        when(capabilityPort.detect(connector.getDescriptor())).thenReturn(descriptor);
+
+        service.getReputation(IndicatorType.IPV4, "8.8.8.8");
+
+        ArgumentCaptor<SocConnector> connectorCaptor = ArgumentCaptor.forClass(SocConnector.class);
+        verify(connectorRepository).save(connectorCaptor.capture());
+        assertThat(connectorCaptor.getValue().getDescriptor()).isEqualTo(descriptor);
     }
 }

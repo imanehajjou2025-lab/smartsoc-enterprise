@@ -50,6 +50,9 @@ class AgentSyncServiceTest {
     @Mock
     private SocConnectorRepository connectorRepository;
 
+    @Mock
+    private WazuhCapabilityPort capabilityPort;
+
     private AgentSyncService service;
 
     private static AgentInventoryPort.AgentSnapshot snapshot(String id) {
@@ -60,7 +63,7 @@ class AgentSyncServiceTest {
     @BeforeEach
     void createService() {
         service = new AgentSyncService(agentInventoryPort, reconciliationService,
-                managerStatsPort, systemInventoryPort, syncRunRepository, connectorRepository);
+                managerStatsPort, systemInventoryPort, syncRunRepository, connectorRepository, capabilityPort);
     }
 
     @Test
@@ -203,5 +206,22 @@ class AgentSyncServiceTest {
         ArgumentCaptor<SocConnector> captor = ArgumentCaptor.forClass(SocConnector.class);
         verify(connectorRepository).save(captor.capture());
         assertThat(captor.getValue().getDescriptor().detectedVersion()).isEqualTo("Wazuh v4.12.0");
+    }
+
+    @Test
+    void appliesTheFreshlyProbedDescriptorOnSuccess() {
+        when(agentInventoryPort.listAgents()).thenReturn(List.of());
+        when(managerStatsPort.checkHealth()).thenReturn(new ManagerHealth(true, List.of()));
+        SocConnector connector = SocConnector.notConfigured(ConnectorType.WAZUH);
+        when(connectorRepository.findByType(ConnectorType.WAZUH)).thenReturn(Optional.of(connector));
+        ConnectorDescriptor probed = new ConnectorDescriptor("4.12.0",
+                java.util.Set.of(com.smartsoc.domain.connectors.ConnectorCapability.AGENT_INVENTORY), Instant.now());
+        when(capabilityPort.detect(connector.getDescriptor())).thenReturn(probed);
+
+        service.synchronize();
+
+        ArgumentCaptor<SocConnector> captor = ArgumentCaptor.forClass(SocConnector.class);
+        verify(connectorRepository).save(captor.capture());
+        assertThat(captor.getValue().getDescriptor()).isEqualTo(probed);
     }
 }

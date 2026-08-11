@@ -10,6 +10,7 @@ import com.smartsoc.domain.connectors.SocConnectorRepository;
 import com.smartsoc.domain.intelligence.IndicatorRepository;
 import com.smartsoc.domain.intelligence.IndicatorType;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -19,6 +20,7 @@ import org.springframework.test.context.DynamicPropertySource;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
+import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
 import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
@@ -62,6 +64,19 @@ class MispSyncLiveIntegrationTest {
 
     @Autowired
     private SocConnectorRepository connectorRepository;
+
+    @BeforeEach
+    void stubVersionByDefault() {
+        // WazuhCapabilityProbe-equivalent pour MISP (ADR-014 §6.5) : forme
+        // reprise de l'echantillon reel capture le 2026-08-10
+        // (docs/integration/fixtures/misp/get-version-sample.json).
+        MISP.stubFor(get(urlEqualTo("/servers/getVersion")).willReturn(aResponse()
+                .withStatus(200)
+                .withHeader("Content-Type", "application/json")
+                .withBody("""
+                        {"version": "2.5.44"}
+                        """)));
+    }
 
     @Test
     void authenticatesFetchesAttributesAndIngestsThemAsIndicators() {
@@ -132,5 +147,22 @@ class MispSyncLiveIntegrationTest {
 
         var connector = connectorRepository.findByType(ConnectorType.MISP).orElseThrow();
         assertThat(connector.getStatus()).isEqualTo(ConnectorStatus.DISCONNECTED);
+    }
+
+    @Test
+    void detectsTheRealVersionAndThreatIntelCapability() {
+        MISP.stubFor(post(urlEqualTo("/attributes/restSearch")).willReturn(aResponse()
+                .withStatus(200)
+                .withHeader("Content-Type", "application/json")
+                .withBody("""
+                        {"response": {"Attribute": []}}
+                        """)));
+
+        mispSyncService.synchronize();
+
+        var connector = connectorRepository.findByType(ConnectorType.MISP).orElseThrow();
+        assertThat(connector.getDescriptor().detectedVersion()).isEqualTo("2.5.44");
+        assertThat(connector.getDescriptor().capabilities())
+                .containsExactly(com.smartsoc.domain.connectors.ConnectorCapability.THREAT_INTEL);
     }
 }

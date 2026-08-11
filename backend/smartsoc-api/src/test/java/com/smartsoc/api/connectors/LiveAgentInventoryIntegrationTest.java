@@ -119,6 +119,16 @@ class LiveAgentInventoryIntegrationTest {
                 .withBody("""
                         {"data": {"affected_items": []}, "message": "ok", "error": 0}
                         """)));
+        // Racine de l'API -- WazuhCapabilityProbe (ADR-014 §6.5), forme
+        // reprise de l'echantillon reel capture le 2026-08-10
+        // (docs/integration/fixtures/wazuh/root-version-sample.json).
+        WAZUH.stubFor(get(urlPathEqualTo("/")).willReturn(aResponse()
+                .withStatus(200)
+                .withHeader("Content-Type", "application/json")
+                .withBody("""
+                        {"data": {"title": "Wazuh API REST", "api_version": "4.12.0",
+                          "revision": "rc1", "hostname": "vm-siem"}, "error": 0}
+                        """)));
     }
 
     @Test
@@ -276,5 +286,65 @@ class LiveAgentInventoryIntegrationTest {
 
         assertThat(connectorRepository.findByType(ConnectorType.WAZUH))
                 .hasValueSatisfying(c -> assertThat(c.getStatus()).isEqualTo(ConnectorStatus.DISCONNECTED));
+    }
+
+    @Test
+    void detectsTheRealVersionAndCapabilitiesOnSuccess() {
+        WAZUH.stubFor(get(urlPathEqualTo("/agents")).willReturn(aResponse()
+                .withStatus(200)
+                .withHeader("Content-Type", "application/json")
+                .withBody("""
+                        {"data": {"affected_items": [
+                          {"id": "004", "name": "WIN10-CLIENT", "ip": "10.100.0.9", "status": "active"}
+                        ], "total_affected_items": 1}, "message": "ok", "error": 0}
+                        """)));
+
+        agentSyncService.synchronize();
+
+        Optional<com.smartsoc.domain.connectors.SocConnector> connector =
+                connectorRepository.findByType(ConnectorType.WAZUH);
+        assertThat(connector).isPresent();
+        assertThat(connector.get().getDescriptor().detectedVersion()).isEqualTo("4.12.0");
+        assertThat(connector.get().getDescriptor().capabilities()).containsExactlyInAnyOrder(
+                com.smartsoc.domain.connectors.ConnectorCapability.AGENT_INVENTORY,
+                com.smartsoc.domain.connectors.ConnectorCapability.SYSTEM_INVENTORY,
+                com.smartsoc.domain.connectors.ConnectorCapability.MANAGER_STATS);
+        // wazuh.actions.mode reste en simulation par defaut dans ce test
+        // (non configure) : AGENT_CONTROL n'est PAS annoncee -- vrai
+        // reflet de l'etat, jamais suppose lie au mode de lecture.
+        assertThat(connector.get().getDescriptor().capabilities())
+                .doesNotContain(com.smartsoc.domain.connectors.ConnectorCapability.AGENT_CONTROL);
+    }
+
+    @Test
+    void keepsThePreviousDescriptorWhenTheVersionProbeFails() {
+        // detectedAt au-dela du TTL de la sonde (1 h) : force un VRAI
+        // appel a GET / plutot qu'un simple hit de cache, pour que ce
+        // test exerce reellement le chemin d'echec.
+        com.smartsoc.domain.connectors.SocConnector alreadyDescribed =
+                com.smartsoc.domain.connectors.SocConnector.notConfigured(ConnectorType.WAZUH);
+        alreadyDescribed.recordSuccess(java.time.Instant.now().minusSeconds(7200),
+                new com.smartsoc.domain.connectors.ConnectorDescriptor("4.12.0",
+                        java.util.Set.of(com.smartsoc.domain.connectors.ConnectorCapability.AGENT_INVENTORY),
+                        java.time.Instant.now().minusSeconds(7200)));
+        connectorRepository.save(alreadyDescribed);
+
+        WAZUH.stubFor(get(urlPathEqualTo("/agents")).willReturn(aResponse()
+                .withStatus(200)
+                .withHeader("Content-Type", "application/json")
+                .withBody("""
+                        {"data": {"affected_items": []}, "total_affected_items": 0, "message": "ok", "error": 0}
+                        """)));
+        // La sonde de version echoue -- l'inventaire, lui, reussit quand meme.
+        WAZUH.stubFor(get(urlPathEqualTo("/")).willReturn(aResponse().withStatus(500)));
+
+        agentSyncService.synchronize();
+
+        Optional<com.smartsoc.domain.connectors.SocConnector> connector =
+                connectorRepository.findByType(ConnectorType.WAZUH);
+        assertThat(connector).isPresent();
+        assertThat(connector.get().getStatus()).isEqualTo(ConnectorStatus.CONNECTED);
+        // Descripteur precedent conserve tel quel -- jamais de valeur supposee.
+        assertThat(connector.get().getDescriptor().detectedVersion()).isEqualTo("4.12.0");
     }
 }
