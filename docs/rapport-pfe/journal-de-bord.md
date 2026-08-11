@@ -3584,3 +3584,50 @@ confirmés en direct avec une version et des capacités réelles dès le
 premier cycle. Shuffle et VirusTotal, connecteurs à la demande sans
 planificateur, n'afficheront leur nouvelle version qu'au prochain
 déclenchement réel par un analyste — comportement attendu.
+
+---
+
+## 2026-08-11 (suite) — `CapabilityProbe` : les 5/5 connecteurs, y compris OpenSearch
+
+À la demande d'Imane, déclenchement réel des deux connecteurs « à la
+demande » pour vérifier l'affichage : un vrai workflow Shuffle
+(`INC-2026-0004`, playbook « Confinement ransomware verif E2E ») et une
+vraie vérification VirusTotal (IOC `203.0.113.42`) — les deux cartes se
+sont mises à jour immédiatement (`Shuffle (onprem/docker)` et
+`Service cloud — pas de version applicable`, capacités correctes).
+
+Pour OpenSearch, resté bloqué en fin de session précédente (403 partout,
+compte `smartsoc-reader` limité en lecture d'index), Imane a réglé ça
+côté SOC en session live, avec beaucoup d'allers-retours : confusion
+initiale entre le RBAC propre à l'API Wazuh (port 55000, système de
+« Policies ») et le plugin OpenSearch Security qui protège l'Indexer
+(port 9200, système de « cluster_permissions ») — deux systèmes de
+permissions distincts, malgré des noms de compte identiques
+(`smartsoc-reader`) et des interfaces d'administration proches. Une fois
+la bonne cible identifiée, tentative d'ajouter directement la permission
+au rôle `readall` (celui réellement porté par le compte, confirmé par le
+message d'erreur `security_exception` lui-même) — refusée par l'API
+(`readall` est un rôle **réservé**, immuable). Contournement standard :
+création d'un rôle personnalisé `smartsoc_cluster_monitor` avec la seule
+permission `cluster:monitor/main`, mappé sur le backend role `readall`
+via l'API `_plugins/_security`, en s'authentifiant avec le compte admin
+de l'Indexer (retrouvé par Imane dans `wazuh-install-files.tar` sur la VM
+`vm-siem`, seul fichier survivant contenant tous les mots de passe
+générés à l'installation).
+
+`GET /` accessible immédiatement après. Sonde `OpenSearchCapabilityProbe`
+implémentée à l'identique des 4 autres — version réelle détectée
+`7.10.2` (cluster `wazuh-cluster`), capacités Recherche d'événements +
+Flux de vulnérabilités (les deux ports que ce connecteur sert réellement).
+Suite backend verte, backend reconstruit et redéployé, confirmé en
+direct.
+
+**`CapabilityProbe` (ADR-014 §6.5), documenté depuis l'origine du socle
+connecteurs mais jamais construit, est désormais intégralement
+implémenté pour les 5 connecteurs.** Trois PR mergées sur ce chantier :
+[#117](https://github.com/imanehajjou2025-lab/smartsoc-enterprise/pull/117)
+(crash du Journal d'audit),
+[#118](https://github.com/imanehajjou2025-lab/smartsoc-enterprise/pull/118)
+(Wazuh, MISP, Shuffle, VirusTotal),
+[#119](https://github.com/imanehajjou2025-lab/smartsoc-enterprise/pull/119)
+(OpenSearch).
