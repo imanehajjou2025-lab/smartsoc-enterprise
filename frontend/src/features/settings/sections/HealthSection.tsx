@@ -9,6 +9,7 @@ import { useTheme } from '@mui/material/styles';
 import { useQuery } from '@tanstack/react-query';
 import SettingsCard from '../../../shared/components/SettingsCard';
 import { resolveChipColor, softChipSx } from '../../../shared/components/chipStyles';
+import { severityColors } from '../../../app/theme';
 import { problemDetail } from '../../../shared/api/client';
 import { ServiceStatusChip } from '../settingsChips';
 import { getAiSettings, getPlatformHealth } from '../settingsApi';
@@ -53,12 +54,14 @@ function HealthSection() {
       <SettingsCard
         title="Backend & base de données"
         icon={<DnsOutlinedIcon />}
+        color={data.platform.status === 'UP' ? severityColors.low : severityColors.critical}
         statusChip={<PlatformStatusChip status={data.platform.status} />}
         description="Actualisé automatiquement toutes les 30 secondes."
       />
       <SettingsCard
         title="Classifieur TP/FP"
         icon={<SmartToyOutlinedIcon />}
+        color={data.ai.classifier.status === 'UP' ? severityColors.low : severityColors.critical}
         statusChip={<ServiceStatusChip status={data.ai.classifier.status} />}
         description={
           data.ai.mode === 'live' ? 'Mode live' : "Mode simulation — ce service n'est pas appelé"
@@ -67,6 +70,7 @@ function HealthSection() {
       <SettingsCard
         title="Assistant conversationnel"
         icon={<SupportAgentOutlinedIcon />}
+        color={data.ai.assistant.status === 'UP' ? severityColors.low : severityColors.critical}
         statusChip={<ServiceStatusChip status={data.ai.assistant.status} />}
         description={
           data.ai.mode === 'live' ? 'Mode live' : "Mode simulation — ce service n'est pas appelé"

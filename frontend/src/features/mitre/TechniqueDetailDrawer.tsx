@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
+import GpsFixedIcon from '@mui/icons-material/GpsFixed';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
 import Divider from '@mui/material/Divider';
@@ -11,8 +11,15 @@ import Drawer from '@mui/material/Drawer';
 import Stack from '@mui/material/Stack';
 import TablePagination from '@mui/material/TablePagination';
 import Typography from '@mui/material/Typography';
+import { alpha } from '@mui/material/styles';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { severityColors } from '../../app/theme';
 import { problemDetail } from '../../shared/api/client';
+import ActionCard from '../../shared/components/ActionCard';
+import DetailDrawerHeader from '../../shared/components/DetailDrawerHeader';
+import DetailField from '../../shared/components/DetailField';
+import MutedText from '../../shared/components/MutedText';
+import SectionLabel from '../../shared/components/SectionLabel';
 import { SeverityChip, StatusChip } from '../alerts/chips';
 import { DeprecatedChip, TacticChip } from './mitreChips';
 import { getTechnique, listTechniqueAlerts } from './mitreApi';
@@ -24,17 +31,6 @@ interface Props {
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <Box sx={{ mb: 1.5 }}>
-      <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-        {label}
-      </Typography>
-      {children}
-    </Box>
-  );
 }
 
 /**
@@ -75,6 +71,8 @@ function TechniqueDetailDrawer({ attackId, onClose }: Props) {
     placeholderData: keepPreviousData,
   });
 
+  const accent = technique?.deprecated ? severityColors.medium : severityColors.critical;
+
   return (
     <Drawer anchor="right" open={Boolean(attackId)} onClose={onClose}>
       <Box sx={{ width: 560, maxWidth: '92vw', p: 3 }}>
@@ -89,102 +87,108 @@ function TechniqueDetailDrawer({ attackId, onClose }: Props) {
 
         {technique && (
           <>
-            <Stack
-              direction="row"
-              spacing={1}
-              useFlexGap
-              sx={{ mb: 1, alignItems: 'center', flexWrap: 'wrap' }}
-            >
-              <Chip
-                label={technique.attackId}
-                size="small"
-                sx={{ fontFamily: 'monospace', fontWeight: 600 }}
-              />
-              {technique.subTechnique && (
-                <Chip label="Sous-technique" size="small" variant="outlined" />
-              )}
-              {technique.deprecated && <DeprecatedChip />}
-            </Stack>
-            <Typography variant="subtitle1" sx={{ mb: 2 }}>
-              {technique.name}
-            </Typography>
+            <DetailDrawerHeader
+              color={accent}
+              icon={<GpsFixedIcon />}
+              title={technique.name}
+              onClose={onClose}
+            />
 
-            <Field label="Tactiques">
+            {(technique.subTechnique || technique.deprecated) && (
+              <Stack direction="row" spacing={1} useFlexGap sx={{ mb: 2, flexWrap: 'wrap' }}>
+                {technique.subTechnique && (
+                  <Chip label="Sous-technique" size="small" variant="outlined" />
+                )}
+                {technique.deprecated && <DeprecatedChip />}
+              </Stack>
+            )}
+
+            <DetailField label="Tactiques" color={accent}>
               <Stack direction="row" spacing={0.5} useFlexGap sx={{ flexWrap: 'wrap' }}>
                 {technique.tactics.map((tactic) => (
                   <TacticChip key={tactic} name={tactic} />
                 ))}
               </Stack>
-            </Field>
+            </DetailField>
+
             {technique.subTechnique && technique.parentId && (
-              <Field label="Technique parente">
+              <DetailField label="Technique parente" color={accent}>
                 <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
                   {technique.parentId}
                 </Typography>
-              </Field>
+              </DetailField>
             )}
+
             {technique.description && (
-              <Field label="Description">
-                <Typography variant="body2">{technique.description}</Typography>
-              </Field>
+              <DetailField label="Description" color={accent}>
+                <MutedText>{technique.description}</MutedText>
+              </DetailField>
             )}
-            {technique.attackVersion && (
-              <Field label="Version ATT&CK">
-                <Typography variant="body2">{technique.attackVersion}</Typography>
-              </Field>
-            )}
+
             {technique.url && (
-              <Button
-                component="a"
-                href={technique.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                size="small"
-                variant="outlined"
-                startIcon={<OpenInNewIcon />}
-                sx={{ mb: 1 }}
-              >
-                Voir sur attack.mitre.org
-              </Button>
+              <Box sx={{ mb: 2 }}>
+                <ActionCard
+                  icon={<OpenInNewIcon />}
+                  title="Voir sur attack.mitre.org"
+                  description="Documentation officielle MITRE ATT&CK pour cette technique."
+                  color={accent}
+                  onClick={() => window.open(technique.url!, '_blank', 'noopener,noreferrer')}
+                />
+              </Box>
             )}
 
             <Divider sx={{ my: 2 }} />
-            <Typography variant="subtitle2" sx={{ mb: 1 }}>
-              Alertes citant cette technique{correlated ? ` (${correlated.totalElements})` : ''}
-            </Typography>
-            {correlated && correlated.items.length === 0 && (
-              <Typography variant="body2" color="text.secondary">
-                Aucune alerte ne cite cette technique.
-              </Typography>
-            )}
-            {correlated?.items.map((alert) => (
-              <Stack
-                key={alert.id}
-                direction="row"
-                spacing={1}
-                sx={{ alignItems: 'center', mb: 0.5 }}
-              >
-                <SeverityChip severity={alert.severity} />
-                <Typography variant="body2" sx={{ flexGrow: 1 }} noWrap>
-                  {alert.title}
-                </Typography>
-                <StatusChip status={alert.status} />
-                <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
-                  {formatDate(alert.detectedAt)}
-                </Typography>
+
+            <SectionLabel color={severityColors.info}>
+              {`Alertes citant cette technique${correlated ? ` (${correlated.totalElements})` : ''}`}
+            </SectionLabel>
+            <Box sx={{ mt: 1.5 }}>
+              {correlated && correlated.items.length === 0 && (
+                <MutedText>Aucune alerte ne cite cette technique.</MutedText>
+              )}
+              <Stack spacing={0.5}>
+                {correlated?.items.map((alert) => (
+                  <Stack
+                    key={alert.id}
+                    direction="row"
+                    spacing={1}
+                    sx={{
+                      alignItems: 'center',
+                      p: 0.75,
+                      borderRadius: 2,
+                      borderLeft: '3px solid',
+                      borderLeftColor: alpha(severityColors.info, 0.4),
+                      transition: 'background-color 120ms ease',
+                      '&:hover': { bgcolor: (t) => alpha(t.palette.text.primary, 0.05) },
+                    }}
+                  >
+                    <SeverityChip severity={alert.severity} />
+                    <Typography variant="body2" sx={{ flexGrow: 1 }} noWrap>
+                      {alert.title}
+                    </Typography>
+                    <StatusChip status={alert.status} />
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{ whiteSpace: 'nowrap' }}
+                    >
+                      {formatDate(alert.detectedAt)}
+                    </Typography>
+                  </Stack>
+                ))}
               </Stack>
-            ))}
-            {correlated && correlated.totalElements > 10 && (
-              <TablePagination
-                component="div"
-                count={correlated.totalElements}
-                page={alertsPage}
-                onPageChange={(_, newPage) => setAlertsPage(newPage)}
-                rowsPerPage={10}
-                rowsPerPageOptions={[10]}
-                labelRowsPerPage=""
-              />
-            )}
+              {correlated && correlated.totalElements > 10 && (
+                <TablePagination
+                  component="div"
+                  count={correlated.totalElements}
+                  page={alertsPage}
+                  onPageChange={(_, newPage) => setAlertsPage(newPage)}
+                  rowsPerPage={10}
+                  rowsPerPageOptions={[10]}
+                  labelRowsPerPage=""
+                />
+              )}
+            </Box>
           </>
         )}
       </Box>

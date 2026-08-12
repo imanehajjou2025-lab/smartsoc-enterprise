@@ -20,15 +20,15 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAppSelector } from '../../app/hooks';
+import { severityColors } from '../../app/theme';
 import { problemDetail } from '../../shared/api/client';
+import ActionCard from '../../shared/components/ActionCard';
+import DetailDrawerHeader from '../../shared/components/DetailDrawerHeader';
+import DetailField from '../../shared/components/DetailField';
+import MutedText from '../../shared/components/MutedText';
+import SectionLabel from '../../shared/components/SectionLabel';
 import { SeverityChip, StatusChip } from '../alerts/chips';
-import {
-  ConfidenceBar,
-  IocStatusChip,
-  IocTypeChip,
-  ReputationVerdictChip,
-  TlpChip,
-} from './iocChips';
+import { ConfidenceBar, IocStatusChip, ReputationVerdictChip, TlpChip } from './iocChips';
 import { getIoc, getReputation, listMatchingAlerts, revokeIoc } from './intelligenceApi';
 
 interface Props {
@@ -38,17 +38,6 @@ interface Props {
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <Box sx={{ mb: 1.5 }}>
-      <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-        {label}
-      </Typography>
-      {children}
-    </Box>
-  );
 }
 
 /**
@@ -131,25 +120,30 @@ function IocDetailDrawer({ iocId, onClose }: Props) {
 
         {ioc && (
           <>
+            <DetailDrawerHeader
+              color={
+                ioc.status === 'ACTIVE'
+                  ? severityColors.low
+                  : ioc.status === 'REVOKED'
+                    ? severityColors.critical
+                    : severityColors.info
+              }
+              icon={<TravelExploreIcon sx={{ fontSize: 26 }} />}
+              title={ioc.value}
+              onClose={onClose}
+            />
             <Stack
               direction="row"
               spacing={1}
               useFlexGap
-              sx={{ mb: 1, alignItems: 'center', flexWrap: 'wrap' }}
+              sx={{ mb: 2, alignItems: 'center', flexWrap: 'wrap' }}
             >
-              <IocTypeChip type={ioc.type} />
               <IocStatusChip status={ioc.status} />
               <TlpChip tlp={ioc.tlp} />
               {isRevoked && (
                 <Chip icon={<LockIcon />} label="Lecture seule" size="small" color="default" />
               )}
             </Stack>
-            <Typography
-              variant="subtitle1"
-              sx={{ mb: 2, fontFamily: 'monospace', wordBreak: 'break-all' }}
-            >
-              {ioc.value}
-            </Typography>
 
             {revokeMutation.isError && (
               <Alert severity="error" sx={{ mb: 2 }}>
@@ -158,29 +152,23 @@ function IocDetailDrawer({ iocId, onClose }: Props) {
             )}
 
             {canWrite && !isRevoked && (
-              <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
-                <Button
-                  size="small"
-                  variant="outlined"
-                  color="error"
-                  startIcon={<BlockIcon />}
+              <Box sx={{ mb: 2 }}>
+                <ActionCard
+                  icon={<BlockIcon />}
+                  title="Révoquer"
+                  description="Retirer cet indicateur de l'enrichissement"
+                  color={severityColors.critical}
                   onClick={() => setRevokeOpen(true)}
-                >
-                  Révoquer
-                </Button>
-              </Stack>
+                />
+              </Box>
             )}
 
             {canWrite && (
               <>
                 <Divider sx={{ mb: 2 }} />
-                <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                  Réputation VirusTotal
-                </Typography>
+                <SectionLabel color="#2f81f7">Réputation VirusTotal</SectionLabel>
                 {ioc.type === 'EMAIL' ? (
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                    VirusTotal n'analyse pas les adresses e-mail.
-                  </Typography>
+                  <MutedText>VirusTotal n'analyse pas les adresses e-mail.</MutedText>
                 ) : (
                   <Box sx={{ mb: 2 }}>
                     <Button
@@ -201,9 +189,7 @@ function IocDetailDrawer({ iocId, onClose }: Props) {
                       <Stack spacing={1} sx={{ mt: 1.5 }}>
                         <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
                           <ReputationVerdictChip verdict={reputationMutation.data.verdict} />
-                          <Typography variant="caption" color="text.secondary">
-                            Relevé le {formatDate(reputationMutation.data.checkedAt)}
-                          </Typography>
+                          <MutedText>Relevé le {formatDate(reputationMutation.data.checkedAt)}</MutedText>
                         </Stack>
                         <Typography variant="body2" color="text.secondary">
                           {reputationMutation.data.maliciousCount} malveillant(s) ·{' '}
@@ -218,61 +204,55 @@ function IocDetailDrawer({ iocId, onClose }: Props) {
               </>
             )}
 
-            <Field label="Confiance">
+            <DetailField label="Confiance" color={severityColors.medium}>
               <ConfidenceBar confidence={ioc.confidence} />
-            </Field>
-            <Field label="Source">
+            </DetailField>
+            <DetailField label="Source">
               <Typography variant="body2">{ioc.feedSource}</Typography>
-            </Field>
+            </DetailField>
             {ioc.externalId && (
-              <Field label="Identifiant externe">
-                <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
-                  {ioc.externalId}
-                </Typography>
-              </Field>
+              <DetailField label="Identifiant externe">
+                <MutedText>{ioc.externalId}</MutedText>
+              </DetailField>
             )}
             {ioc.description && (
-              <Field label="Description">
+              <DetailField label="Description">
                 <Typography variant="body2">{ioc.description}</Typography>
-              </Field>
+              </DetailField>
             )}
             {ioc.tags.length > 0 && (
-              <Field label="Tags">
+              <DetailField label="Tags">
                 <Stack direction="row" spacing={0.5} useFlexGap sx={{ flexWrap: 'wrap' }}>
                   {ioc.tags.map((tag) => (
                     <Chip key={tag} label={tag} size="small" variant="outlined" />
                   ))}
                 </Stack>
-              </Field>
+              </DetailField>
             )}
-            <Field label="Première observation">
-              <Typography variant="body2">{formatDate(ioc.firstSeen)}</Typography>
-            </Field>
-            <Field label="Dernière observation">
-              <Typography variant="body2">{formatDate(ioc.lastSeen)}</Typography>
-            </Field>
-            <Field label="Valide jusqu'à">
-              <Typography variant="body2">
-                {ioc.validUntil ? formatDate(ioc.validUntil) : 'Sans péremption'}
-              </Typography>
-            </Field>
+            <DetailField label="Première observation">
+              <MutedText>{formatDate(ioc.firstSeen)}</MutedText>
+            </DetailField>
+            <DetailField label="Dernière observation">
+              <MutedText>{formatDate(ioc.lastSeen)}</MutedText>
+            </DetailField>
+            <DetailField label="Valide jusqu'à">
+              <MutedText>{ioc.validUntil ? formatDate(ioc.validUntil) : 'Sans péremption'}</MutedText>
+            </DetailField>
             {isRevoked && ioc.revocationReason && (
-              <Field label="Motif de révocation">
+              <DetailField label="Motif de révocation" color={severityColors.critical}>
                 <Typography variant="body2">
                   {ioc.revocationReason}
                   {ioc.revokedAt ? ` — ${formatDate(ioc.revokedAt)}` : ''}
                 </Typography>
-              </Field>
+              </DetailField>
             )}
 
             <Divider sx={{ my: 2 }} />
-            <Typography variant="subtitle2" sx={{ mb: 1 }}>
+            <SectionLabel color={severityColors.critical}>
               Alertes citant cet indicateur{correlated ? ` (${correlated.totalElements})` : ''}
-            </Typography>
+            </SectionLabel>
             {correlated && correlated.items.length === 0 && (
-              <Typography variant="body2" color="text.secondary">
-                Aucune alerte ne cite cet indicateur.
-              </Typography>
+              <MutedText>Aucune alerte ne cite cet indicateur.</MutedText>
             )}
             {correlated?.items.map((alert) => (
               <Stack

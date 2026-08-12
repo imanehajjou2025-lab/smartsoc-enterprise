@@ -4,7 +4,9 @@ import AddIcon from '@mui/icons-material/Add';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
+import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
+import InputAdornment from '@mui/material/InputAdornment';
 import MenuItem from '@mui/material/MenuItem';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
@@ -17,9 +19,22 @@ import TablePagination from '@mui/material/TablePagination';
 import TableRow from '@mui/material/TableRow';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import { alpha, useTheme } from '@mui/material/styles';
+import CloseIcon from '@mui/icons-material/Close';
+import FilterListIcon from '@mui/icons-material/FilterList';
+import GppGoodOutlinedIcon from '@mui/icons-material/GppGoodOutlined';
+import GppMaybeOutlinedIcon from '@mui/icons-material/GppMaybeOutlined';
+import LabelOutlinedIcon from '@mui/icons-material/LabelOutlined';
+import SearchIcon from '@mui/icons-material/Search';
+import SourceOutlinedIcon from '@mui/icons-material/SourceOutlined';
+import TravelExploreIcon from '@mui/icons-material/TravelExplore';
+import VerifiedUserOutlinedIcon from '@mui/icons-material/VerifiedUserOutlined';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { severityColors } from '../../app/theme';
 import { useAppSelector } from '../../app/hooks';
 import { problemDetail } from '../../shared/api/client';
+import KpiTile from '../../shared/components/KpiTile';
+import PageHeaderBanner from '../../shared/components/PageHeaderBanner';
 import DeclareIocDialog from './DeclareIocDialog';
 import {
   ConfidenceBar,
@@ -39,8 +54,29 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
 }
 
+/** Nombre d'IOC pour un filtre donné — dérivé d'une pagination réelle (size=1), pas d'endpoint dédié. */
+function useIocCount(filters: { status?: IndicatorStatus; minConfidence?: number }) {
+  return useQuery({
+    queryKey: ['iocs-count', filters],
+    queryFn: () =>
+      listIocs({
+        type: '',
+        status: filters.status ?? '',
+        feedSource: '',
+        tag: '',
+        minConfidence: filters.minConfidence ?? '',
+        search: '',
+        page: 0,
+        size: 1,
+      }),
+    select: (d) => d.totalElements,
+    staleTime: 30_000,
+  });
+}
+
 /** Référentiel des indicateurs de compromission (IOC) — le renseignement du SOC. */
 function IntelligencePage() {
+  const theme = useTheme();
   const [type, setType] = useState<IndicatorType | ''>('');
   const [status, setStatus] = useState<IndicatorStatus | ''>('');
   const [feedSource, setFeedSource] = useState('');
@@ -65,111 +101,286 @@ function IntelligencePage() {
     }
   };
 
+  const hasActiveFilters = Boolean(type || status || feedSource || tag || minConfidence || search);
+  const resetFilters = () => {
+    setType('');
+    setStatus('');
+    setFeedSource('');
+    setTag('');
+    setMinConfidence('');
+    setSearch('');
+    setPage(0);
+  };
+
   const { data, isPending, isError, error } = useQuery({
     queryKey: ['iocs', { type, status, feedSource, tag, minConfidence, search, page, size }],
     queryFn: () => listIocs({ type, status, feedSource, tag, minConfidence, search, page, size }),
     placeholderData: keepPreviousData,
   });
 
+  const totalCount = useIocCount({});
+  const activeCount = useIocCount({ status: 'ACTIVE' });
+  const highConfidenceCount = useIocCount({ minConfidence: 75 });
+  const revokedCount = useIocCount({ status: 'REVOKED' });
+
   const resetPage = () => setPage(0);
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-        <Typography variant="h5" component="h2">
-          Threat Intelligence
-        </Typography>
-        {canWrite && (
-          <Button variant="contained" startIcon={<AddIcon />} onClick={() => setDeclareOpen(true)}>
-            Déclarer un IOC
-          </Button>
-        )}
+      <PageHeaderBanner
+        icon={<TravelExploreIcon sx={{ color: theme.palette.primary.main, fontSize: 28 }} />}
+        title="Threat Intelligence"
+        subtitle="Référentiel des indicateurs de compromission (IOC) — le renseignement du SOC."
+        action={
+          canWrite
+            ? { label: 'Déclarer un IOC', icon: <AddIcon />, onClick: () => setDeclareOpen(true) }
+            : undefined
+        }
+      />
+
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: { xs: '1fr 1fr', sm: 'repeat(4, 1fr)' },
+          gap: 2,
+          mb: 3,
+        }}
+      >
+        <KpiTile
+          label="Indicateurs"
+          value={totalCount.data == null ? '…' : String(totalCount.data)}
+          hint="au total"
+          color={severityColors.info}
+          icon={<TravelExploreIcon />}
+        />
+        <KpiTile
+          label="IOC actifs"
+          value={activeCount.data == null ? '…' : String(activeCount.data)}
+          hint="enrichissent encore les alertes"
+          color={severityColors.low}
+          icon={<VerifiedUserOutlinedIcon />}
+          onClick={() => {
+            setStatus('ACTIVE');
+            resetPage();
+          }}
+        />
+        <KpiTile
+          label="Haute confiance"
+          value={highConfidenceCount.data == null ? '…' : String(highConfidenceCount.data)}
+          hint="confiance ≥ 75"
+          color={severityColors.critical}
+          icon={<GppMaybeOutlinedIcon />}
+          onClick={() => {
+            setMinConfidence(75);
+            resetPage();
+          }}
+        />
+        <KpiTile
+          label="IOC révoqués"
+          value={revokedCount.data == null ? '…' : String(revokedCount.data)}
+          hint="ne doivent plus enrichir"
+          color={severityColors.medium}
+          icon={<GppGoodOutlinedIcon />}
+          onClick={() => {
+            setStatus('REVOKED');
+            resetPage();
+          }}
+        />
       </Box>
 
-      <Stack direction="row" spacing={2} useFlexGap sx={{ mb: 2, flexWrap: 'wrap' }}>
-        <TextField
-          label="Recherche"
-          size="small"
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            resetPage();
+      <Paper
+        elevation={0}
+        sx={{
+          p: 2.5,
+          mb: 3,
+          borderRadius: 4,
+          border: '1px solid',
+          borderColor: alpha(theme.palette.primary.main, 0.2),
+          background: `linear-gradient(160deg, ${alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.16 : 0.08)} 0%, ${theme.palette.background.paper} 55%)`,
+        }}
+      >
+        <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', mb: 2.25 }}>
+          <Box
+            sx={{
+              width: 36,
+              height: 36,
+              borderRadius: '50%',
+              flexShrink: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: theme.palette.primary.main,
+              bgcolor: alpha(theme.palette.primary.main, 0.16),
+              boxShadow: `0 0 14px 2px ${alpha(theme.palette.primary.main, 0.4)}`,
+            }}
+          >
+            <FilterListIcon fontSize="small" />
+          </Box>
+          <Box sx={{ minWidth: 0, flexGrow: 1 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+              Filtres
+            </Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ opacity: 0.75 }}>
+              {data
+                ? `${data.totalElements} indicateur${data.totalElements > 1 ? 's' : ''} correspondant${data.totalElements > 1 ? 's' : ''}`
+                : 'Affinez le référentiel'}
+            </Typography>
+          </Box>
+          {hasActiveFilters && (
+            <Button
+              size="small"
+              onClick={resetFilters}
+              startIcon={<CloseIcon fontSize="small" />}
+              sx={{ fontWeight: 700, borderRadius: 2, flexShrink: 0 }}
+            >
+              Réinitialiser
+            </Button>
+          )}
+        </Stack>
+
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: { xs: '1fr 1fr', sm: 'repeat(3, 1fr)', lg: 'repeat(6, 1fr)' },
+            gap: 1.5,
+            '& .MuiOutlinedInput-root': { borderRadius: 2.5, bgcolor: 'background.paper' },
           }}
-          placeholder="valeur ou description"
-          sx={{ minWidth: 200 }}
-        />
-        <TextField
-          select
-          label="Type"
-          size="small"
-          value={type}
-          onChange={(e) => {
-            setType(e.target.value as IndicatorType | '');
-            resetPage();
-          }}
-          sx={{ minWidth: 140 }}
         >
-          <MenuItem value="">Tous</MenuItem>
-          {TYPES.map((value) => (
-            <MenuItem key={value} value={value}>
-              {IOC_TYPE_LABELS[value]}
-            </MenuItem>
-          ))}
-        </TextField>
-        <TextField
-          select
-          label="Statut"
-          size="small"
-          value={status}
-          onChange={(e) => {
-            setStatus(e.target.value as IndicatorStatus | '');
-            resetPage();
-          }}
-          sx={{ minWidth: 140 }}
-        >
-          <MenuItem value="">Tous</MenuItem>
-          {STATUSES.map((value) => (
-            <MenuItem key={value} value={value}>
-              {IOC_STATUS_LABELS[value]}
-            </MenuItem>
-          ))}
-        </TextField>
-        <TextField
-          label="Source"
-          size="small"
-          value={feedSource}
-          onChange={(e) => {
-            setFeedSource(e.target.value);
-            resetPage();
-          }}
-          placeholder="misp, otx…"
-          sx={{ minWidth: 140 }}
-        />
-        <TextField
-          label="Tag"
-          size="small"
-          value={tag}
-          onChange={(e) => {
-            setTag(e.target.value);
-            resetPage();
-          }}
-          placeholder="c2, ransomware…"
-          sx={{ minWidth: 140 }}
-        />
-        <TextField
-          label="Confiance min."
-          size="small"
-          type="number"
-          value={minConfidence}
-          onChange={(e) => {
-            const raw = e.target.value;
-            setMinConfidence(raw === '' ? '' : Math.max(0, Math.min(100, Number(raw))));
-            resetPage();
-          }}
-          slotProps={{ htmlInput: { min: 0, max: 100 } }}
-          sx={{ minWidth: 120 }}
-        />
-      </Stack>
+          <TextField
+            label="Recherche"
+            size="small"
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              resetPage();
+            }}
+            placeholder="valeur ou description"
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+                  </InputAdornment>
+                ),
+              },
+            }}
+          />
+          <TextField
+            select
+            label="Type"
+            size="small"
+            value={type}
+            onChange={(e) => {
+              setType(e.target.value as IndicatorType | '');
+              resetPage();
+            }}
+          >
+            <MenuItem value="">Tous</MenuItem>
+            {TYPES.map((value) => (
+              <MenuItem key={value} value={value}>
+                {IOC_TYPE_LABELS[value]}
+              </MenuItem>
+            ))}
+          </TextField>
+          <TextField
+            select
+            label="Statut"
+            size="small"
+            value={status}
+            onChange={(e) => {
+              setStatus(e.target.value as IndicatorStatus | '');
+              resetPage();
+            }}
+          >
+            <MenuItem value="">Tous</MenuItem>
+            {STATUSES.map((value) => (
+              <MenuItem key={value} value={value}>
+                {IOC_STATUS_LABELS[value]}
+              </MenuItem>
+            ))}
+          </TextField>
+          <TextField
+            label="Source"
+            size="small"
+            value={feedSource}
+            onChange={(e) => {
+              setFeedSource(e.target.value);
+              resetPage();
+            }}
+            placeholder="misp, otx…"
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SourceOutlinedIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+                  </InputAdornment>
+                ),
+              },
+            }}
+          />
+          <TextField
+            label="Tag (exact)"
+            size="small"
+            value={tag}
+            onChange={(e) => {
+              setTag(e.target.value);
+              resetPage();
+            }}
+            placeholder="ex. ransomware"
+            helperText="Correspondance exacte — le libellé attaché à l'IOC lors de sa déclaration"
+            slotProps={{
+              formHelperText: { sx: { fontSize: 10, lineHeight: 1.3, mt: 0.5, maxWidth: 160 } },
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <LabelOutlinedIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+                  </InputAdornment>
+                ),
+              },
+            }}
+          />
+          <TextField
+            label="Confiance min."
+            size="small"
+            type="number"
+            value={minConfidence}
+            onChange={(e) => {
+              const raw = e.target.value;
+              setMinConfidence(raw === '' ? '' : Math.max(0, Math.min(100, Number(raw))));
+              resetPage();
+            }}
+            slotProps={{ htmlInput: { min: 0, max: 100 } }}
+          />
+        </Box>
+
+        {hasActiveFilters && (
+          <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap', mt: 2 }}>
+            {search && (
+              <Chip size="small" label={`Recherche : ${search}`} onDelete={() => { setSearch(''); resetPage(); }} />
+            )}
+            {type && (
+              <Chip size="small" label={`Type : ${IOC_TYPE_LABELS[type]}`} onDelete={() => { setType(''); resetPage(); }} />
+            )}
+            {status && (
+              <Chip size="small" label={`Statut : ${IOC_STATUS_LABELS[status]}`} onDelete={() => { setStatus(''); resetPage(); }} />
+            )}
+            {feedSource && (
+              <Chip size="small" label={`Source : ${feedSource}`} onDelete={() => { setFeedSource(''); resetPage(); }} />
+            )}
+            {tag && <Chip size="small" label={`Tag : ${tag}`} onDelete={() => { setTag(''); resetPage(); }} />}
+            {minConfidence !== '' && (
+              <Chip
+                size="small"
+                label={`Confiance ≥ ${minConfidence}`}
+                onDelete={() => {
+                  setMinConfidence('');
+                  resetPage();
+                }}
+              />
+            )}
+          </Stack>
+        )}
+      </Paper>
 
       {isPending && (
         <Box sx={{ display: 'flex', justifyContent: 'center', mt: 6 }}>
@@ -183,17 +394,17 @@ function IntelligencePage() {
       )}
 
       {data && (
-        <TableContainer component={Paper} variant="outlined">
+        <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 3 }}>
           <Table size="small" aria-label="Référentiel des indicateurs">
             <TableHead>
-              <TableRow>
-                <TableCell>Type</TableCell>
-                <TableCell>Valeur</TableCell>
-                <TableCell>Statut</TableCell>
-                <TableCell sx={{ minWidth: 110 }}>Confiance</TableCell>
-                <TableCell>TLP</TableCell>
-                <TableCell>Source</TableCell>
-                <TableCell>Dernière obs.</TableCell>
+              <TableRow sx={{ '& th': { bgcolor: 'action.hover' } }}>
+                <TableCell sx={{ fontWeight: 700 }}>Type</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Valeur</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Statut</TableCell>
+                <TableCell sx={{ fontWeight: 700, minWidth: 110 }}>Confiance</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>TLP</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Source</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Dernière obs.</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -210,7 +421,18 @@ function IntelligencePage() {
                 <TableRow
                   key={ioc.id}
                   hover
-                  sx={{ cursor: 'pointer' }}
+                  sx={{
+                    cursor: 'pointer',
+                    borderLeft: '3px solid',
+                    borderLeftColor: alpha(
+                      ioc.status === 'ACTIVE'
+                        ? severityColors.low
+                        : ioc.status === 'REVOKED'
+                          ? severityColors.critical
+                          : severityColors.info,
+                      0.6,
+                    ),
+                  }}
                   onClick={() => setSelectedId(ioc.id)}
                 >
                   <TableCell>
@@ -238,10 +460,8 @@ function IntelligencePage() {
                     <TlpChip tlp={ioc.tlp} />
                   </TableCell>
                   <TableCell sx={{ whiteSpace: 'nowrap' }}>{ioc.feedSource}</TableCell>
-                  <TableCell sx={{ whiteSpace: 'nowrap' }}>
-                    <Typography variant="caption" color="text.secondary">
-                      {formatDate(ioc.lastSeen)}
-                    </Typography>
+                  <TableCell sx={{ whiteSpace: 'nowrap', color: 'text.secondary' }}>
+                    {formatDate(ioc.lastSeen)}
                   </TableCell>
                 </TableRow>
               ))}

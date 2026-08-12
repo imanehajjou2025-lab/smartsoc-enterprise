@@ -52,6 +52,8 @@ public class Alert {
     private AiZone aiZone;
     private boolean aiHardOverride;
     private List<String> aiJustifications;
+    private AnalystTier assignedTier;
+    private String assignedToUsername;
 
     /** Données d'ingestion — parameter object du point d'entrée unique. */
     @Builder
@@ -182,6 +184,22 @@ public class Alert {
         this.aiZone = zone;
         this.aiHardOverride = hardOverride;
         this.aiJustifications = justifications == null ? List.of() : List.copyOf(justifications);
+    }
+
+    /** Affectation de triage (N1/N2/N3), avec analyste nommé optionnel — distincte de l'escalade en incident. */
+    public void assignToTier(AnalystTier tier, String username) {
+        if (tier == null) {
+            throw new BusinessRuleViolationException("INVALID_ALERT_ASSIGNMENT",
+                    "An assignment must specify a tier");
+        }
+        this.assignedTier = tier;
+        this.assignedToUsername = (username == null || username.isBlank())
+                ? null : username.trim().toLowerCase();
+    }
+
+    public void unassign() {
+        this.assignedTier = null;
+        this.assignedToUsername = null;
     }
 
     private static void requireNonBlank(String value, String field) {

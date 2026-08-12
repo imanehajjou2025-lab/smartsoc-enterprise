@@ -107,7 +107,7 @@ class AlertPersistenceIntegrationTest {
         alertRepository.save(alert("evt-low-" + marker, Severity.LOW));
 
         PageResult<Alert> page = alertRepository.search(
-                new AlertQuery(null, Severity.CRITICAL, "wazuh", PageQuery.of(0, 2)));
+                new AlertQuery(null, Severity.CRITICAL, "wazuh", null, null, null, null, PageQuery.of(0, 2)));
 
         assertThat(page.items()).hasSize(2);
         assertThat(page.totalElements()).isGreaterThanOrEqualTo(3);

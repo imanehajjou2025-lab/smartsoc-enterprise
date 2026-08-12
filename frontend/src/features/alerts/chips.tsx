@@ -6,7 +6,7 @@ import {
   softChipSx,
   type ChipPaletteColor,
 } from '../../shared/components/chipStyles';
-import type { AiZone, AlertSeverity, AlertStatus } from './alertsApi';
+import type { AiZone, AlertSeverity, AlertStatus, AnalystTier } from './alertsApi';
 
 export const STATUS_LABELS: Record<AlertStatus, string> = {
   NEW: 'Nouvelle',
@@ -53,4 +53,23 @@ export function AiZoneChip({ zone }: { zone: AiZone }) {
   const theme = useTheme();
   const color = resolveChipColor(theme, AI_ZONE_CHIP_COLORS[zone]);
   return <Chip label={AI_ZONE_LABELS[zone]} size="small" sx={softChipSx(color)} />;
+}
+
+export const ANALYST_TIER_LABELS: Record<AnalystTier, string> = {
+  N1: 'Niveau 1 — Triage',
+  N2: 'Niveau 2 — Analyste',
+  N3: 'Niveau 3 — Expert',
+};
+
+const ANALYST_TIER_CHIP_COLORS: Record<AnalystTier, ChipPaletteColor> = {
+  N1: 'info',
+  N2: 'warning',
+  N3: 'error',
+};
+
+/** Niveau de triage affecté (N1/N2/N3) — distinct du statut et de l'escalade en incident. */
+export function AnalystTierChip({ tier }: { tier: AnalystTier }) {
+  const theme = useTheme();
+  const color = resolveChipColor(theme, ANALYST_TIER_CHIP_COLORS[tier]);
+  return <Chip label={tier} size="small" sx={{ ...softChipSx(color), minWidth: 42 }} />;
 }

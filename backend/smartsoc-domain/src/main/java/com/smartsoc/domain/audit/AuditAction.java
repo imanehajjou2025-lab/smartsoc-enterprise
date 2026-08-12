@@ -36,5 +36,13 @@ public enum AuditAction {
      * phase 5) — même doctrine : un seul type d'audit, succès ET échec,
      * {@code details} porte l'issue et l'identifiant d'exécution Shuffle.
      */
-    SHUFFLE_WORKFLOW_TRIGGER_REQUESTED
+    SHUFFLE_WORKFLOW_TRIGGER_REQUESTED,
+    /**
+     * Affectation d'une alerte à un niveau de triage (N1/N2/N3), avec
+     * analyste nommé optionnel — un seul type d'audit pour l'affectation,
+     * qu'un analyste soit nommé ou non (porté par {@code details}).
+     */
+    ALERT_ASSIGNED,
+    /** Retrait de l'affectation de triage d'une alerte. */
+    ALERT_UNASSIGNED
 }

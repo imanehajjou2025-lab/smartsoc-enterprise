@@ -6,6 +6,7 @@ import SmartToyOutlinedIcon from '@mui/icons-material/SmartToyOutlined';
 import SupportAgentOutlinedIcon from '@mui/icons-material/SupportAgentOutlined';
 import { useQuery } from '@tanstack/react-query';
 import SettingsCard, { SettingsRow } from '../../../shared/components/SettingsCard';
+import { severityColors } from '../../../app/theme';
 import { problemDetail } from '../../../shared/api/client';
 import { ConfiguredChip, ModeChip, ServiceStatusChip } from '../settingsChips';
 import { getAiSettings, type AiServiceStatus } from '../settingsApi';
@@ -23,6 +24,7 @@ function ServiceCard({
     <SettingsCard
       title={title}
       icon={icon}
+      color={service.status === 'UP' ? severityColors.low : severityColors.critical}
       statusChip={<ServiceStatusChip status={service.status} />}
     >
       <SettingsRow
@@ -74,6 +76,7 @@ function AiSection() {
         title="Mode d'intégration"
         description="simulation = stubs embarqués, plateforme démontrable sans service externe ; live = appels réels aux services IA ci-dessous (ADR-008)."
         icon={<SmartToyOutlinedIcon />}
+        color="#8957e5"
         statusChip={<ModeChip mode={data.mode} />}
       />
       <Box

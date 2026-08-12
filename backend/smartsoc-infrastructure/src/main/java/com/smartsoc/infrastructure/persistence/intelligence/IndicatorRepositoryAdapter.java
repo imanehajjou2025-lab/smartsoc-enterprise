@@ -78,8 +78,11 @@ public class IndicatorRepositoryAdapter implements IndicatorRepository {
             spec = spec.and((root, q, cb) -> cb.equal(root.get("type"), query.type()));
         }
         if (query.feedSource() != null && !query.feedSource().isBlank()) {
-            String feedSource = query.feedSource().trim().toLowerCase(Locale.ROOT);
-            spec = spec.and((root, q, cb) -> cb.equal(root.get("feedSource"), feedSource));
+            // Contient plutôt qu'égalité stricte : un champ de recherche
+            // libre ("mis" -> "misp") est ce qu'un analyste attend d'un
+            // filtre texte, l'égalité stricte le fait paraître cassé.
+            String needle = "%" + likeEscape(query.feedSource().trim().toLowerCase(Locale.ROOT)) + "%";
+            spec = spec.and((root, q, cb) -> cb.like(root.get("feedSource"), needle, '\\'));
         }
         if (query.minConfidence() != null) {
             spec = spec.and((root, q, cb) ->
@@ -144,6 +147,11 @@ public class IndicatorRepositoryAdapter implements IndicatorRepository {
     private static String jsonArrayOf(String tag) {
         String escaped = tag.replace("\\", "\\\\").replace("\"", "\\\"");
         return "[\"" + escaped + "\"]";
+    }
+
+    /** Échappe les métacaractères LIKE (`%`, `_`) pour qu'une recherche libre ne les interprète pas. */
+    private static String likeEscape(String value) {
+        return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
     }
 
     /**

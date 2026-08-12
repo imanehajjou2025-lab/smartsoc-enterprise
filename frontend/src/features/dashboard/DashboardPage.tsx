@@ -8,9 +8,8 @@ import CircularProgress from '@mui/material/CircularProgress';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import { alpha, keyframes, useTheme } from '@mui/material/styles';
+import { alpha, useTheme } from '@mui/material/styles';
 import BugReportIcon from '@mui/icons-material/BugReport';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
 import DnsIcon from '@mui/icons-material/Dns';
@@ -29,6 +28,9 @@ import { useAppSelector } from '../../app/hooks';
 import { severityColors } from '../../app/theme';
 import { problemDetail } from '../../shared/api/client';
 import EChart from '../../shared/components/EChart';
+import KpiTile from '../../shared/components/KpiTile';
+import PageHeaderBanner from '../../shared/components/PageHeaderBanner';
+import SectionLabel from '../../shared/components/SectionLabel';
 import { softChipSx } from '../../shared/components/chipStyles';
 import { SeverityChip } from '../alerts/chips';
 import { useAlertsRealtime } from '../alerts/useAlertsRealtime';
@@ -44,11 +46,6 @@ import type {
 } from '../assets/assetsApi';
 import type { AlertStats } from './dashboardApi';
 import { useDashboardData } from './useDashboardData';
-
-const pulse = keyframes`
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.35; transform: scale(1.5); }
-`;
 
 const INCIDENT_STATUS_ORDER: IncidentStatus[] = [
   'OPEN',
@@ -82,75 +79,6 @@ const ACTIVITY_KIND_COLOR: Record<'alert' | 'incident' | 'report', string> = {
   report: severityColors.info,
 };
 
-function KpiTile({
-  label,
-  value,
-  hint,
-  color,
-  icon,
-  onClick,
-}: {
-  label: string;
-  value: string;
-  hint: string;
-  color: string;
-  icon: React.ReactNode;
-  onClick?: () => void;
-}) {
-  return (
-    <Paper
-      variant="outlined"
-      onClick={onClick}
-      sx={{
-        p: 2,
-        minHeight: 108,
-        display: 'flex',
-        gap: 1.75,
-        alignItems: 'center',
-        flex: 1,
-        borderRadius: 3,
-        cursor: onClick ? 'pointer' : 'default',
-        borderColor: alpha(color, 0.25),
-        background: (t) =>
-          `linear-gradient(135deg, ${alpha(color, t.palette.mode === 'dark' ? 0.18 : 0.12)} 0%, ${t.palette.background.paper} 70%)`,
-        transition: 'transform 150ms ease, border-color 150ms ease',
-        '&:hover': onClick ? { borderColor: color, transform: 'translateY(-2px)' } : undefined,
-      }}
-    >
-      <Box
-        sx={{
-          width: 46,
-          height: 46,
-          borderRadius: '50%',
-          flexShrink: 0,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color,
-          backgroundColor: alpha(color, 0.16),
-          boxShadow: `0 0 16px 3px ${alpha(color, 0.45)}`,
-        }}
-      >
-        {icon}
-      </Box>
-      <Box sx={{ minWidth: 0 }}>
-        <Typography
-          variant="caption"
-          color="text.secondary"
-          sx={{ textTransform: 'uppercase', letterSpacing: 0.4, fontWeight: 700 }}
-        >
-          {label}
-        </Typography>
-        <Typography variant="h4" sx={{ fontWeight: 800, lineHeight: 1.1, color }}>
-          {value}
-        </Typography>
-        <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
-          {hint}
-        </Typography>
-      </Box>
-    </Paper>
-  );
-}
 
 function Panel({
   title,
@@ -291,20 +219,6 @@ function AccentPanel({
  * pour se distinguer sans ambiguïté du contenu (texte gris + gras seul
  * se confondait trop avec les libellés de données).
  */
-function SectionLabel({ children, color }: { children: React.ReactNode; color: string }) {
-  return (
-    <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center', mb: 0.75 }}>
-      <Box sx={{ width: 3, height: 12, borderRadius: 999, bgcolor: color, flexShrink: 0 }} />
-      <Typography
-        variant="caption"
-        sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.6, color }}
-      >
-        {children}
-      </Typography>
-    </Stack>
-  );
-}
-
 /**
  * Anneau de couverture MITRE (observées vs catalogue). Le pourcentage et
  * le total ne sont PAS le titre ECharts (son centrage interne dépend de
@@ -544,149 +458,43 @@ function DashboardPage() {
 
   return (
     <Box>
-      <Paper
-        elevation={0}
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 2.5,
-          px: 2.5,
-          py: 2,
-          mb: 3,
-          borderRadius: 4,
-          flexWrap: 'wrap',
-          border: '1px solid',
-          borderColor: alpha(theme.palette.primary.main, 0.18),
-          background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.22 : 0.1)} 0%, ${theme.palette.background.paper} 80%)`,
-        }}
-      >
-        <Box
-          sx={{
-            width: 56,
-            height: 56,
-            borderRadius: 2,
-            flexShrink: 0,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            bgcolor: alpha(theme.palette.primary.main, 0.14),
-            border: '1px solid',
-            borderColor: alpha(theme.palette.primary.main, 0.35),
-          }}
-        >
-          <DashboardIcon sx={{ color: theme.palette.primary.main, fontSize: 28 }} />
-        </Box>
-
-        <Box sx={{ minWidth: 0 }}>
-          <Typography variant="h5" component="h2" sx={{ fontWeight: 800 }}>
-            Dashboard
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
+      <PageHeaderBanner
+        icon={<DashboardIcon sx={{ color: theme.palette.primary.main, fontSize: 28 }} />}
+        title="Dashboard"
+        subtitle={
+          <>
             Bienvenue,{' '}
             <Box component="span" sx={{ color: theme.palette.primary.main, fontWeight: 700 }}>
               {displayName}
             </Box>
-          </Typography>
-        </Box>
-
-        <Box sx={{ width: '1px', alignSelf: 'stretch', bgcolor: 'divider' }} />
-
-        <Box
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 0.75,
-            px: 1.5,
-            py: 0.6,
-            borderRadius: 999,
-            border: '1px solid',
-            borderColor: alpha(connected ? severityColors.low : theme.palette.text.secondary, 0.4),
-            bgcolor: alpha(connected ? severityColors.low : theme.palette.text.secondary, 0.12),
-          }}
-        >
-          <Box
-            sx={{
-              width: 8,
-              height: 8,
-              borderRadius: '50%',
-              bgcolor: connected ? severityColors.low : theme.palette.text.secondary,
-              boxShadow: connected ? `0 0 6px 2px ${alpha(severityColors.low, 0.7)}` : 'none',
-              animation: connected ? `${pulse} 1.6s ease-in-out infinite` : 'none',
-            }}
-          />
-          <MonitorHeartIcon
-            sx={{
-              fontSize: 18,
-              color: connected ? severityColors.low : theme.palette.text.secondary,
-            }}
-          />
-          <Typography
-            variant="body2"
-            sx={{
-              fontWeight: 700,
-              color: connected ? severityColors.low : theme.palette.text.secondary,
-            }}
-          >
-            {connected ? 'En temps réel' : 'Hors ligne'}
-          </Typography>
-        </Box>
-
-        <Box
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 0.75,
-            px: 1.5,
-            py: 0.6,
-            borderRadius: 999,
-            border: '1px solid',
-            borderColor: alpha(isError ? severityColors.critical : theme.palette.primary.main, 0.4),
-            bgcolor: alpha(isError ? severityColors.critical : theme.palette.primary.main, 0.12),
-          }}
-        >
-          {isError ? (
-            <ErrorOutlineIcon sx={{ fontSize: 18, color: severityColors.critical }} />
-          ) : (
-            <GppGoodIcon sx={{ fontSize: 18, color: theme.palette.primary.main }} />
-          )}
-          <Typography
-            variant="body2"
-            sx={{
-              fontWeight: 700,
-              color: isError ? severityColors.critical : theme.palette.primary.main,
-            }}
-          >
-            {isError ? 'Source(s) indisponible(s)' : 'Plateforme opérationnelle'}
-          </Typography>
-        </Box>
-
-        <Box sx={{ flexGrow: 1 }} />
-
-        {data && (
-          <Button
-            variant="contained"
-            disableElevation
-            startIcon={<DescriptionOutlinedIcon />}
-            endIcon={<ChevronRightIcon />}
-            component="a"
-            href="/reports"
-            onClick={(e) => {
-              e.preventDefault();
-              navigate('/reports');
-            }}
-            sx={{
-              bgcolor: '#2f81f7',
-              borderRadius: 2,
-              px: 2.5,
-              fontWeight: 700,
-              boxShadow: '0 0 20px rgba(47,129,247,0.5)',
-              '&:hover': { bgcolor: '#1f6feb', boxShadow: '0 0 24px rgba(47,129,247,0.65)' },
-            }}
-          >
-            Générer un rapport
-          </Button>
-        )}
-      </Paper>
+          </>
+        }
+        badges={[
+          {
+            icon: <MonitorHeartIcon />,
+            label: connected ? 'En temps réel' : 'Hors ligne',
+            active: connected,
+            activeColor: severityColors.low,
+            pulseDot: true,
+          },
+          {
+            icon: isError ? <ErrorOutlineIcon /> : <GppGoodIcon />,
+            label: isError ? 'Source(s) indisponible(s)' : 'Plateforme opérationnelle',
+            active: !isError,
+            activeColor: theme.palette.primary.main,
+            inactiveColor: severityColors.critical,
+          },
+        ]}
+        action={
+          data
+            ? {
+                label: 'Générer un rapport',
+                icon: <DescriptionOutlinedIcon />,
+                onClick: () => navigate('/reports'),
+              }
+            : undefined
+        }
+      />
 
       {isPending && (
         <Box sx={{ display: 'flex', justifyContent: 'center', mt: 6 }}>

@@ -37,6 +37,8 @@ const overview: DashboardOverview = {
       aiZone: null,
       aiHardOverride: false,
       aiJustifications: [],
+      assignedTier: null,
+      assignedToUsername: null,
     },
   ],
   incidents: [

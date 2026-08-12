@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.smartsoc.domain.alerts.AiVerdict;
 import com.smartsoc.domain.alerts.AiZone;
 import com.smartsoc.domain.alerts.AlertStatus;
+import com.smartsoc.domain.alerts.AnalystTier;
 import com.smartsoc.domain.alerts.Severity;
 import com.smartsoc.domain.intelligence.IndicatorType;
 import com.smartsoc.domain.intelligence.Observable;
@@ -108,6 +109,10 @@ public final class AlertDtos {
     public record UpdateAlertStatusRequest(@NotNull AlertStatus status) {
     }
 
+    /** Demande d'affectation de triage (PUT /alerts/{id}/assignment). Username optionnel : on peut affecter un niveau sans nommer d'analyste. */
+    public record AssignAlertRequest(@NotNull AnalystTier tier, @Size(max = 50) String username) {
+    }
+
     public record AlertResponse(
             UUID id,
             String source,
@@ -132,6 +137,9 @@ public final class AlertDtos {
             AiZone aiZone,
             boolean aiHardOverride,
             List<String> aiJustifications,
+            /** Niveau de triage affecté (N1/N2/N3) — distinct de l'escalade en incident. */
+            AnalystTier assignedTier,
+            String assignedToUsername,
             /** Renseigné uniquement par le webhook d'ingestion : ailleurs
              *  il n'y a rien à rendre compte, donc le champ est absent
              *  du JSON plutôt que présent à null. */
@@ -142,7 +150,7 @@ public final class AlertDtos {
             return new AlertResponse(id, source, externalId, title, description, severity,
                     status, detectedAt, receivedAt, hostname, ruleId, mitreTechniques,
                     observables, rawPayload, aiScore, aiVerdict, aiZone, aiHardOverride,
-                    aiJustifications, report);
+                    aiJustifications, assignedTier, assignedToUsername, report);
         }
     }
 }

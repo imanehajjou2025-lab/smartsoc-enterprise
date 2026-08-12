@@ -126,7 +126,7 @@ describe('IntelligencePage', () => {
     expect(screen.getByLabelText('Type')).toBeInTheDocument();
     expect(screen.getByLabelText('Statut')).toBeInTheDocument();
     expect(screen.getByLabelText('Source')).toBeInTheDocument();
-    expect(screen.getByLabelText('Tag')).toBeInTheDocument();
+    expect(screen.getByLabelText('Tag (exact)')).toBeInTheDocument();
     expect(screen.getByLabelText('Confiance min.')).toBeInTheDocument();
   });
 });

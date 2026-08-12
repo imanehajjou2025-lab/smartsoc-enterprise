@@ -2,7 +2,9 @@ import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
 import LinearProgress from '@mui/material/LinearProgress';
 import Typography from '@mui/material/Typography';
+import { useTheme } from '@mui/material/styles';
 import { severityColors } from '../../app/theme';
+import { resolveChipColor, softChipSx, type ChipPaletteColor } from '../../shared/components/chipStyles';
 import type {
   IndicatorStatus,
   IndicatorType,
@@ -39,19 +41,22 @@ export function IocTypeChip({ type }: { type: IndicatorType }) {
   return <Chip label={IOC_TYPE_LABELS[type]} size="small" variant="outlined" />;
 }
 
+const IOC_STATUS_COLORS: Record<IndicatorStatus, ChipPaletteColor> = {
+  ACTIVE: 'success',
+  EXPIRED: 'default',
+  REVOKED: 'error',
+};
+
 /**
- * Statut d'un IOC — reçu du serveur, jamais recalculé ici. Seul ACTIVE
- * enrichit encore les alertes : il est mis en avant (plein vert), tandis
- * qu'expiré (gris) et révoqué (rouge) restent lisibles mais éteints.
+ * Statut d'un IOC — reçu du serveur, jamais recalculé ici. Même badge
+ * « doux » (bordure + fond teinté) que les autres statuts de la
+ * plateforme : seul ACTIVE enrichit encore les alertes, mis en valeur par
+ * la couleur, pas par un remplissage plein qui détonnerait avec le reste.
  */
 export function IocStatusChip({ status }: { status: IndicatorStatus }) {
-  if (status === 'ACTIVE') {
-    return <Chip label={IOC_STATUS_LABELS.ACTIVE} size="small" color="success" />;
-  }
-  if (status === 'REVOKED') {
-    return <Chip label={IOC_STATUS_LABELS.REVOKED} size="small" color="error" variant="outlined" />;
-  }
-  return <Chip label={IOC_STATUS_LABELS.EXPIRED} size="small" variant="outlined" />;
+  const theme = useTheme();
+  const color = resolveChipColor(theme, IOC_STATUS_COLORS[status]);
+  return <Chip label={IOC_STATUS_LABELS[status]} size="small" sx={softChipSx(color)} />;
 }
 
 /**

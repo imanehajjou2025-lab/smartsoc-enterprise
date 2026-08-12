@@ -5,6 +5,7 @@ import SecurityOutlinedIcon from '@mui/icons-material/SecurityOutlined';
 import VpnKeyOutlinedIcon from '@mui/icons-material/VpnKeyOutlined';
 import { useQuery } from '@tanstack/react-query';
 import SettingsCard, { SettingsRow } from '../../../shared/components/SettingsCard';
+import { severityColors } from '../../../app/theme';
 import { problemDetail } from '../../../shared/api/client';
 import { ConfiguredChip } from '../settingsChips';
 import { getSecuritySettings } from '../settingsApi';
@@ -34,6 +35,7 @@ function SecuritySection() {
         title="Jetons d'authentification (JWT)"
         description="Durées de validité configurées côté backend — non modifiables depuis cette console (ADR-005), la variable d'environnement reste la seule source de vérité."
         icon={<SecurityOutlinedIcon />}
+        color={severityColors.critical}
       >
         <SettingsRow label="Jeton d'accès" value={`${data.jwtAccessTokenExpirationMinutes} min`} />
         <SettingsRow
@@ -45,6 +47,7 @@ function SecuritySection() {
         title="Clés d'API sensibles"
         description="Présence de la clé, jamais sa valeur — les secrets ne transitent pas par cette interface."
         icon={<VpnKeyOutlinedIcon />}
+        color={severityColors.high}
       >
         <SettingsRow
           label="Webhook d'ingestion (SOC)"

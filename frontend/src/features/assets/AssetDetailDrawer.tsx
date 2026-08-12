@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 import BlockIcon from '@mui/icons-material/Block';
+import DnsOutlinedIcon from '@mui/icons-material/DnsOutlined';
 import EditIcon from '@mui/icons-material/Edit';
 import LockIcon from '@mui/icons-material/Lock';
+import PowerSettingsNewOutlinedIcon from '@mui/icons-material/PowerSettingsNewOutlined';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
 import Divider from '@mui/material/Divider';
@@ -16,12 +17,17 @@ import TablePagination from '@mui/material/TablePagination';
 import Typography from '@mui/material/Typography';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAppSelector } from '../../app/hooks';
+import { severityColors } from '../../app/theme';
 import { problemDetail } from '../../shared/api/client';
+import ActionCard from '../../shared/components/ActionCard';
+import DetailDrawerHeader from '../../shared/components/DetailDrawerHeader';
+import DetailField from '../../shared/components/DetailField';
+import MutedText from '../../shared/components/MutedText';
+import SectionLabel from '../../shared/components/SectionLabel';
 import { SeverityChip, StatusChip } from '../alerts/chips';
 import {
   AgentConnectionStatusChip,
   AssetStatusChip,
-  CriticalityChip,
   ExposureChip,
   ASSET_TYPE_LABELS,
 } from './assetChips';
@@ -39,17 +45,6 @@ interface Props {
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <Box sx={{ mb: 1.5 }}>
-      <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-        {label}
-      </Typography>
-      {children}
-    </Box>
-  );
 }
 
 /**
@@ -135,16 +130,18 @@ function AssetDetailDrawer({ assetId, onClose }: Props) {
 
         {asset && (
           <>
+            <DetailDrawerHeader
+              color={severityColors[asset.criticality.toLowerCase() as keyof typeof severityColors]}
+              icon={<DnsOutlinedIcon sx={{ fontSize: 26 }} />}
+              title={asset.displayName}
+              onClose={onClose}
+            />
             <Stack
               direction="row"
               spacing={1}
               useFlexGap
-              sx={{ mb: 1, alignItems: 'center', flexWrap: 'wrap' }}
+              sx={{ mb: 2, alignItems: 'center', flexWrap: 'wrap' }}
             >
-              <Typography variant="subtitle2" sx={{ fontFamily: 'monospace' }}>
-                {asset.hostname}
-              </Typography>
-              <CriticalityChip criticality={asset.criticality} />
               <ExposureChip exposure={asset.exposure} />
               <AssetStatusChip status={asset.status} />
               <AgentConnectionStatusChip status={asset.agentConnectionStatus} />
@@ -152,9 +149,6 @@ function AssetDetailDrawer({ assetId, onClose }: Props) {
                 <Chip icon={<LockIcon />} label="Lecture seule" size="small" color="default" />
               )}
             </Stack>
-            <Typography variant="h6" sx={{ mb: 2 }}>
-              {asset.displayName}
-            </Typography>
 
             {mutationError && (
               <Alert severity="error" sx={{ mb: 2 }}>
@@ -163,115 +157,114 @@ function AssetDetailDrawer({ assetId, onClose }: Props) {
             )}
 
             {canWrite && (
-              <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
+              <Box
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
+                  gap: 1.25,
+                  mb: 2,
+                }}
+              >
                 {!isDecommissioned && (
                   <>
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      startIcon={<EditIcon />}
+                    <ActionCard
+                      icon={<EditIcon />}
+                      title="Modifier"
+                      description="Mettre à jour la fiche de l'actif"
+                      color="#2f81f7"
                       onClick={() => setEditOpen(true)}
-                    >
-                      Modifier
-                    </Button>
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      color="error"
+                    />
+                    <ActionCard
+                      icon={<PowerSettingsNewOutlinedIcon />}
+                      title="Décommissionner"
+                      description="Retirer cet actif du parc actif"
+                      color={severityColors.critical}
                       disabled={decommissionMutation.isPending}
                       onClick={() => decommissionMutation.mutate()}
-                    >
-                      Décommissionner
-                    </Button>
+                    />
                     {asset.externalSource === 'wazuh' && (
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        color="warning"
-                        startIcon={<RestartAltIcon />}
+                      <ActionCard
+                        icon={<RestartAltIcon />}
+                        title="Redémarrer l'agent"
+                        description="Redémarrer l'agent Wazuh à distance"
+                        color={severityColors.high}
                         onClick={() => setRestartOpen(true)}
-                      >
-                        Redémarrer l'agent
-                      </Button>
+                      />
                     )}
                     {asset.externalSource === 'wazuh' && (
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        color="warning"
-                        startIcon={<BlockIcon />}
+                      <ActionCard
+                        icon={<BlockIcon />}
+                        title="Bloquer une IP"
+                        description="Bloquer une IP sur le pare-feu local"
+                        color={severityColors.high}
                         onClick={() => setBlockIpOpen(true)}
-                      >
-                        Bloquer une IP
-                      </Button>
+                      />
                     )}
                   </>
                 )}
                 {isDecommissioned && (
-                  <Button
-                    size="small"
-                    variant="outlined"
+                  <ActionCard
+                    icon={<PowerSettingsNewOutlinedIcon />}
+                    title="Réactiver"
+                    description="Remettre cet actif en service"
+                    color={severityColors.low}
                     disabled={reactivateMutation.isPending}
                     onClick={() => reactivateMutation.mutate()}
-                  >
-                    Réactiver
-                  </Button>
+                  />
                 )}
-              </Stack>
+              </Box>
             )}
 
-            <Field label="Type">
+            <DetailField label="Type">
               <Typography variant="body2">{ASSET_TYPE_LABELS[asset.type]}</Typography>
-            </Field>
+            </DetailField>
             {asset.ipAddress && (
-              <Field label="Adresse IP">
-                <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
+              <DetailField label="Adresse IP">
+                <Typography variant="body2" color="text.secondary" sx={{ fontFamily: 'monospace', opacity: 0.85 }}>
                   {asset.ipAddress}
                 </Typography>
-              </Field>
+              </DetailField>
             )}
             {asset.owner && (
-              <Field label="Propriétaire">
+              <DetailField label="Propriétaire">
                 <Typography variant="body2">{asset.owner}</Typography>
-              </Field>
+              </DetailField>
             )}
             {asset.operatingSystem && (
-              <Field label="Système d'exploitation">
+              <DetailField label="Système d'exploitation">
                 <Typography variant="body2">{asset.operatingSystem}</Typography>
-              </Field>
+              </DetailField>
             )}
             {asset.hardwareSummary && (
-              <Field label="Matériel">
+              <DetailField label="Matériel">
                 <Typography variant="body2">{asset.hardwareSummary}</Typography>
-              </Field>
+              </DetailField>
             )}
             {asset.lastSeenAt && (
-              <Field label="Dernier contact">
-                <Typography variant="body2">{formatDate(asset.lastSeenAt)}</Typography>
-              </Field>
+              <DetailField label="Dernier contact">
+                <MutedText>{formatDate(asset.lastSeenAt)}</MutedText>
+              </DetailField>
             )}
             {asset.description && (
-              <Field label="Description">
+              <DetailField label="Description">
                 <Typography variant="body2">{asset.description}</Typography>
-              </Field>
+              </DetailField>
             )}
-            <Field label="Inventorié le">
-              <Typography variant="body2">{formatDate(asset.registeredAt)}</Typography>
-            </Field>
+            <DetailField label="Inventorié le">
+              <MutedText>{formatDate(asset.registeredAt)}</MutedText>
+            </DetailField>
             {asset.decommissionedAt && (
-              <Field label="Décommissionné le">
-                <Typography variant="body2">{formatDate(asset.decommissionedAt)}</Typography>
-              </Field>
+              <DetailField label="Décommissionné le">
+                <MutedText>{formatDate(asset.decommissionedAt)}</MutedText>
+              </DetailField>
             )}
 
             <Divider sx={{ my: 2 }} />
-            <Typography variant="subtitle2" sx={{ mb: 1 }}>
+            <SectionLabel color={severityColors.critical}>
               Alertes corrélées{correlated ? ` (${correlated.totalElements})` : ''}
-            </Typography>
+            </SectionLabel>
             {correlated && correlated.items.length === 0 && (
-              <Typography variant="body2" color="text.secondary">
-                Aucune alerte pour ce hostname.
-              </Typography>
+              <MutedText>Aucune alerte pour ce hostname.</MutedText>
             )}
             {correlated?.items.map((alert) => (
               <Stack
@@ -303,13 +296,11 @@ function AssetDetailDrawer({ assetId, onClose }: Props) {
             )}
 
             <Divider sx={{ my: 2 }} />
-            <Typography variant="subtitle2" sx={{ mb: 1 }}>
+            <SectionLabel color={severityColors.high}>
               Vulnérabilités{vulnerabilities ? ` (${vulnerabilities.totalElements})` : ''}
-            </Typography>
+            </SectionLabel>
             {vulnerabilities && vulnerabilities.items.length === 0 && (
-              <Typography variant="body2" color="text.secondary">
-                Aucune vulnérabilité connue pour cet actif.
-              </Typography>
+              <MutedText>Aucune vulnérabilité connue pour cet actif.</MutedText>
             )}
             {vulnerabilities?.items.map((vuln) => (
               <Stack

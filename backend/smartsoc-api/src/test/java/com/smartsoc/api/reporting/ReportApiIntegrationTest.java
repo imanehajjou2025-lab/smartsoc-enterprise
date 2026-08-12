@@ -85,7 +85,14 @@ class ReportApiIntegrationTest {
         ResponseEntity<byte[]> csv = exchange(HttpMethod.GET, REPORTS + "/" + reportId + "/export/csv",
                 admin, null, byte[].class);
         assertThat(csv.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(new String(csv.getBody(), StandardCharsets.UTF_8)).startsWith("Section,Metric,Value");
+        // BOM UTF-8 (EF BB BF) en tête : requis pour qu'Excel reconnaisse
+        // l'encodage sur un simple double-clic, voir ReportExporterAdapter.
+        byte[] csvBody = csv.getBody();
+        assertThat(csvBody[0]).isEqualTo((byte) 0xEF);
+        assertThat(csvBody[1]).isEqualTo((byte) 0xBB);
+        assertThat(csvBody[2]).isEqualTo((byte) 0xBF);
+        assertThat(new String(csvBody, 3, csvBody.length - 3, StandardCharsets.UTF_8))
+                .startsWith("Section,Metric,Value");
 
         // Export PDF : en-tête magique %PDF, contenu non vide.
         ResponseEntity<byte[]> pdf = exchange(HttpMethod.GET, REPORTS + "/" + reportId + "/export/pdf",

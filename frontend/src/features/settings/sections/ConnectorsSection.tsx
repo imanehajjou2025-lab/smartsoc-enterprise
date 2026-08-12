@@ -12,9 +12,23 @@ import ScheduleOutlinedIcon from '@mui/icons-material/ScheduleOutlined';
 import SecurityOutlinedIcon from '@mui/icons-material/SecurityOutlined';
 import { useQuery } from '@tanstack/react-query';
 import SettingsCard, { SettingsRow } from '../../../shared/components/SettingsCard';
+import { severityColors } from '../../../app/theme';
 import { problemDetail } from '../../../shared/api/client';
 import { ConnectorStatusChip } from '../settingsChips';
-import { listConnectors, type ConnectorOverview, type ConnectorType } from '../settingsApi';
+import {
+  listConnectors,
+  type ConnectorOverview,
+  type ConnectorStatus,
+  type ConnectorType,
+} from '../settingsApi';
+
+const CONNECTOR_STATUS_ACCENT: Record<ConnectorStatus, string> = {
+  NOT_CONFIGURED: severityColors.info,
+  DISABLED: severityColors.info,
+  CONNECTED: severityColors.low,
+  DEGRADED: severityColors.medium,
+  DISCONNECTED: severityColors.critical,
+};
 
 const CAPABILITY_LABELS: Record<string, string> = {
   AGENT_INVENTORY: "Inventaire d'agents",
@@ -106,6 +120,7 @@ function ImplementedConnectorCard({
       <SettingsCard
         title={meta.label}
         icon={meta.icon}
+        color={severityColors.info}
         description={meta.description}
         statusChip={<Chip label="En attente du premier cycle" size="small" variant="outlined" />}
       >
@@ -120,6 +135,7 @@ function ImplementedConnectorCard({
     <SettingsCard
       title={meta.label}
       icon={meta.icon}
+      color={CONNECTOR_STATUS_ACCENT[overview.status]}
       description={meta.description}
       statusChip={<ConnectorStatusChip status={overview.status} />}
     >
@@ -176,6 +192,7 @@ function PlannedConnectorCard({ meta }: { meta: ConnectorMeta }) {
     <SettingsCard
       title={meta.label}
       icon={meta.icon}
+      color={severityColors.info}
       description={meta.description}
       statusChip={
         <Chip

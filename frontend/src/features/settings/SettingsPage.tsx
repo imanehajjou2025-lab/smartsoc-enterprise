@@ -7,7 +7,6 @@ import ListSubheader from '@mui/material/ListSubheader';
 import MenuItem from '@mui/material/MenuItem';
 import Paper from '@mui/material/Paper';
 import TextField from '@mui/material/TextField';
-import Typography from '@mui/material/Typography';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme } from '@mui/material/styles';
 import CableOutlinedIcon from '@mui/icons-material/CableOutlined';
@@ -21,8 +20,10 @@ import NotificationsOutlinedIcon from '@mui/icons-material/NotificationsOutlined
 import PrecisionManufacturingOutlinedIcon from '@mui/icons-material/PrecisionManufacturingOutlined';
 import SaveOutlinedIcon from '@mui/icons-material/SaveOutlined';
 import SecurityOutlinedIcon from '@mui/icons-material/SecurityOutlined';
+import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
 import SmartToyOutlinedIcon from '@mui/icons-material/SmartToyOutlined';
 import { useSearchParams } from 'react-router-dom';
+import PageHeaderBanner from '../../shared/components/PageHeaderBanner';
 import AboutSection from './sections/AboutSection';
 import AiSection from './sections/AiSection';
 import AuditLogSection from './sections/AuditLogSection';
@@ -178,13 +179,11 @@ function SettingsPage() {
 
   return (
     <Box>
-      <Typography variant="h5" component="h2" sx={{ mb: 0.5 }}>
-        Paramètres
-      </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
-        Console d'administration de la plateforme — configuration, sécurité, intégrations et
-        exploitation.
-      </Typography>
+      <PageHeaderBanner
+        icon={<SettingsOutlinedIcon sx={{ color: theme.palette.primary.main, fontSize: 28 }} />}
+        title="Paramètres"
+        subtitle="Console d'administration de la plateforme — configuration, sécurité, intégrations et exploitation."
+      />
 
       {isNarrow ? (
         <TextField
@@ -232,9 +231,18 @@ function SettingsPage() {
                     key={c.key}
                     selected={c.key === active.key}
                     onClick={() => selectCategory(c.key)}
-                    sx={{ borderRadius: 0 }}
+                    sx={{
+                      borderRadius: 0,
+                      borderLeft: '3px solid',
+                      borderLeftColor: c.key === active.key ? 'primary.main' : 'transparent',
+                      '&.Mui-selected': { bgcolor: (t) => t.palette.action.selected },
+                    }}
                   >
-                    <ListItemIcon sx={{ minWidth: 34 }}>{c.icon}</ListItemIcon>
+                    <ListItemIcon
+                      sx={{ minWidth: 34, color: c.key === active.key ? 'primary.main' : undefined }}
+                    >
+                      {c.icon}
+                    </ListItemIcon>
                     <ListItemText
                       slotProps={{
                         primary: {

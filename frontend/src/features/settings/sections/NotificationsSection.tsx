@@ -8,6 +8,7 @@ import NotificationsOutlinedIcon from '@mui/icons-material/NotificationsOutlined
 import SendOutlinedIcon from '@mui/icons-material/SendOutlined';
 import { useQuery } from '@tanstack/react-query';
 import SettingsCard, { SettingsRow } from '../../../shared/components/SettingsCard';
+import { severityColors } from '../../../app/theme';
 import { problemDetail } from '../../../shared/api/client';
 import { ConfiguredChip, ModeChip } from '../settingsChips';
 import { getNotificationsSettings } from '../settingsApi';
@@ -41,6 +42,7 @@ function NotificationsSection() {
         title="Notifications par e-mail"
         description="simulation = journalisée seulement, plateforme démontrable sans SMTP ; live = envoi réel (ADR-005)."
         icon={<NotificationsOutlinedIcon />}
+        color={severityColors.medium}
         statusChip={<ModeChip mode={data.mode} />}
         actions={
           <Button

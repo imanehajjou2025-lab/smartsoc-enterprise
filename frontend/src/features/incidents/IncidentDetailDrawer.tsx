@@ -2,11 +2,14 @@ import { useState } from 'react';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
+import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
 import Divider from '@mui/material/Divider';
 import Drawer from '@mui/material/Drawer';
 import IconButton from '@mui/material/IconButton';
 import LinkOffIcon from '@mui/icons-material/LinkOff';
+import PersonOutlineIcon from '@mui/icons-material/PersonOutlineOutlined';
+import ReportProblemOutlinedIcon from '@mui/icons-material/ReportProblemOutlined';
 import SmartToyOutlinedIcon from '@mui/icons-material/SmartToyOutlined';
 import TravelExploreIcon from '@mui/icons-material/TravelExplore';
 import Stack from '@mui/material/Stack';
@@ -14,10 +17,20 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutlined';
 import AccountTreeOutlinedIcon from '@mui/icons-material/AccountTreeOutlined';
+import { useTheme } from '@mui/material/styles';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { useAppSelector } from '../../app/hooks';
 import { problemDetail } from '../../shared/api/client';
+import { severityColors } from '../../app/theme';
+import { listUsers } from '../admin/usersApi';
+import ActionCard from '../../shared/components/ActionCard';
+import AssigneeAutocomplete from '../../shared/components/AssigneeAutocomplete';
+import DetailDrawerHeader from '../../shared/components/DetailDrawerHeader';
+import DetailField from '../../shared/components/DetailField';
+import MutedText from '../../shared/components/MutedText';
+import SectionLabel from '../../shared/components/SectionLabel';
+import Timeline, { type TimelineRow } from '../../shared/components/Timeline';
 import { SeverityChip } from '../alerts/chips';
 import { setAssistantContext, summarizeIncidentForAssistant } from '../assistant/assistantContext';
 import { openCaseFromIncident } from '../investigations/investigationsApi';
@@ -34,8 +47,19 @@ import {
   unassignIncident,
   unlinkAlertFromIncident,
   updateIncidentStatus,
+  type IncidentEventType,
   type IncidentStatus,
 } from './incidentsApi';
+
+const EVENT_TYPE_META: Record<IncidentEventType, { label: string; color: string }> = {
+  CREATED: { label: 'Création', color: severityColors.info },
+  STATUS_CHANGED: { label: 'Statut', color: severityColors.high },
+  ASSIGNED: { label: 'Affectation', color: '#2f81f7' },
+  UNASSIGNED: { label: 'Désaffectation', color: '#8b949e' },
+  NOTE: { label: 'Note', color: '#8ecfff' },
+  ALERT_LINKED: { label: 'Alerte liée', color: severityColors.critical },
+  ALERT_UNLINKED: { label: 'Alerte déliée', color: '#8b949e' },
+};
 
 interface Props {
   incidentId: string | null;
@@ -46,20 +70,10 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <Box sx={{ mb: 1.5 }}>
-      <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-        {label}
-      </Typography>
-      {children}
-    </Box>
-  );
-}
-
 function IncidentDetailDrawer({ incidentId, onClose }: Props) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const theme = useTheme();
   const role = useAppSelector((state) => state.auth.user?.role);
   const canWrite = role === 'ADMIN' || role === 'SOC_MANAGER' || role === 'SOC_ANALYST';
   const [assignee, setAssignee] = useState('');
@@ -77,6 +91,13 @@ function IncidentDetailDrawer({ incidentId, onClose }: Props) {
     queryKey: ['incident', incidentId],
     queryFn: () => getIncident(incidentId!),
     enabled: Boolean(incidentId),
+  });
+
+  const { data: platformUsers } = useQuery({
+    queryKey: ['platform-users'],
+    queryFn: listUsers,
+    enabled: canWrite,
+    staleTime: 5 * 60_000,
   });
 
   const invalidate = () => {
@@ -142,16 +163,16 @@ function IncidentDetailDrawer({ incidentId, onClose }: Props) {
 
         {data && (
           <>
-            <Stack direction="row" spacing={1} sx={{ mb: 1, alignItems: 'center' }}>
-              <Typography variant="subtitle2" color="text.secondary">
-                {data.incident.reference}
-              </Typography>
-              <SeverityChip severity={data.incident.severity} />
+            <DetailDrawerHeader
+              color={severityColors[data.incident.severity.toLowerCase() as keyof typeof severityColors]}
+              icon={<ReportProblemOutlinedIcon sx={{ fontSize: 26 }} />}
+              title={data.incident.title}
+              onClose={onClose}
+            />
+            <Stack direction="row" spacing={1} sx={{ mb: 2, alignItems: 'center', flexWrap: 'wrap' }} useFlexGap>
+              <Chip label={data.incident.reference} size="small" variant="outlined" sx={{ fontWeight: 700 }} />
               <IncidentStatusChip status={data.incident.status} />
             </Stack>
-            <Typography variant="h6" sx={{ mb: 2 }}>
-              {data.incident.title}
-            </Typography>
 
             {mutationError && (
               <Alert severity="error" sx={{ mb: 2 }}>
@@ -159,41 +180,46 @@ function IncidentDetailDrawer({ incidentId, onClose }: Props) {
               </Alert>
             )}
 
-            <Stack direction="row" spacing={1} sx={{ mb: 2, flexWrap: 'wrap' }} useFlexGap>
+            <Box
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
+                gap: 1.25,
+                mb: 2,
+              }}
+            >
               {canWrite && (
                 <>
-                  <Button
-                    size="small"
-                    variant="contained"
-                    startIcon={<TravelExploreIcon />}
+                  <ActionCard
+                    icon={<TravelExploreIcon />}
+                    title={openCaseMutation.isPending ? 'Ouverture…' : 'Ouvrir un cas'}
+                    description="Lancer une investigation approfondie"
+                    color="#2f81f7"
+                    filled
                     disabled={openCaseMutation.isPending}
                     onClick={() => openCaseMutation.mutate()}
-                  >
-                    {openCaseMutation.isPending ? 'Ouverture…' : 'Ouvrir un cas'}
-                  </Button>
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    startIcon={<PlayCircleOutlineIcon />}
+                  />
+                  <ActionCard
+                    icon={<PlayCircleOutlineIcon />}
+                    title="Exécuter un playbook"
+                    description="Lancer une réponse automatisée"
+                    color="#2f81f7"
                     onClick={() => setStartPlaybookOpen(true)}
-                  >
-                    Exécuter un playbook
-                  </Button>
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    color="warning"
-                    startIcon={<AccountTreeOutlinedIcon />}
+                  />
+                  <ActionCard
+                    icon={<AccountTreeOutlinedIcon />}
+                    title="Déclencher via Shuffle"
+                    description="Lancer un workflow SOAR externe"
+                    color={severityColors.high}
                     onClick={() => setTriggerShuffleOpen(true)}
-                  >
-                    Déclencher via Shuffle
-                  </Button>
+                  />
                 </>
               )}
-              <Button
-                size="small"
-                variant="outlined"
-                startIcon={<SmartToyOutlinedIcon />}
+              <ActionCard
+                icon={<SmartToyOutlinedIcon />}
+                title="Demander à l'assistant"
+                description="Obtenir de l'aide pour cet incident"
+                color="#2f81f7"
                 onClick={() => {
                   setAssistantContext({
                     incidentId: data.incident.id,
@@ -202,14 +228,12 @@ function IncidentDetailDrawer({ incidentId, onClose }: Props) {
                   onClose();
                   navigate('/assistant');
                 }}
-              >
-                Demander à l'assistant
-              </Button>
-            </Stack>
+              />
+            </Box>
 
             {canWrite && (
               <>
-                <Field label="Changer le statut">
+                <DetailField label="Changer le statut" color={severityColors.high}>
                   <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
                     {ALLOWED_TRANSITIONS[data.incident.status].map((target) => (
                       <Button
@@ -223,17 +247,18 @@ function IncidentDetailDrawer({ incidentId, onClose }: Props) {
                       </Button>
                     ))}
                     {ALLOWED_TRANSITIONS[data.incident.status].length === 0 && (
-                      <Typography variant="body2" color="text.secondary">
-                        Statut terminal.
-                      </Typography>
+                      <MutedText>Statut terminal.</MutedText>
                     )}
                   </Stack>
-                </Field>
+                </DetailField>
 
-                <Field label="Affectation">
+                <DetailField label="Affectation" color={theme.palette.primary.main}>
                   {data.incident.assigneeUsername ? (
                     <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-                      <Typography variant="body2">{data.incident.assigneeUsername}</Typography>
+                      <PersonOutlineIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        {data.incident.assigneeUsername}
+                      </Typography>
                       <Button
                         size="small"
                         onClick={() => unassignMutation.mutate()}
@@ -244,11 +269,10 @@ function IncidentDetailDrawer({ incidentId, onClose }: Props) {
                     </Stack>
                   ) : (
                     <Stack direction="row" spacing={1}>
-                      <TextField
-                        size="small"
-                        placeholder="nom d'utilisateur"
+                      <AssigneeAutocomplete
+                        users={platformUsers ?? []}
                         value={assignee}
-                        onChange={(e) => setAssignee(e.target.value)}
+                        onChange={setAssignee}
                       />
                       <Button
                         size="small"
@@ -260,24 +284,22 @@ function IncidentDetailDrawer({ incidentId, onClose }: Props) {
                       </Button>
                     </Stack>
                   )}
-                </Field>
+                </DetailField>
               </>
             )}
 
             {data.incident.description && (
-              <Field label="Description">
+              <DetailField label="Description">
                 <Typography variant="body2">{data.incident.description}</Typography>
-              </Field>
+              </DetailField>
             )}
 
             <Divider sx={{ my: 2 }} />
-            <Typography variant="subtitle2" sx={{ mb: 1 }}>
+            <SectionLabel color={severityColors.critical}>
               Alertes liées ({data.linkedAlerts.length})
-            </Typography>
+            </SectionLabel>
             {data.linkedAlerts.length === 0 && (
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Aucune alerte liée.
-              </Typography>
+              <MutedText>Aucune alerte liée.</MutedText>
             )}
             {data.linkedAlerts.map((alert) => (
               <Stack
@@ -303,13 +325,11 @@ function IncidentDetailDrawer({ incidentId, onClose }: Props) {
             ))}
 
             <Divider sx={{ my: 2 }} />
-            <Typography variant="subtitle2" sx={{ mb: 1 }}>
+            <SectionLabel color={theme.palette.primary.main}>
               Réponses ({executions?.items.length ?? 0})
-            </Typography>
+            </SectionLabel>
             {executions && executions.items.length === 0 && (
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Aucun playbook exécuté.
-              </Typography>
+              <MutedText>Aucun playbook exécuté.</MutedText>
             )}
             {executions?.items.map((execution) => (
               <Stack
@@ -327,9 +347,7 @@ function IncidentDetailDrawer({ incidentId, onClose }: Props) {
             ))}
 
             <Divider sx={{ my: 2 }} />
-            <Typography variant="subtitle2" sx={{ mb: 1 }}>
-              Timeline
-            </Typography>
+            <SectionLabel color="#8ecfff">Timeline</SectionLabel>
             {canWrite && (
               <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
                 <TextField
@@ -349,14 +367,17 @@ function IncidentDetailDrawer({ incidentId, onClose }: Props) {
                 </Button>
               </Stack>
             )}
-            {data.timeline.map((entry, index) => (
-              <Box key={index} sx={{ mb: 1.5 }}>
-                <Typography variant="body2">{entry.message}</Typography>
-                <Typography variant="caption" color="text.secondary">
-                  {entry.author} · {formatDate(entry.occurredAt)}
-                </Typography>
-              </Box>
-            ))}
+            <Timeline
+              rows={data.timeline.map(
+                (entry, index): TimelineRow => ({
+                  key: `${entry.type}-${index}`,
+                  label: EVENT_TYPE_META[entry.type].label,
+                  color: EVENT_TYPE_META[entry.type].color,
+                  message: entry.message,
+                  date: `${entry.author} · ${formatDate(entry.occurredAt)}`,
+                }),
+              )}
+            />
           </>
         )}
       </Box>

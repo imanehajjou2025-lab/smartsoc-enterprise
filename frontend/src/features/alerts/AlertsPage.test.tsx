@@ -30,6 +30,8 @@ const alerts: Alert[] = [
     aiZone: null,
     aiHardOverride: false,
     aiJustifications: [],
+    assignedTier: null,
+    assignedToUsername: null,
   },
   {
     id: 'a-2',
@@ -51,6 +53,8 @@ const alerts: Alert[] = [
     aiZone: 'SOAR_ESCALATION',
     aiHardOverride: false,
     aiJustifications: ['FINAL TRIAGE SCORE: 0.87 (87.0%)'],
+    assignedTier: null,
+    assignedToUsername: null,
   },
 ];
 
@@ -112,6 +116,6 @@ describe('AlertsPage', () => {
     renderPage();
     await screen.findByText(/brute force/i);
 
-    expect(screen.getByText('Temps réel')).toBeInTheDocument();
+    expect(screen.getByText('En temps réel')).toBeInTheDocument();
   });
 });

@@ -9,6 +9,8 @@ interface SettingsCardProps {
   title: string;
   description?: string;
   icon?: React.ReactNode;
+  /** Teinte sémantique de la carte (icône + dégradé de fond) — bleu primaire par défaut. */
+  color?: string;
   /** Puce d'état affichée à droite du titre (ex. AiZoneChip, StatusChip…). */
   statusChip?: React.ReactNode;
   /** Zone de boutons d'action, séparée du contenu par un filet. */
@@ -26,13 +28,29 @@ function SettingsCard({
   title,
   description,
   icon,
+  color,
   statusChip,
   actions,
   children,
 }: SettingsCardProps) {
   return (
-    <Paper variant="outlined" sx={{ borderRadius: 3, overflow: 'hidden' }}>
-      <Box sx={{ p: 2.5 }}>
+    <Paper
+      variant="outlined"
+      sx={{
+        borderRadius: 3,
+        overflow: 'hidden',
+        borderColor: color ? alpha(color, 0.25) : undefined,
+      }}
+    >
+      <Box
+        sx={{
+          p: 2.5,
+          background: (t) =>
+            color
+              ? `linear-gradient(160deg, ${alpha(color, t.palette.mode === 'dark' ? 0.14 : 0.06)} 0%, ${t.palette.background.paper} 60%)`
+              : undefined,
+        }}
+      >
         <Stack
           direction="row"
           spacing={1.5}
@@ -48,8 +66,8 @@ function SettingsCard({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: 'primary.main',
-                bgcolor: (t) => alpha(t.palette.primary.main, 0.12),
+                color: color ?? 'primary.main',
+                bgcolor: (t) => alpha(color ?? t.palette.primary.main, 0.14),
               }}
             >
               {icon}

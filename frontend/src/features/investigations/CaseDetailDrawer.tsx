@@ -2,6 +2,7 @@ import { useState } from 'react';
 import AddIcon from '@mui/icons-material/Add';
 import LinkOffIcon from '@mui/icons-material/LinkOff';
 import LockIcon from '@mui/icons-material/Lock';
+import TravelExploreIcon from '@mui/icons-material/TravelExplore';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -14,9 +15,16 @@ import IconButton from '@mui/material/IconButton';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import { useTheme } from '@mui/material/styles';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAppSelector } from '../../app/hooks';
+import { severityColors } from '../../app/theme';
 import { problemDetail } from '../../shared/api/client';
+import DetailDrawerHeader from '../../shared/components/DetailDrawerHeader';
+import DetailField from '../../shared/components/DetailField';
+import MutedText from '../../shared/components/MutedText';
+import SectionLabel from '../../shared/components/SectionLabel';
+import Timeline, { type TimelineRow } from '../../shared/components/Timeline';
 import { SeverityChip } from '../alerts/chips';
 import { CaseStatusChip, CASE_STATUS_LABELS, TASK_STATUS_LABELS } from './caseChips';
 import CloseCaseDialog from './CloseCaseDialog';
@@ -32,9 +40,27 @@ import {
   unlinkIncidentFromCase,
   updateCaseStatus,
   updateCaseTask,
+  type CaseEventType,
   type CaseStatus,
   type CaseTask,
 } from './investigationsApi';
+
+const EVENT_TYPE_META: Record<CaseEventType, { label: string; color: string }> = {
+  CREATED: { label: 'Création', color: severityColors.info },
+  STATUS_CHANGED: { label: 'Statut', color: severityColors.high },
+  ASSIGNED: { label: 'Affectation', color: '#2f81f7' },
+  UNASSIGNED: { label: 'Désaffectation', color: '#8b949e' },
+  INCIDENT_LINKED: { label: 'Incident lié', color: severityColors.high },
+  INCIDENT_UNLINKED: { label: 'Incident délié', color: '#8b949e' },
+  ALERT_LINKED: { label: 'Alerte liée', color: severityColors.critical },
+  ALERT_UNLINKED: { label: 'Alerte déliée', color: '#8b949e' },
+  TASK_ADDED: { label: 'Tâche', color: severityColors.medium },
+  TASK_UPDATED: { label: 'Tâche', color: severityColors.medium },
+  TASK_COMPLETED: { label: 'Tâche terminée', color: severityColors.low },
+  NOTE_ADDED: { label: 'Note', color: '#8ecfff' },
+  CLOSED: { label: 'Clôture', color: severityColors.low },
+  FOLLOW_UP_OPENED: { label: 'Suivi ouvert', color: '#2f81f7' },
+};
 
 interface Props {
   caseId: string | null;
@@ -45,23 +71,13 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <Box sx={{ mb: 1.5 }}>
-      <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-        {label}
-      </Typography>
-      {children}
-    </Box>
-  );
-}
-
 /**
  * Tiroir de détail d'un cas d'investigation. Un cas CLOSED est immuable :
  * badge dédié, tous les contrôles d'écriture masqués — seule reste
  * l'ouverture d'un cas de suivi (l'unique voie de reprise du domaine).
  */
 function CaseDetailDrawer({ caseId, onClose }: Props) {
+  const theme = useTheme();
   const queryClient = useQueryClient();
   const role = useAppSelector((state) => state.auth.user?.role);
   const canWrite = role === 'ADMIN' || role === 'SOC_MANAGER' || role === 'SOC_ANALYST';
@@ -153,24 +169,24 @@ function CaseDetailDrawer({ caseId, onClose }: Props) {
 
         {data && (
           <>
-            <Stack direction="row" spacing={1} sx={{ mb: 1, alignItems: 'center' }}>
-              <Typography variant="subtitle2" color="text.secondary">
-                {data.investigation.reference}
-              </Typography>
-              <SeverityChip severity={data.investigation.priority} />
+            <DetailDrawerHeader
+              color={severityColors[data.investigation.priority.toLowerCase() as keyof typeof severityColors]}
+              icon={<TravelExploreIcon sx={{ fontSize: 26 }} />}
+              title={data.investigation.title}
+              onClose={onClose}
+            />
+            <Stack direction="row" spacing={1} sx={{ mb: 2, alignItems: 'center', flexWrap: 'wrap' }} useFlexGap>
+              <Chip
+                label={data.investigation.reference}
+                size="small"
+                variant="outlined"
+                sx={{ fontWeight: 700 }}
+              />
               <CaseStatusChip status={data.investigation.status} />
               {isClosed && (
-                <Chip
-                  icon={<LockIcon />}
-                  label="Cas clôturé — immuable"
-                  size="small"
-                  color="default"
-                />
+                <Chip icon={<LockIcon />} label="Cas clôturé — immuable" size="small" color="default" />
               )}
             </Stack>
-            <Typography variant="h6" sx={{ mb: 2 }}>
-              {data.investigation.title}
-            </Typography>
 
             {mutationError && (
               <Alert severity="error" sx={{ mb: 2 }}>
@@ -179,12 +195,10 @@ function CaseDetailDrawer({ caseId, onClose }: Props) {
             )}
 
             {isClosed && (
-              <Field label="Conclusion">
+              <DetailField label="Conclusion" color={severityColors.low}>
                 <Typography variant="body2">{data.investigation.conclusion}</Typography>
-                <Typography variant="caption" color="text.secondary">
-                  Clôturé le {formatDate(data.investigation.closedAt!)}
-                </Typography>
-              </Field>
+                <MutedText>Clôturé le {formatDate(data.investigation.closedAt!)}</MutedText>
+              </DetailField>
             )}
 
             {canWrite && isClosed && (
@@ -200,7 +214,7 @@ function CaseDetailDrawer({ caseId, onClose }: Props) {
 
             {canEdit && (
               <>
-                <Field label="Changer le statut">
+                <DetailField label="Changer le statut" color={severityColors.high}>
                   <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
                     {ALLOWED_TRANSITIONS[data.investigation.status]
                       .filter((target) => target !== 'CLOSED')
@@ -226,12 +240,14 @@ function CaseDetailDrawer({ caseId, onClose }: Props) {
                       </Button>
                     )}
                   </Stack>
-                </Field>
+                </DetailField>
 
-                <Field label="Affectation">
+                <DetailField label="Affectation" color={theme.palette.primary.main}>
                   {data.investigation.assigneeUsername ? (
                     <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-                      <Typography variant="body2">{data.investigation.assigneeUsername}</Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        {data.investigation.assigneeUsername}
+                      </Typography>
                       <Button
                         size="small"
                         onClick={() => unassignMutation.mutate()}
@@ -258,20 +274,20 @@ function CaseDetailDrawer({ caseId, onClose }: Props) {
                       </Button>
                     </Stack>
                   )}
-                </Field>
+                </DetailField>
               </>
             )}
 
             {data.investigation.description && (
-              <Field label="Description">
+              <DetailField label="Description">
                 <Typography variant="body2">{data.investigation.description}</Typography>
-              </Field>
+              </DetailField>
             )}
 
             <Divider sx={{ my: 2 }} />
-            <Typography variant="subtitle2" sx={{ mb: 1 }}>
+            <SectionLabel color={severityColors.medium}>
               Tâches ({data.tasks.filter((t) => t.status === 'DONE').length}/{data.tasks.length})
-            </Typography>
+            </SectionLabel>
             {canEdit && (
               <Stack direction="row" spacing={1} sx={{ mb: 1 }}>
                 <TextField
@@ -292,11 +308,7 @@ function CaseDetailDrawer({ caseId, onClose }: Props) {
                 </Button>
               </Stack>
             )}
-            {data.tasks.length === 0 && (
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Aucune tâche.
-              </Typography>
-            )}
+            {data.tasks.length === 0 && <MutedText>Aucune tâche.</MutedText>}
             {data.tasks.map((task) => (
               <Stack
                 key={task.id}
@@ -320,7 +332,7 @@ function CaseDetailDrawer({ caseId, onClose }: Props) {
                 >
                   {task.title}
                 </Typography>
-                <Typography variant="caption" color="text.secondary">
+                <Typography variant="caption" color="text.secondary" sx={{ opacity: 0.65 }}>
                   {task.status === 'DONE' && task.completedAt
                     ? `${TASK_STATUS_LABELS.DONE} le ${formatDate(task.completedAt)}`
                     : TASK_STATUS_LABELS[task.status]}
@@ -329,14 +341,10 @@ function CaseDetailDrawer({ caseId, onClose }: Props) {
             ))}
 
             <Divider sx={{ my: 2 }} />
-            <Typography variant="subtitle2" sx={{ mb: 1 }}>
+            <SectionLabel color={severityColors.critical}>
               Incidents liés ({data.linkedIncidents.length})
-            </Typography>
-            {data.linkedIncidents.length === 0 && (
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Aucun incident lié.
-              </Typography>
-            )}
+            </SectionLabel>
+            {data.linkedIncidents.length === 0 && <MutedText>Aucun incident lié.</MutedText>}
             {data.linkedIncidents.map((incident) => (
               <Stack
                 key={incident.id}
@@ -360,14 +368,10 @@ function CaseDetailDrawer({ caseId, onClose }: Props) {
               </Stack>
             ))}
 
-            <Typography variant="subtitle2" sx={{ mb: 1, mt: 2 }}>
-              Alertes liées ({data.linkedAlerts.length})
-            </Typography>
-            {data.linkedAlerts.length === 0 && (
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Aucune alerte liée.
-              </Typography>
-            )}
+            <Box sx={{ mt: 2 }}>
+              <SectionLabel color="#8ecfff">Alertes liées ({data.linkedAlerts.length})</SectionLabel>
+            </Box>
+            {data.linkedAlerts.length === 0 && <MutedText>Aucune alerte liée.</MutedText>}
             {data.linkedAlerts.map((alert) => (
               <Stack
                 key={alert.id}
@@ -394,9 +398,9 @@ function CaseDetailDrawer({ caseId, onClose }: Props) {
             {data.followUps.length > 0 && (
               <>
                 <Divider sx={{ my: 2 }} />
-                <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                <SectionLabel color={severityColors.medium}>
                   Cas de suivi ({data.followUps.length})
-                </Typography>
+                </SectionLabel>
                 {data.followUps.map((followUp) => (
                   <Stack
                     key={followUp.id}
@@ -404,9 +408,7 @@ function CaseDetailDrawer({ caseId, onClose }: Props) {
                     spacing={1}
                     sx={{ alignItems: 'center', mb: 0.5 }}
                   >
-                    <Typography variant="body2" color="text.secondary">
-                      {followUp.reference}
-                    </Typography>
+                    <MutedText>{followUp.reference}</MutedText>
                     <Typography variant="body2" sx={{ flexGrow: 1 }} noWrap>
                       {followUp.title}
                     </Typography>
@@ -417,9 +419,7 @@ function CaseDetailDrawer({ caseId, onClose }: Props) {
             )}
 
             <Divider sx={{ my: 2 }} />
-            <Typography variant="subtitle2" sx={{ mb: 1 }}>
-              Timeline
-            </Typography>
+            <SectionLabel color={theme.palette.primary.main}>Timeline</SectionLabel>
             {canEdit && (
               <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
                 <TextField
@@ -439,14 +439,17 @@ function CaseDetailDrawer({ caseId, onClose }: Props) {
                 </Button>
               </Stack>
             )}
-            {data.timeline.map((entry, index) => (
-              <Box key={index} sx={{ mb: 1.5 }}>
-                <Typography variant="body2">{entry.message}</Typography>
-                <Typography variant="caption" color="text.secondary">
-                  {entry.type} · {entry.author} · {formatDate(entry.occurredAt)}
-                </Typography>
-              </Box>
-            ))}
+            <Timeline
+              rows={data.timeline.map(
+                (entry, index): TimelineRow => ({
+                  key: `${entry.type}-${index}`,
+                  label: EVENT_TYPE_META[entry.type].label,
+                  color: EVENT_TYPE_META[entry.type].color,
+                  message: entry.message,
+                  date: `${entry.author} · ${formatDate(entry.occurredAt)}`,
+                }),
+              )}
+            />
 
             <CloseCaseDialog
               caseId={data.investigation.id}

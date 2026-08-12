@@ -3,6 +3,7 @@ package com.smartsoc.infrastructure.persistence.alerts;
 import com.smartsoc.domain.alerts.AiVerdict;
 import com.smartsoc.domain.alerts.AiZone;
 import com.smartsoc.domain.alerts.AlertStatus;
+import com.smartsoc.domain.alerts.AnalystTier;
 import com.smartsoc.domain.alerts.Severity;
 import com.smartsoc.infrastructure.persistence.common.AbstractAuditableEntity;
 import jakarta.persistence.CollectionTable;
@@ -122,4 +123,11 @@ public class AlertJpaEntity extends AbstractAuditableEntity {
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "ai_justifications")
     private List<String> aiJustifications;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "assigned_tier", length = 10)
+    private AnalystTier assignedTier;
+
+    @Column(name = "assigned_to_username", length = 50)
+    private String assignedToUsername;
 }

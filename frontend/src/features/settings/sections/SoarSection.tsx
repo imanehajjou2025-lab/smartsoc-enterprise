@@ -6,6 +6,7 @@ import PrecisionManufacturingOutlinedIcon from '@mui/icons-material/PrecisionMan
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import SettingsCard, { SettingsRow } from '../../../shared/components/SettingsCard';
+import { severityColors } from '../../../app/theme';
 import { problemDetail } from '../../../shared/api/client';
 import { listPlaybooks } from '../../soar/soarApi';
 
@@ -35,6 +36,7 @@ function SoarSection() {
     <SettingsCard
       title="Catalogue de playbooks"
       icon={<PrecisionManufacturingOutlinedIcon />}
+      color={severityColors.high}
       description="La plateforme documente et suit les procédures de réponse (Shuffle reste le moteur d'automatisation réel côté SOC — ADR-012)."
       actions={
         <Button

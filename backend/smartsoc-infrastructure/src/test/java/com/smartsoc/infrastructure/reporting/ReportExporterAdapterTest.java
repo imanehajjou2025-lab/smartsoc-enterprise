@@ -43,9 +43,18 @@ class ReportExporterAdapterTest {
     }
 
     @Test
-    void csvExportStartsWithTheExpectedHeaderRow() {
-        String csv = new String(exporter.toCsv(sampleReport()), StandardCharsets.UTF_8);
-        assertThat(csv).startsWith("Section,Metric,Value\r\n");
+    void csvExportStartsWithAUtf8BomThenTheExpectedHeaderRow() {
+        // Le BOM (EF BB BF) est ce qu'Excel exige pour reconnaître l'UTF-8
+        // d'un simple double-clic sur le fichier — sans lui, il retombe sur
+        // l'ANSI de la machine et corrompt tous les accents (régression
+        // constatée : "Sévérité" devenait "SÃ©vÃ©ritÃ©").
+        byte[] csv = exporter.toCsv(sampleReport());
+        assertThat(csv[0]).isEqualTo((byte) 0xEF);
+        assertThat(csv[1]).isEqualTo((byte) 0xBB);
+        assertThat(csv[2]).isEqualTo((byte) 0xBF);
+
+        String body = new String(csv, 3, csv.length - 3, StandardCharsets.UTF_8);
+        assertThat(body).startsWith("Section,Metric,Value\r\n");
     }
 
     @Test

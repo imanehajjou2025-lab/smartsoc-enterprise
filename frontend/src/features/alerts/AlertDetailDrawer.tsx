@@ -1,21 +1,37 @@
+import { useState } from 'react';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import Divider from '@mui/material/Divider';
 import Drawer from '@mui/material/Drawer';
+import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
+import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import ArrowOutwardIcon from '@mui/icons-material/ArrowOutward';
+import AssignmentTurnedInOutlinedIcon from '@mui/icons-material/AssignmentTurnedInOutlined';
+import CheckCircleOutlineOutlinedIcon from '@mui/icons-material/CheckCircleOutlineOutlined';
 import DnsIcon from '@mui/icons-material/Dns';
 import GppMaybeIcon from '@mui/icons-material/GppMaybe';
+import PersonOutlineOutlinedIcon from '@mui/icons-material/PersonOutlineOutlined';
+import PlayCircleOutlineOutlinedIcon from '@mui/icons-material/PlayCircleOutlineOutlined';
+import PlaylistAddCheckOutlinedIcon from '@mui/icons-material/PlaylistAddCheckOutlined';
 import SmartToyOutlinedIcon from '@mui/icons-material/SmartToyOutlined';
+import ThumbDownOutlinedIcon from '@mui/icons-material/ThumbDownOutlined';
+import { useTheme } from '@mui/material/styles';
 import axios from 'axios';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { useAppSelector } from '../../app/hooks';
 import { problemDetail } from '../../shared/api/client';
 import { severityColors } from '../../app/theme';
+import ActionCard from '../../shared/components/ActionCard';
+import AssigneeAutocomplete from '../../shared/components/AssigneeAutocomplete';
+import DetailDrawerHeader from '../../shared/components/DetailDrawerHeader';
+import DetailField from '../../shared/components/DetailField';
+import MutedText from '../../shared/components/MutedText';
+import { listUsers } from '../admin/usersApi';
 import { getAssetByHostname } from '../assets/assetsApi';
 import { ExposureChip } from '../assets/assetChips';
 import { setAssistantContext, summarizeAlertForAssistant } from '../assistant/assistantContext';
@@ -24,11 +40,16 @@ import { getAlertMitre, type ResolvedTechnique } from '../mitre/mitreApi';
 import { escalateFromAlert } from '../incidents/incidentsApi';
 import {
   ALLOWED_TRANSITIONS,
+  assignAlert,
+  unassignAlert,
   updateAlertStatus,
   type Alert as SocAlert,
   type AlertStatus,
+  type AnalystTier,
 } from './alertsApi';
-import { AiZoneChip, SeverityChip, StatusChip, STATUS_LABELS } from './chips';
+import { AiZoneChip, ANALYST_TIER_LABELS, AnalystTierChip, StatusChip, STATUS_LABELS } from './chips';
+
+const ANALYST_TIERS: AnalystTier[] = ['N1', 'N2', 'N3'];
 
 interface Props {
   alert: SocAlert | null;
@@ -36,34 +57,65 @@ interface Props {
   onUpdated: (alert: SocAlert) => void;
 }
 
-const TRANSITION_BUTTON_COLORS: Record<string, 'primary' | 'success' | 'warning'> = {
-  ACKNOWLEDGED: 'primary',
-  IN_PROGRESS: 'primary',
-  RESOLVED: 'success',
-  FALSE_POSITIVE: 'warning',
+const TRANSITION_META: Record<
+  AlertStatus,
+  { icon: React.ReactNode; description: string; color: string }
+> = {
+  NEW: { icon: <PlaylistAddCheckOutlinedIcon />, description: '', color: severityColors.info },
+  ACKNOWLEDGED: {
+    icon: <AssignmentTurnedInOutlinedIcon />,
+    description: 'Se positionner sur cette alerte',
+    color: '#2f81f7',
+  },
+  IN_PROGRESS: {
+    icon: <PlayCircleOutlineOutlinedIcon />,
+    description: "Poursuivre l'investigation",
+    color: '#2f81f7',
+  },
+  RESOLVED: {
+    icon: <CheckCircleOutlineOutlinedIcon />,
+    description: 'Marquer comme résolue',
+    color: severityColors.low,
+  },
+  FALSE_POSITIVE: {
+    icon: <ThumbDownOutlinedIcon />,
+    description: 'Marquer comme faux positif',
+    color: severityColors.high,
+  },
 };
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <Box sx={{ mb: 1.5 }}>
-      <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-        {label}
-      </Typography>
-      {children}
-    </Box>
-  );
-}
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'medium' });
 }
 
+/** Score IA : même palette sémantique que le tableau des alertes. */
+function aiScoreColor(score: number | null): string {
+  if (score == null) return severityColors.info;
+  if (score >= 0.7) return severityColors.critical;
+  if (score >= 0.4) return severityColors.high;
+  return severityColors.low;
+}
+
 /** Détail d'une alerte : contexte SOC, payload brut (évidence) et triage. */
 function AlertDetailDrawer({ alert, onClose, onUpdated }: Props) {
+  const theme = useTheme();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const role = useAppSelector((state) => state.auth.user?.role);
   const canTriage = role === 'ADMIN' || role === 'SOC_MANAGER' || role === 'SOC_ANALYST';
+  const [tier, setTier] = useState<AnalystTier | ''>('');
+  const [assignee, setAssignee] = useState('');
+
+  // Roster réel pour le sélecteur d'affectation — lecture seule (le
+  // triage n'a pas besoin de créer/modifier des comptes), demandée
+  // uniquement pour les rôles qui peuvent effectivement affecter une
+  // alerte : GET /users est ouvert à leur lecture, pas à leur écriture.
+  const { data: platformUsers } = useQuery({
+    queryKey: ['platform-users'],
+    queryFn: listUsers,
+    enabled: canTriage,
+    staleTime: 5 * 60_000,
+  });
 
   const mutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: AlertStatus }) =>
@@ -80,6 +132,25 @@ function AlertDetailDrawer({ alert, onClose, onUpdated }: Props) {
       void queryClient.invalidateQueries({ queryKey: ['incidents'] });
       onClose();
       navigate('/incidents');
+    },
+  });
+
+  const assignMutation = useMutation({
+    mutationFn: ({ id, tier: t, username }: { id: string; tier: AnalystTier; username: string }) =>
+      assignAlert(id, t, username),
+    onSuccess: (updated) => {
+      void queryClient.invalidateQueries({ queryKey: ['alerts'] });
+      setTier('');
+      setAssignee('');
+      onUpdated(updated);
+    },
+  });
+
+  const unassignMutation = useMutation({
+    mutationFn: (id: string) => unassignAlert(id),
+    onSuccess: (updated) => {
+      void queryClient.invalidateQueries({ queryKey: ['alerts'] });
+      onUpdated(updated);
     },
   });
 
@@ -132,13 +203,16 @@ function AlertDetailDrawer({ alert, onClose, onUpdated }: Props) {
     <Drawer anchor="right" open={Boolean(alert)} onClose={onClose}>
       {alert && (
         <Box sx={{ width: 480, maxWidth: '90vw', p: 3 }}>
-          <Stack direction="row" spacing={1} sx={{ mb: 1 }}>
-            <SeverityChip severity={alert.severity} />
+          <DetailDrawerHeader
+            color={severityColors[alert.severity.toLowerCase() as keyof typeof severityColors]}
+            icon={<GppMaybeIcon sx={{ fontSize: 26 }} />}
+            title={alert.title}
+            onClose={onClose}
+          />
+          <Stack direction="row" spacing={1} sx={{ mb: 2, flexWrap: 'wrap' }} useFlexGap>
             <StatusChip status={alert.status} />
+            {alert.assignedTier && <AnalystTierChip tier={alert.assignedTier} />}
           </Stack>
-          <Typography variant="h6" sx={{ mb: 2 }}>
-            {alert.title}
-          </Typography>
 
           {mutation.isError && (
             <Alert severity="error" sx={{ mb: 2 }}>
@@ -150,23 +224,36 @@ function AlertDetailDrawer({ alert, onClose, onUpdated }: Props) {
               {problemDetail(escalateMutation.error, 'Escalade impossible.')}
             </Alert>
           )}
+          {(assignMutation.isError || unassignMutation.isError) && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {problemDetail(assignMutation.error ?? unassignMutation.error, 'Affectation impossible.')}
+            </Alert>
+          )}
 
-          <Stack direction="row" spacing={1} sx={{ mb: 2, flexWrap: 'wrap' }} useFlexGap>
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
+              gap: 1.25,
+              mb: canTriage && transitions.length > 0 ? 1.25 : 2,
+            }}
+          >
             {canTriage && (
-              <Button
-                size="small"
-                variant="contained"
-                startIcon={<ArrowOutwardIcon />}
+              <ActionCard
+                icon={<ArrowOutwardIcon />}
+                title={escalateMutation.isPending ? 'Escalade…' : 'Escalader en incident'}
+                description="Créer un incident à partir de cette alerte"
+                color="#2f81f7"
+                filled
                 disabled={escalateMutation.isPending}
                 onClick={() => escalateMutation.mutate(alert.id)}
-              >
-                {escalateMutation.isPending ? 'Escalade…' : 'Escalader en incident'}
-              </Button>
+              />
             )}
-            <Button
-              size="small"
-              variant="outlined"
-              startIcon={<SmartToyOutlinedIcon />}
+            <ActionCard
+              icon={<SmartToyOutlinedIcon />}
+              title="Demander à l'assistant"
+              description="Obtenir de l'aide pour cette alerte"
+              color="#2f81f7"
               onClick={() => {
                 setAssistantContext({
                   alertId: alert.id,
@@ -175,55 +262,107 @@ function AlertDetailDrawer({ alert, onClose, onUpdated }: Props) {
                 onClose();
                 navigate('/assistant');
               }}
-            >
-              Demander à l'assistant
-            </Button>
-          </Stack>
+            />
+            {canTriage &&
+              transitions.map((target) => (
+                <ActionCard
+                  key={target}
+                  icon={TRANSITION_META[target].icon}
+                  title={STATUS_LABELS[target]}
+                  description={TRANSITION_META[target].description}
+                  color={TRANSITION_META[target].color}
+                  disabled={mutation.isPending}
+                  onClick={() => mutation.mutate({ id: alert.id, status: target })}
+                />
+              ))}
+          </Box>
+          {canTriage && transitions.length > 0 && <Divider sx={{ mb: 2 }} />}
 
-          {canTriage && transitions.length > 0 && (
-            <>
-              <Stack direction="row" spacing={1} useFlexGap sx={{ mb: 2, flexWrap: 'wrap' }}>
-                {transitions.map((target) => (
+          <DetailField label="Affectation de triage" color={severityColors.high}>
+            {alert.assignedTier ? (
+              <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }} useFlexGap>
+                <AnalystTierChip tier={alert.assignedTier} />
+                <MutedText>{ANALYST_TIER_LABELS[alert.assignedTier]}</MutedText>
+                {alert.assignedToUsername && (
+                  <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
+                    <PersonOutlineOutlinedIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                      {alert.assignedToUsername}
+                    </Typography>
+                  </Stack>
+                )}
+                {canTriage && (
                   <Button
-                    key={target}
                     size="small"
-                    variant="outlined"
-                    color={TRANSITION_BUTTON_COLORS[target]}
-                    disabled={mutation.isPending}
-                    onClick={() => mutation.mutate({ id: alert.id, status: target })}
+                    disabled={unassignMutation.isPending}
+                    onClick={() => unassignMutation.mutate(alert.id)}
                   >
-                    {STATUS_LABELS[target]}
+                    Retirer l'affectation
                   </Button>
-                ))}
+                )}
               </Stack>
-              <Divider sx={{ mb: 2 }} />
-            </>
-          )}
+            ) : canTriage ? (
+              <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
+                <TextField
+                  select
+                  size="small"
+                  label="Niveau"
+                  value={tier}
+                  onChange={(e) => setTier(e.target.value as AnalystTier | '')}
+                  sx={{ minWidth: 170 }}
+                >
+                  {ANALYST_TIERS.map((t) => (
+                    <MenuItem key={t} value={t}>
+                      {ANALYST_TIER_LABELS[t]}
+                    </MenuItem>
+                  ))}
+                </TextField>
+                <AssigneeAutocomplete
+                  users={platformUsers ?? []}
+                  value={assignee}
+                  onChange={setAssignee}
+                  placeholder="Analyste (optionnel)"
+                />
+                <Button
+                  size="small"
+                  variant="outlined"
+                  disabled={!tier || assignMutation.isPending}
+                  onClick={() => tier && assignMutation.mutate({ id: alert.id, tier, username: assignee })}
+                >
+                  Affecter
+                </Button>
+              </Stack>
+            ) : (
+              <MutedText>Non affectée</MutedText>
+            )}
+          </DetailField>
 
           {alert.description && (
-            <Field label="Description">
+            <DetailField label="Description">
               <Typography variant="body2">{alert.description}</Typography>
-            </Field>
+            </DetailField>
           )}
-          <Field label="Source / Identifiant externe">
-            <Typography variant="body2">
+          <DetailField label="Source / Identifiant externe">
+            <MutedText>
               {alert.source} · {alert.externalId}
-            </Typography>
-          </Field>
-          <Field label="Détection / Réception">
-            <Typography variant="body2">
+            </MutedText>
+          </DetailField>
+          <DetailField label="Détection / Réception">
+            <MutedText>
               {formatDate(alert.detectedAt)} · reçue {formatDate(alert.receivedAt)}
-            </Typography>
-          </Field>
+            </MutedText>
+          </DetailField>
           {alert.hostname && (
-            <Field label="Actif concerné">
+            <DetailField label="Actif concerné" color={severityColors.info}>
               <Stack
                 direction="row"
                 spacing={1}
                 useFlexGap
                 sx={{ alignItems: 'center', flexWrap: 'wrap' }}
               >
-                <Typography variant="body2">{alert.hostname}</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                  {alert.hostname}
+                </Typography>
                 {linkedAsset && (
                   <>
                     <Chip
@@ -251,15 +390,15 @@ function AlertDetailDrawer({ alert, onClose, onUpdated }: Props) {
                   </>
                 )}
               </Stack>
-            </Field>
+            </DetailField>
           )}
           {alert.ruleId && (
-            <Field label="Règle de détection">
-              <Typography variant="body2">{alert.ruleId}</Typography>
-            </Field>
+            <DetailField label="Règle de détection">
+              <MutedText>{alert.ruleId}</MutedText>
+            </DetailField>
           )}
           {alert.mitreTechniques.length > 0 && (
-            <Field label="Techniques MITRE ATT&CK">
+            <DetailField label="Techniques MITRE ATT&CK" color={theme.palette.primary.main}>
               <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
                 {(
                   mitreTechniques ??
@@ -300,10 +439,10 @@ function AlertDetailDrawer({ alert, onClose, onUpdated }: Props) {
                   ),
                 )}
               </Stack>
-            </Field>
+            </DetailField>
           )}
           {threatIntel && threatIntel.observables.length > 0 && (
-            <Field label="Renseignement CTI">
+            <DetailField label="Renseignement CTI" color={severityColors.critical}>
               {threatIntel.matches.length > 0 && (
                 <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center', mb: 0.75 }}>
                   <GppMaybeIcon fontSize="small" sx={{ color: severityColors.critical }} />
@@ -348,29 +487,29 @@ function AlertDetailDrawer({ alert, onClose, onUpdated }: Props) {
                   );
                 })}
               </Stack>
-            </Field>
+            </DetailField>
           )}
 
-          <Field label="Score IA (classifieur TP/FP externe)">
-            <Typography
-              variant="body2"
-              color={alert.aiScore == null ? 'text.secondary' : undefined}
-            >
-              {alert.aiScore == null
-                ? 'Non évalué — service IA non connecté'
-                : `${(alert.aiScore * 100).toFixed(1)} % · ${alert.aiVerdict}`}
-            </Typography>
-          </Field>
+          <DetailField label="Score IA (classifieur TP/FP externe)" color={aiScoreColor(alert.aiScore)}>
+            {alert.aiScore == null ? (
+              <MutedText>Non évalué — service IA non connecté</MutedText>
+            ) : (
+              <Typography
+                variant="body2"
+                sx={{ fontWeight: 700, color: aiScoreColor(alert.aiScore) }}
+              >
+                {(alert.aiScore * 100).toFixed(1)} % · {alert.aiVerdict}
+              </Typography>
+            )}
+          </DetailField>
 
           {(alert.aiZone != null || alert.aiJustifications.length > 0) && (
-            <Field label="Zone recommandée (enrichissement complémentaire)">
+            <DetailField label="Zone recommandée (enrichissement complémentaire)" color={severityColors.medium}>
               <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 1 }}>
                 {alert.aiZone != null ? (
                   <AiZoneChip zone={alert.aiZone} />
                 ) : (
-                  <Typography variant="body2" color="text.secondary">
-                    Non évaluée
-                  </Typography>
+                  <MutedText>Non évaluée</MutedText>
                 )}
                 {alert.aiHardOverride && (
                   <Chip label="Dérogation forcée" size="small" color="error" variant="outlined" />
@@ -406,11 +545,11 @@ function AlertDetailDrawer({ alert, onClose, onUpdated }: Props) {
                     ))}
                 </Box>
               )}
-            </Field>
+            </DetailField>
           )}
 
           {rawPayloadPretty && (
-            <Field label="Événement brut (évidence)">
+            <DetailField label="Événement brut (évidence)">
               <Box
                 component="pre"
                 sx={{
@@ -427,7 +566,7 @@ function AlertDetailDrawer({ alert, onClose, onUpdated }: Props) {
               >
                 {rawPayloadPretty}
               </Box>
-            </Field>
+            </DetailField>
           )}
         </Box>
       )}

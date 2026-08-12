@@ -7,6 +7,7 @@ import ManageAccountsOutlinedIcon from '@mui/icons-material/ManageAccountsOutlin
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import SettingsCard, { SettingsRow } from '../../../shared/components/SettingsCard';
+import { severityColors } from '../../../app/theme';
 import { problemDetail } from '../../../shared/api/client';
 import { listUsers } from '../../admin/usersApi';
 import type { Role } from '../../auth/authApi';
@@ -52,6 +53,7 @@ function RbacSection() {
         title="Effectif de la plateforme"
         description={`${data.length} compte${data.length > 1 ? 's' : ''} au total, répartis par rôle (RBAC à 4 niveaux).`}
         icon={<ManageAccountsOutlinedIcon />}
+        color={severityColors.info}
         actions={
           <Button
             size="small"
@@ -69,6 +71,7 @@ function RbacSection() {
       <SettingsCard
         title="État des comptes"
         icon={<ManageAccountsOutlinedIcon />}
+        color={severityColors.low}
         description="Un compte désactivé perd immédiatement toutes ses sessions actives."
       >
         <SettingsRow label="Comptes actifs" value={data.length - disabledCount} />

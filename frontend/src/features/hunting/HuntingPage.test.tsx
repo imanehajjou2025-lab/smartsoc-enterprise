@@ -62,6 +62,8 @@ const matchedAlert: Alert = {
   aiZone: null,
   aiHardOverride: false,
   aiJustifications: [],
+  assignedTier: null,
+  assignedToUsername: null,
 };
 
 const executionResult: HuntExecutionResult = {

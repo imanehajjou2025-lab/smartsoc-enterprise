@@ -10,6 +10,7 @@ import DialogTitle from '@mui/material/DialogTitle';
 import SaveOutlinedIcon from '@mui/icons-material/SaveOutlined';
 import { useMutation } from '@tanstack/react-query';
 import SettingsCard from '../../../shared/components/SettingsCard';
+import { severityColors } from '../../../app/theme';
 import { problemDetail } from '../../../shared/api/client';
 import { downloadBackup } from '../settingsApi';
 
@@ -25,6 +26,7 @@ function BackupSection() {
       <SettingsCard
         title="Sauvegarde de la base de données"
         icon={<SaveOutlinedIcon />}
+        color={severityColors.low}
         description="Produit un instantané complet (pg_dump, format personnalisé) et le télécharge dans le navigateur. Chaque export est tracé dans le journal d'audit."
         actions={
           <Button

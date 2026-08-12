@@ -42,6 +42,8 @@ const citingAlert: Alert = {
   aiZone: null,
   aiHardOverride: false,
   aiJustifications: [],
+  assignedTier: null,
+  assignedToUsername: null,
 };
 
 const correlated: PageResponse<Alert> = {

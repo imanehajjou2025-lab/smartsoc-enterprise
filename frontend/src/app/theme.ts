@@ -72,10 +72,26 @@ export function buildTheme(mode: PaletteMode): Theme {
       },
       MuiDrawer: {
         styleOverrides: {
-          paper: {
+          // Les tiroirs temporaires (détail d'alerte, d'actif...) ne
+          // doivent jamais passer SOUS la topbar fixe (z-index volontairement
+          // au-dessus du tiroir permanent, voir AppLayout) : on les fait
+          // commencer sous elle plutôt que de se battre sur le z-index.
+          paper: ({ ownerState }) => ({
             backgroundColor: s.drawer,
             borderRight: `1px solid ${s.divider}`,
-          },
+            // Le thumb de scrollbar par défaut est quasi invisible sur un
+            // fond très sombre (#0d1117) : on le rend explicitement visible
+            // plutôt que de compter sur le rendu par défaut du navigateur.
+            scrollbarColor:
+              mode === 'dark' ? 'rgba(255,255,255,0.28) transparent' : undefined,
+            '&::-webkit-scrollbar-thumb':
+              mode === 'dark'
+                ? { backgroundColor: 'rgba(255,255,255,0.28)', borderRadius: 8 }
+                : undefined,
+            ...(ownerState.variant === 'temporary'
+              ? { top: 49, height: 'calc(100% - 49px)' }
+              : {}),
+          }),
         },
       },
       MuiListItemButton: {

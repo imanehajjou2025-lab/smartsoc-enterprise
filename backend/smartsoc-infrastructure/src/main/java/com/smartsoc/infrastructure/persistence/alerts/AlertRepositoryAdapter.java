@@ -61,8 +61,24 @@ public class AlertRepositoryAdapter implements AlertRepository {
             spec = spec.and((root, q, cb) -> cb.equal(root.get("severity"), query.severity()));
         }
         if (query.source() != null && !query.source().isBlank()) {
-            spec = spec.and((root, q, cb) ->
-                    cb.equal(root.get("source"), query.source().trim().toLowerCase()));
+            // Contient plutôt qu'égalité stricte : un champ de recherche
+            // libre ("wa" -> "wazuh") est ce qu'un analyste attend d'un
+            // filtre texte, l'égalité stricte le fait paraître cassé.
+            String needle = "%" + likeEscape(query.source().trim().toLowerCase()) + "%";
+            spec = spec.and((root, q, cb) -> cb.like(root.get("source"), needle, '\\'));
+        }
+        if (query.hostname() != null && !query.hostname().isBlank()) {
+            String needle = "%" + likeEscape(query.hostname().trim().toLowerCase()) + "%";
+            spec = spec.and((root, q, cb) -> cb.like(cb.lower(root.get("hostname")), needle, '\\'));
+        }
+        if (query.from() != null) {
+            spec = spec.and((root, q, cb) -> cb.greaterThanOrEqualTo(root.get("detectedAt"), query.from()));
+        }
+        if (query.to() != null) {
+            spec = spec.and((root, q, cb) -> cb.lessThan(root.get("detectedAt"), query.to()));
+        }
+        if (query.assignedTier() != null) {
+            spec = spec.and((root, q, cb) -> cb.equal(root.get("assignedTier"), query.assignedTier()));
         }
 
         PageRequest pageRequest = PageRequest.of(query.page().page(), query.page().size(),
@@ -182,5 +198,10 @@ public class AlertRepositoryAdapter implements AlertRepository {
     private static String jsonArrayOf(String value) {
         String escaped = value.replace("\\", "\\\\").replace("\"", "\\\"");
         return "[\"" + escaped + "\"]";
+    }
+
+    /** Échappe les métacaractères LIKE (`%`, `_`) pour qu'une recherche libre ne les interprète pas. */
+    private static String likeEscape(String value) {
+        return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
     }
 }

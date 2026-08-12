@@ -31,6 +31,15 @@ public class ReportExporterAdapter implements ReportExporter {
 
     private static final DateTimeFormatter TIMESTAMP = DateTimeFormatter.ISO_INSTANT;
 
+    /**
+     * BOM UTF-8 (EF BB BF) : sans lui, Excel ouvre un .csv sans passer par
+     * l'en-tête HTTP {@code charset} (il n'existe déjà plus, le fichier est
+     * sur disque) et devine l'ANSI de la machine — chaque accent du CSV
+     * ressort corrompu ("SÃ©vÃ©ritÃ©"). Le BOM est le seul signal qu'Excel
+     * respecte de façon fiable pour un simple double-clic.
+     */
+    private static final byte[] UTF8_BOM = { (byte) 0xEF, (byte) 0xBB, (byte) 0xBF };
+
     @Override
     public byte[] toCsv(Report report) {
         StringBuilder csv = new StringBuilder("Section,Metric,Value\r\n");
@@ -40,7 +49,11 @@ public class ReportExporterAdapter implements ReportExporter {
                     .append(escape(parts[1])).append(',')
                     .append(escape(value)).append("\r\n");
         });
-        return csv.toString().getBytes(StandardCharsets.UTF_8);
+        byte[] body = csv.toString().getBytes(StandardCharsets.UTF_8);
+        byte[] withBom = new byte[UTF8_BOM.length + body.length];
+        System.arraycopy(UTF8_BOM, 0, withBom, 0, UTF8_BOM.length);
+        System.arraycopy(body, 0, withBom, UTF8_BOM.length, body.length);
+        return withBom;
     }
 
     @Override

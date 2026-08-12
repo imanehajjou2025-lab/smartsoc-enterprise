@@ -3,7 +3,9 @@ import AddIcon from '@mui/icons-material/Add';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
+import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
+import InputAdornment from '@mui/material/InputAdornment';
 import MenuItem from '@mui/material/MenuItem';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
@@ -16,9 +18,23 @@ import TablePagination from '@mui/material/TablePagination';
 import TableRow from '@mui/material/TableRow';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import { alpha, useTheme } from '@mui/material/styles';
+import ArchiveOutlinedIcon from '@mui/icons-material/ArchiveOutlined';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutlineOutlined';
+import CloseIcon from '@mui/icons-material/Close';
+import FilterListIcon from '@mui/icons-material/FilterList';
+import LockOpenOutlinedIcon from '@mui/icons-material/LockOpenOutlined';
+import PersonOutlineIcon from '@mui/icons-material/PersonOutlineOutlined';
+import ReportProblemOutlinedIcon from '@mui/icons-material/ReportProblemOutlined';
+import ShieldOutlinedIcon from '@mui/icons-material/ShieldOutlined';
+import TravelExploreIcon from '@mui/icons-material/TravelExplore';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
+import { severityColors } from '../../app/theme';
 import { problemDetail } from '../../shared/api/client';
+import { resolveChipColor } from '../../shared/components/chipStyles';
+import KpiTile from '../../shared/components/KpiTile';
+import PageHeaderBanner from '../../shared/components/PageHeaderBanner';
 import type { AlertSeverity } from '../alerts/alertsApi';
 import { SeverityChip } from '../alerts/chips';
 import CreateIncidentDialog from './CreateIncidentDialog';
@@ -29,14 +45,54 @@ import { listIncidents, type IncidentStatus } from './incidentsApi';
 const SEVERITIES: AlertSeverity[] = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'];
 const STATUSES: IncidentStatus[] = ['OPEN', 'INVESTIGATING', 'CONTAINED', 'RESOLVED', 'CLOSED'];
 
+// Libellés distincts de INCIDENT_STATUS_LABELS (utilisés par les puces de
+// statut du tableau) : une tuile KPI "Ouvert" et une puce "Ouvert" auraient
+// le même texte visible deux fois sur l'écran, ambigu pour la lecture comme
+// pour les tests (assertions par texte exact).
+const STATUS_TILE_LABEL: Record<IncidentStatus, string> = {
+  OPEN: 'Ouverts',
+  INVESTIGATING: 'En investigation',
+  CONTAINED: 'Contenus',
+  RESOLVED: 'Résolus',
+  CLOSED: 'Clôturés',
+};
+
+const STATUS_TILE_ICON: Record<IncidentStatus, React.ReactNode> = {
+  OPEN: <LockOpenOutlinedIcon />,
+  INVESTIGATING: <TravelExploreIcon />,
+  CONTAINED: <ShieldOutlinedIcon />,
+  RESOLVED: <CheckCircleOutlineIcon />,
+  CLOSED: <ArchiveOutlinedIcon />,
+};
+
+const STATUS_TILE_COLOR: Record<IncidentStatus, 'info' | 'warning' | 'secondary' | 'success' | 'default'> = {
+  OPEN: 'info',
+  INVESTIGATING: 'warning',
+  CONTAINED: 'secondary',
+  RESOLVED: 'success',
+  CLOSED: 'default',
+};
+
 function formatDate(iso: string) {
   return new Date(iso).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
 }
 
+/** Nombre total d'incidents pour un statut donné (ou tous) — dérivé d'une pagination réelle (size=1), pas d'endpoint dédié. */
+function useIncidentCount(status?: IncidentStatus) {
+  return useQuery({
+    queryKey: ['incidents-count', status ?? 'ALL'],
+    queryFn: () => listIncidents({ status: status ?? '', severity: '', page: 0, size: 1 }),
+    select: (d) => d.totalElements,
+    staleTime: 30_000,
+  });
+}
+
 /** Gestion des incidents SOC. */
 function IncidentsPage() {
+  const theme = useTheme();
   const [status, setStatus] = useState<IncidentStatus | ''>('');
   const [severity, setSeverity] = useState<AlertSeverity | ''>('');
+  const [assignee, setAssignee] = useState('');
   const [page, setPage] = useState(0);
   const [size, setSize] = useState(25);
   const [createOpen, setCreateOpen] = useState(false);
@@ -47,61 +103,244 @@ function IncidentsPage() {
   const selectIncident = (id: string) => setSearchParams({ selected: id });
   const closeDrawer = () => setSearchParams({}, { replace: true });
 
+  const hasActiveFilters = Boolean(status || severity || assignee);
+  const resetFilters = () => {
+    setStatus('');
+    setSeverity('');
+    setAssignee('');
+    setPage(0);
+  };
+
   const { data, isPending, isError, error } = useQuery({
-    queryKey: ['incidents', { status, severity, page, size }],
-    queryFn: () => listIncidents({ status, severity, page, size }),
+    queryKey: ['incidents', { status, severity, assignee, page, size }],
+    queryFn: () => listIncidents({ status, severity, assignee: assignee || undefined, page, size }),
     placeholderData: keepPreviousData,
   });
 
+  const totalCount = useIncidentCount();
+  const openCount = useIncidentCount('OPEN');
+  const investigatingCount = useIncidentCount('INVESTIGATING');
+  const containedCount = useIncidentCount('CONTAINED');
+  const resolvedCount = useIncidentCount('RESOLVED');
+  const closedCount = useIncidentCount('CLOSED');
+  const statusCounts: Record<IncidentStatus, number | undefined> = {
+    OPEN: openCount.data,
+    INVESTIGATING: investigatingCount.data,
+    CONTAINED: containedCount.data,
+    RESOLVED: resolvedCount.data,
+    CLOSED: closedCount.data,
+  };
+
   return (
     <Box>
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-        <Typography variant="h5" component="h2">
-          Incidents
-        </Typography>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={() => setCreateOpen(true)}>
-          Nouvel incident
-        </Button>
+      <PageHeaderBanner
+        icon={<ReportProblemOutlinedIcon sx={{ color: theme.palette.primary.main, fontSize: 28 }} />}
+        title="Incidents"
+        subtitle="Regroupez les alertes liées et pilotez la réponse jusqu'à sa clôture."
+        action={{ label: 'Nouvel incident', icon: <AddIcon />, onClick: () => setCreateOpen(true) }}
+      />
+
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(3, 1fr)', lg: 'repeat(6, 1fr)' },
+          gap: 2,
+          mb: 3,
+        }}
+      >
+        <KpiTile
+          label="Total"
+          value={totalCount.data == null ? '…' : String(totalCount.data)}
+          hint="tous statuts confondus"
+          color={severityColors.info}
+          icon={<ReportProblemOutlinedIcon />}
+        />
+        {STATUSES.map((s) => (
+          <KpiTile
+            key={s}
+            label={STATUS_TILE_LABEL[s]}
+            value={statusCounts[s] == null ? '…' : String(statusCounts[s])}
+            hint={
+              totalCount.data && statusCounts[s] != null
+                ? `${Math.round(((statusCounts[s] ?? 0) / totalCount.data) * 100)}% du total`
+                : 'du total'
+            }
+            color={resolveChipColor(theme, STATUS_TILE_COLOR[s])}
+            icon={STATUS_TILE_ICON[s]}
+            onClick={() => {
+              setStatus(s);
+              setPage(0);
+            }}
+          />
+        ))}
       </Box>
 
-      <Stack direction="row" spacing={2} sx={{ mb: 2 }}>
-        <TextField
-          select
-          label="Statut"
-          size="small"
-          value={status}
-          onChange={(e) => {
-            setStatus(e.target.value as IncidentStatus | '');
-            setPage(0);
+      <Paper
+        elevation={0}
+        sx={{
+          p: 2.5,
+          mb: 3,
+          borderRadius: 4,
+          border: '1px solid',
+          borderColor: alpha(theme.palette.primary.main, 0.2),
+          background: `linear-gradient(160deg, ${alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.16 : 0.08)} 0%, ${theme.palette.background.paper} 55%)`,
+        }}
+      >
+        <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', mb: 2.25 }}>
+          <Box
+            sx={{
+              width: 36,
+              height: 36,
+              borderRadius: '50%',
+              flexShrink: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: theme.palette.primary.main,
+              bgcolor: alpha(theme.palette.primary.main, 0.16),
+              boxShadow: `0 0 14px 2px ${alpha(theme.palette.primary.main, 0.4)}`,
+            }}
+          >
+            <FilterListIcon fontSize="small" />
+          </Box>
+          <Box sx={{ minWidth: 0, flexGrow: 1 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+              Filtres
+            </Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ opacity: 0.75 }}>
+              {data
+                ? `${data.totalElements} incident${data.totalElements > 1 ? 's' : ''} correspondant${data.totalElements > 1 ? 's' : ''}`
+                : 'Affinez la liste'}
+            </Typography>
+          </Box>
+          {hasActiveFilters && (
+            <Button
+              size="small"
+              onClick={resetFilters}
+              startIcon={<CloseIcon fontSize="small" />}
+              sx={{ fontWeight: 700, borderRadius: 2, flexShrink: 0 }}
+            >
+              Réinitialiser
+            </Button>
+          )}
+        </Stack>
+
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: { xs: '1fr 1fr', sm: 'repeat(3, 1fr)' },
+            gap: 1.5,
+            '& .MuiOutlinedInput-root': { borderRadius: 2.5, bgcolor: 'background.paper' },
           }}
-          sx={{ minWidth: 180 }}
         >
-          <MenuItem value="">Tous</MenuItem>
-          {STATUSES.map((value) => (
-            <MenuItem key={value} value={value}>
-              {INCIDENT_STATUS_LABELS[value]}
-            </MenuItem>
-          ))}
-        </TextField>
-        <TextField
-          select
-          label="Sévérité"
-          size="small"
-          value={severity}
-          onChange={(e) => {
-            setSeverity(e.target.value as AlertSeverity | '');
-            setPage(0);
-          }}
-          sx={{ minWidth: 150 }}
-        >
-          <MenuItem value="">Toutes</MenuItem>
-          {SEVERITIES.map((value) => (
-            <MenuItem key={value} value={value}>
-              {value}
-            </MenuItem>
-          ))}
-        </TextField>
-      </Stack>
+          <TextField
+            select
+            label="Statut"
+            size="small"
+            value={status}
+            onChange={(e) => {
+              setStatus(e.target.value as IncidentStatus | '');
+              setPage(0);
+            }}
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <ShieldOutlinedIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+                  </InputAdornment>
+                ),
+              },
+            }}
+          >
+            <MenuItem value="">Tous</MenuItem>
+            {STATUSES.map((value) => (
+              <MenuItem key={value} value={value}>
+                {INCIDENT_STATUS_LABELS[value]}
+              </MenuItem>
+            ))}
+          </TextField>
+          <TextField
+            select
+            label="Sévérité"
+            size="small"
+            value={severity}
+            onChange={(e) => {
+              setSeverity(e.target.value as AlertSeverity | '');
+              setPage(0);
+            }}
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <ReportProblemOutlinedIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+                  </InputAdornment>
+                ),
+              },
+            }}
+          >
+            <MenuItem value="">Toutes</MenuItem>
+            {SEVERITIES.map((value) => (
+              <MenuItem key={value} value={value}>
+                {value}
+              </MenuItem>
+            ))}
+          </TextField>
+          <TextField
+            label="Assigné à"
+            placeholder="nom d'utilisateur…"
+            size="small"
+            value={assignee}
+            onChange={(e) => {
+              setAssignee(e.target.value);
+              setPage(0);
+            }}
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <PersonOutlineIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+                  </InputAdornment>
+                ),
+              },
+            }}
+          />
+        </Box>
+
+        {hasActiveFilters && (
+          <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap', mt: 2 }}>
+            {status && (
+              <Chip
+                size="small"
+                label={`Statut : ${INCIDENT_STATUS_LABELS[status]}`}
+                onDelete={() => {
+                  setStatus('');
+                  setPage(0);
+                }}
+              />
+            )}
+            {severity && (
+              <Chip
+                size="small"
+                label={`Sévérité : ${severity}`}
+                onDelete={() => {
+                  setSeverity('');
+                  setPage(0);
+                }}
+              />
+            )}
+            {assignee && (
+              <Chip
+                size="small"
+                label={`Assigné : ${assignee}`}
+                onDelete={() => {
+                  setAssignee('');
+                  setPage(0);
+                }}
+              />
+            )}
+          </Stack>
+        )}
+      </Paper>
 
       {isPending && (
         <Box sx={{ display: 'flex', justifyContent: 'center', mt: 6 }}>
@@ -115,16 +354,16 @@ function IncidentsPage() {
       )}
 
       {data && (
-        <TableContainer component={Paper} variant="outlined">
+        <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 3 }}>
           <Table size="small" aria-label="Liste des incidents">
             <TableHead>
-              <TableRow>
-                <TableCell>Référence</TableCell>
-                <TableCell>Sévérité</TableCell>
-                <TableCell>Titre</TableCell>
-                <TableCell>Statut</TableCell>
-                <TableCell>Assigné</TableCell>
-                <TableCell>Ouvert le</TableCell>
+              <TableRow sx={{ '& th': { bgcolor: 'action.hover' } }}>
+                <TableCell sx={{ fontWeight: 700 }}>Référence</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Sévérité</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Titre</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Statut</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Assigné</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Ouvert le</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -141,10 +380,19 @@ function IncidentsPage() {
                 <TableRow
                   key={incident.id}
                   hover
-                  sx={{ cursor: 'pointer' }}
+                  sx={{
+                    cursor: 'pointer',
+                    borderLeft: '3px solid',
+                    borderLeftColor: alpha(
+                      severityColors[incident.severity.toLowerCase() as keyof typeof severityColors],
+                      0.6,
+                    ),
+                  }}
                   onClick={() => selectIncident(incident.id)}
                 >
-                  <TableCell sx={{ whiteSpace: 'nowrap' }}>{incident.reference}</TableCell>
+                  <TableCell sx={{ whiteSpace: 'nowrap', fontWeight: 700 }}>
+                    {incident.reference}
+                  </TableCell>
                   <TableCell>
                     <SeverityChip severity={incident.severity} />
                   </TableCell>
@@ -154,8 +402,19 @@ function IncidentsPage() {
                   <TableCell>
                     <IncidentStatusChip status={incident.status} />
                   </TableCell>
-                  <TableCell>{incident.assigneeUsername ?? '—'}</TableCell>
-                  <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                  <TableCell>
+                    {incident.assigneeUsername ? (
+                      <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
+                        <PersonOutlineIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+                        <Typography variant="body2">{incident.assigneeUsername}</Typography>
+                      </Stack>
+                    ) : (
+                      <Typography variant="body2" color="text.secondary">
+                        —
+                      </Typography>
+                    )}
+                  </TableCell>
+                  <TableCell sx={{ whiteSpace: 'nowrap', color: 'text.secondary' }}>
                     {formatDate(incident.openedAt)}
                   </TableCell>
                 </TableRow>

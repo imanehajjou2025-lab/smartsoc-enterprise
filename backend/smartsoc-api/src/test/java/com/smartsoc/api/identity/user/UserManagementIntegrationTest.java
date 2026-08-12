@@ -97,18 +97,27 @@ class UserManagementIntegrationTest {
         assertThat(response.getBody()).contains("VALIDATION_FAILED").contains("password");
     }
 
+    /**
+     * Lecture ouverte aux rôles de triage (ils en ont besoin pour peupler
+     * un sélecteur d'affectation réel), écriture strictement réservée à
+     * ADMIN — les deux moitiés de la même règle RBAC, vérifiées ensemble.
+     */
     @Test
-    void nonAdminIsForbiddenByRbac() {
+    void nonAdminCanReadUsersButNotWriteThem() {
         String adminToken = loginToken("admin", "IntegrationTest123!");
         exchange(HttpMethod.POST, USERS, adminToken,
                 createUserBody("analyst.rbac", "analyst.rbac@smartsoc.io"), UserResponse.class);
 
         String analystToken = loginToken("analyst.rbac", STRONG_PASSWORD);
-        ResponseEntity<String> forbidden = exchange(HttpMethod.GET, USERS, analystToken,
-                null, String.class);
 
-        assertThat(forbidden.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
-        assertThat(forbidden.getBody()).contains("ACCESS_DENIED");
+        ResponseEntity<String> readAllowed = exchange(HttpMethod.GET, USERS, analystToken,
+                null, String.class);
+        assertThat(readAllowed.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        ResponseEntity<String> writeForbidden = exchange(HttpMethod.POST, USERS, analystToken,
+                createUserBody("analyst.rbac2", "analyst.rbac2@smartsoc.io"), String.class);
+        assertThat(writeForbidden.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(writeForbidden.getBody()).contains("ACCESS_DENIED");
     }
 
     @Test
