@@ -112,7 +112,7 @@ describe('AssetDetailDrawer — redémarrage agent Wazuh', () => {
   it("n'affiche aucun déclencheur pour un rôle sans droit d'écriture", async () => {
     renderDrawer('VIEWER');
 
-    await screen.findByText('win10-client');
+    await screen.findByText('Poste WIN10-CLIENT');
     expect(screen.queryByRole('button', { name: /Redémarrer l'agent/i })).not.toBeInTheDocument();
   });
 });
@@ -160,7 +160,7 @@ describe('AssetDetailDrawer — blocage IP (active-response)', () => {
   it("n'affiche aucun déclencheur pour un rôle sans droit d'écriture", async () => {
     renderDrawer('VIEWER');
 
-    await screen.findByText('win10-client');
+    await screen.findByText('Poste WIN10-CLIENT');
     expect(screen.queryByRole('button', { name: /Bloquer une IP/i })).not.toBeInTheDocument();
   });
 });

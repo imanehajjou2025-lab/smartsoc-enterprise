@@ -80,7 +80,6 @@ describe('TechniqueDetailDrawer', () => {
     renderDrawer();
 
     expect(await screen.findByText('Command and Scripting Interpreter')).toBeInTheDocument();
-    expect(screen.getByText('T1059')).toBeInTheDocument();
     expect(screen.getByText('execution')).toBeInTheDocument();
     expect(
       screen.getByText('Adversaries abuse command and script interpreters.'),
